@@ -1,0 +1,8 @@
+# TypeShift
+[![License](http://img.shields.io/:license-mit-blue.svg?style=flat)](https://opensource.org/licenses/MIT)
+
+TypeShift is a code first schema generator. Use it to generate OpenApi v3.0.3, GQL*, Avro*, and JSON Schemas* for your TypeScript. Focus on building a well tested, functionally correct product, then tack on a schema. TypeShift is simple, so setup and usage happens quickly. TypeShift is fast. Include it in your build and development processes. The time cost is nearly imperceptible.
+
+&nbsp;&nbsp;&nbsp;&nbsp;* on the roadmap
+
+## [LICENSE](LICENSE)
