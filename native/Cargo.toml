@@ -1,0 +1,29 @@
+[package]
+name = "typeshift"
+version = "0.1.0"
+edition = "2021"
+authors = ["Joel C Rainear-Wills <jrainearwills@gmail.com>"]
+exclude = ["index.node"]
+
+[lib]
+crate-type=["cdylib"]
+
+[dependencies.swc_ecma_parser]
+version = "0.124.5"
+features = ["typescript", "debug"]
+
+[dependencies.ahash]
+version = "0.8.2"
+
+[dependencies.serde_json]
+version = "1.0.89"
+features = ["preserve_order"]
+
+[dependencies.serde]
+version = "1.0.148"
+features = ["derive"]
+
+[dependencies.neon]
+version = "0.10.1"
+default-features = false
+features = ["napi-1"]

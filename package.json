@@ -4,7 +4,15 @@
   "description": "TypeShift is a cli tool that enables \"code first\" schema generation from TypeScript",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "yarn build:app",
+    "prebuild": "rimraf lib/*",
+    "postbuild": "yarn build:addon && yarn copy:addon",
+    "build:addon": "./build.sh",
+    "build:app": "tsc -b",
+    "copy:addon": "copyfiles --error --up 2 src/generator/*.node lib/generator",
+    "test": "mocha",
+    "pretest": "yarn build:addon",
+    "start": "node -r ts-node/register ./src/code-first.ts"
   },
   "repository": {
     "type": "git",
@@ -16,5 +24,14 @@
   "bugs": {
     "url": "https://github.com/engagedtheory/typeshift/issues"
   },
-  "homepage": "https://github.com/engagedtheory/typeshift#readme"
+  "homepage": "https://github.com/engagedtheory/typeshift#readme",
+  "dependencies": {
+    "commander": "^10.0.0",
+    "fast-glob": "^3.2.12",
+    "openapi-types": "^12.1.0",
+    "typescript": "^4.9.5"
+  },
+  "devDependencies": {
+    "@types/node": "^18.11.18"
+  }
 }
