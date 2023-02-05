@@ -1,14 +1,19 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+mod generators;
+
+use generators::generate_openapi;
+use neon::{prelude::*, result::Throw};
+
+fn generate_schemas(mut cx: FunctionContext) -> Result<Handle<JsObject>, Throw> {
+    let schemas_result: Handle<JsObject> = cx.empty_object();
+    let options_handle: Handle<JsObject> = cx.argument(0)?;
+
+    generate_openapi(schemas_result, options_handle, &mut cx)?;
+
+    Ok(schemas_result)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+#[neon::main]
+fn main(mut cx: ModuleContext) -> NeonResult<()> {
+    cx.export_function("generateSchemas", generate_schemas)?;
+    Ok(())
 }

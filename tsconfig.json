@@ -1,9 +1,10 @@
 {
   "exclude": [
+    "scripts",
     "node_modules",
-    "tests/**/*",
-    "lib/**/*",
-    "bin/**/*"
+    "tests",
+    "lib",
+    "bin"
   ],
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig to read more about this file */

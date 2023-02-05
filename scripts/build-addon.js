@@ -9,14 +9,15 @@ const run = async () => {
         '--manifest-path',
         './native/Cargo.toml',
         '--release',
-        '--verbose'
+        '--message-format=json-render-diagnostics'
     ]);
 
     console.log(stdout);
     console.log(stderr)
 
-    const src = `native/target/release/typeshift.${process.platform == 'darwin' ? 'dylib' : 'dll'}`;
-    const dest = `src/generator/${process.arch}-${process.platform}.node`;
+    const ext = process.platform == 'darwin' ? 'dylib' : process.platform == 'linux' ? 'so' : 'dll';
+    const src = `native/target/release/typeshift.${ext}`;
+    const dest = `src/generator/typeshift-${process.arch}-${process.platform}.node`;
 
     await copyFile(src, dest);
 }    
