@@ -16,7 +16,7 @@ impl OpenApiV3 {
 
     pub(crate) fn path(&mut self, key: String) -> Option<&mut ApiPath> {
         let path = ApiPath::new();
-        self.paths.insert(key, path);
+        self.paths.insert(key.clone(), path);
         self.paths.get_mut(&key)
     }
 }

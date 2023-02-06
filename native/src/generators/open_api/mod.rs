@@ -69,7 +69,7 @@ fn add_api_paths<'cx>(open_api: &mut OpenApiV3, root: &mut TsNode, cx: &mut Func
         // TODO add additional path properties
     } else {
         for mut child in root.get_children(cx)? {
-            add_api_paths(open_api, &mut child, cx);
+            add_api_paths(open_api, &mut child, cx)?;
         }
     }
 

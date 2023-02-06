@@ -2,10 +2,6 @@ mod syntax_kind;
 
 use neon::{prelude::*, result::Throw};
 
-use self::syntax_kind::*;
-
-use super::open_api_v3::OpenApiV3;
-
 pub struct TsNode<'h> {
     ast: Handle<'h, JsObject>,
 }
