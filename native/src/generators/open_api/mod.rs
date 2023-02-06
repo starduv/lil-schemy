@@ -6,7 +6,10 @@ use std::{fs::File, io::Write, path::PathBuf};
 use neon::{prelude::*, result::Throw};
 use serde_json::json;
 
-use self::{open_api_v3::OpenApiV3, typescript::TsNode};
+use self::{
+    open_api_v3::{OpenApiV3, PathArgs},
+    typescript::TsNode,
+};
 
 fn merge_schemas(
     open_api: &OpenApiV3,
@@ -37,8 +40,38 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
     }
 }
 
-fn add_api_paths<'cx>(open_api: &mut OpenApiV3, node: &mut TsNode<'cx>, cx: &mut FunctionContext) -> Result<(), Throw> {
-    let api_paths = node.get_api_paths(cx)?;
+fn get_path_args(root: &mut TsNode, cx: &mut FunctionContext) -> Result<PathArgs, Throw> {
+    let mut path_args = PathArgs::new();
+    for arg in root.get_properties(cx)? {
+        if let Some(arg_name) = arg.get_identifier(cx)? {
+            if arg_name == "method" {
+                path_args.method = root.get_initialized_string(cx)?;
+            }
+
+            if arg_name == "path" {
+                path_args.path = root.get_initialized_string(cx)?;
+            }
+
+            if arg_name == "tags" {
+                path_args.tags = root.get_initialized_array(cx)?;
+            }
+        }
+    }
+
+    Ok(path_args)
+}
+
+fn add_api_paths<'cx>(open_api: &mut OpenApiV3, root: &mut TsNode, cx: &mut FunctionContext<'cx>) -> Result<(), Throw> {
+    if root.is_api_path(cx)? {
+        let path_args = get_path_args(root, cx)?;
+        let route = path_args.path.expect("Property 'path' of PathOptions is required");
+        open_api.path(route);
+        // TODO add additional path properties
+    } else {
+        for mut child in root.get_children(cx)? {
+            add_api_paths(open_api, &mut child, cx);
+        }
+    }
 
     Ok(())
 }
