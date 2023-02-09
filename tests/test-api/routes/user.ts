@@ -32,7 +32,7 @@ router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: 
         statusCode: 200,
         namespace: "v1",
         description: "Who am I",
-        examples: [["success", "User"]]
+        example: "User"
     });
 
     reply.send(response);
@@ -73,10 +73,7 @@ router.delete("", {}, Path(async (request: { id: RouteParam<string, true>; }, re
         statusCode: 204,
         description: "no content",
         namespace: "v1",
-        examples: [
-            ["failure", "BadRequest"],
-            ["success", "NoContent"],
-        ]
+        example: "NoContent"
     });
 
     reply.send(response);

@@ -10,7 +10,7 @@ export interface PathItemOptions {
 
 export interface ResponseOptions {
     description?: string;
-    examples?: Array<[key: string, ref: Ref]>;
+    example?: string;
     namespace?: string;
     statusCode: number;
 }
