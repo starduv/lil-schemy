@@ -1,4 +1,7 @@
+#![allow(dead_code)]
 mod generators;
+mod typescript;
+mod utils;
 
 use generators::generate_openapi;
 use neon::{prelude::*, result::Throw};

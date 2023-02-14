@@ -144,3 +144,6 @@ dist
 # Generated files and exes
 *.node
 lib/
+
+.vscode/*
+!.vscode/launch.json

@@ -1,9 +1,7 @@
-use std::{hash::Hash, rc::Rc};
-
 use ahash::{HashMap, HashMapExt};
 use serde::Serialize;
 
-use super::typescript::TsNode;
+use crate::typescript::ResponseOptions;
 
 #[derive(Serialize, Debug)]
 pub struct OpenApiV3 {
@@ -30,18 +28,31 @@ pub struct ApiComponents {}
 
 #[derive(Serialize, Debug)]
 pub struct ApiPath {
+    #[serde(rename = "$ref", skip_serializing_if = "Option::is_none")]
     schema_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     get: Option<ApiPathOperation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     put: Option<ApiPathOperation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     post: Option<ApiPathOperation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     delete: Option<ApiPathOperation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     options: Option<ApiPathOperation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     head: Option<ApiPathOperation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     patch: Option<ApiPathOperation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     trace: Option<ApiPathOperation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     servers: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     parameters: Option<ApiPathParameter>,
 }
 
@@ -84,9 +95,13 @@ impl ApiPath {
 
 #[derive(Serialize, Debug)]
 pub struct ApiPathOperation {
+    #[serde(skip_serializing_if = "Option::is_none")]
     examples: Option<HashMap<String, ApiSchema>>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
     responses: HashMap<String, ApiResponse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     parameters: Option<Vec<ApiParam>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     tags: Option<Vec<String>>,
 }
 
@@ -143,12 +158,18 @@ pub struct ApiPathParameter {}
 #[derive(Serialize, Debug)]
 pub struct ApiResponse {
     description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     headers: Option<HashMap<String, ApiParam>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<HashMap<String, ApiConent>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     links: Option<Vec<ApiSchema>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     examples: Option<Vec<String>>,
+    #[serde(skip)]
     namespace: Option<String>,
 }
+
 impl ApiResponse {
     fn new(description: String) -> Self {
         ApiResponse {
@@ -190,9 +211,13 @@ impl ApiConent {
 
 #[derive(Serialize, Debug)]
 pub struct ApiSchema {
+    #[serde(skip_serializing_if = "Option::is_none")]
     example: Option<Box<ApiSchema>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     format: Option<String>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     primitive: Option<String>,
+    #[serde(rename = "$ref", skip_serializing_if = "Option::is_none")]
     reference: Option<String>,
 }
 
@@ -234,8 +259,11 @@ impl ApiSchema {
 #[derive(Serialize, Debug)]
 pub struct ApiParam {
     name: String,
+    #[serde(rename = "in")]
     location: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<HashMap<String, ApiConent>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     required: Option<bool>,
 }
 
@@ -262,50 +290,5 @@ impl ApiParam {
     pub(crate) fn required(&mut self, required: Option<bool>) -> &mut ApiParam {
         self.required = required;
         self
-    }
-}
-
-pub enum Param<'cx> {
-    Header(String, TsNode<'cx>),
-    Query(String, TsNode<'cx>),
-    Route(String, TsNode<'cx>),
-    None,
-}
-
-pub enum ValueType {
-    Primitive(String, Option<String>),
-    Literal(Box<ValueType>),
-    Reference(String),
-}
-
-pub struct PathArgs {
-    pub method: Option<String>,
-    pub path: Option<String>,
-    pub tags: Option<Vec<String>>,
-}
-impl PathArgs {
-    pub(crate) fn new() -> Self {
-        PathArgs {
-            method: None,
-            path: None,
-            tags: None,
-        }
-    }
-}
-
-pub struct ResponseOptions {
-    pub description: Option<String>,
-    pub example: Option<String>,
-    pub namespace: Option<String>,
-    pub status_code: Option<String>,
-}
-impl ResponseOptions {
-    pub(crate) fn new() -> Self {
-        ResponseOptions {
-            description: None,
-            example: None,
-            namespace: None,
-            status_code: None,
-        }
     }
 }

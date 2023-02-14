@@ -8,13 +8,6 @@ exclude = ["index.node"]
 [lib]
 crate-type=["cdylib"]
 
-[dependencies]
-swc_common = "0.29.29"
-
-[dependencies.swc_ecma_parser]
-version = "0.124.5"
-features = ["typescript", "debug"]
-
 [dependencies.ahash]
 version = "0.8.2"
 

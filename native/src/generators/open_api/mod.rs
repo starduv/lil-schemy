@@ -1,15 +1,14 @@
 mod open_api_v3;
-mod typescript;
 
 use std::{fs::File, io::Write, path::PathBuf};
 
+use ahash::{HashMap, HashMapExt};
 use neon::{prelude::*, result::Throw};
 use serde_json::json;
 
-use self::{
-    open_api_v3::{ApiPathOperation, OpenApiV3, Param, PathArgs, ResponseOptions, ValueType},
-    typescript::TsNode,
-};
+use crate::typescript::*;
+
+use self::open_api_v3::{ApiPathOperation, OpenApiV3};
 
 fn merge_schemas(
     open_api: &OpenApiV3,
@@ -40,11 +39,50 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
     }
 }
 
-fn get_response_type(type_arg: Option<&TsNode>, cx: &mut FunctionContext) -> Result<Option<String>, Throw> {
-    match type_arg {
-        Some(type_arg) => type_arg.get_identifier(cx),
-        None => Ok(None),
+fn find_type_name(
+    name: String,
+    cx: &mut FunctionContext,
+    cache: &mut HashMap<String, TsDeclaration>,
+) -> Result<String, Throw> {
+    if let Some(declaration) = cache.get(&name) {
+        match declaration.declaration_type {
+            DeclarationType::Alias => {
+                if let Some(name) = declaration.node.get_property_name(cx)? {
+                    return find_type_name(name, cx, cache);
+                }
+            }
+            DeclarationType::Variable => {
+                if let Some(expression) = declaration.node.get_initialized_expression(cx)? {
+                    if let Some(name) = expression.get_identifier(cx)? {
+                        return find_type_name(name, cx, cache);
+                    }
+                };
+            }
+            _ => {}
+        }
     }
+
+    return Ok(name);
+}
+
+fn cache_declarations<'cx, 'ca>(
+    node: &TsNode<'cx>,
+    cx: &mut FunctionContext<'cx>,
+    cache: &'ca mut HashMap<String, TsDeclaration<'cx>>,
+) -> Result<(), Throw> {
+    if let Some(mut declarations) = node.get_import_declarations(cx)? {
+        while let Some(declaration) = declarations.pop() {
+            cache.insert(declaration.name.clone(), declaration);
+        }
+    } else if let Some(mut declarations) = node.get_variable_declarations(cx)? {
+        while let Some(declaration) = declarations.pop() {
+            cache.insert(declaration.name.clone(), declaration);
+        }
+    } else if let Some(declaration) = node.get_type_declaration(cx)? {
+        cache.insert(declaration.name.clone(), declaration);
+    }
+
+    Ok(())
 }
 
 fn get_response_options(options: Option<&TsNode>, cx: &mut FunctionContext) -> Result<ResponseOptions, Throw> {
@@ -66,16 +104,18 @@ fn get_response_options(options: Option<&TsNode>, cx: &mut FunctionContext) -> R
     Ok(response_args)
 }
 
-fn get_path_args(root: &mut TsNode, cx: &mut FunctionContext) -> Result<PathArgs, Throw> {
+fn get_path_args(arguments: &Vec<TsNode>, cx: &mut FunctionContext) -> Result<PathArgs, Throw> {
     let mut path_args = PathArgs::new();
-    for prop in root.get_properties(cx)? {
-        if let Some(arg_name) = prop.get_identifier(cx)? {
-            if arg_name == "method" {
-                path_args.method = prop.get_initialized_string(cx)?;
-            } else if arg_name == "path" {
-                path_args.path = prop.get_initialized_string(cx)?;
-            } else if arg_name == "tags" {
-                path_args.tags = prop.get_initialized_array(cx)?;
+    if let Some(route_options) = arguments.get(1) {
+        for prop in route_options.get_properties(cx)? {
+            if let Some(arg_name) = prop.get_identifier(cx)? {
+                if arg_name == "method" {
+                    path_args.method = prop.get_initialized_string(cx)?;
+                } else if arg_name == "path" {
+                    path_args.path = prop.get_initialized_string(cx)?;
+                } else if arg_name == "tags" {
+                    path_args.tags = prop.get_initialized_array(cx)?;
+                }
             }
         }
     }
@@ -83,10 +123,11 @@ fn get_path_args(root: &mut TsNode, cx: &mut FunctionContext) -> Result<PathArgs
     Ok(path_args)
 }
 
-fn add_operation_response(
+fn add_operation_response<'cx>(
     root: &mut TsNode,
     operation: &mut ApiPathOperation,
-    cx: &mut FunctionContext,
+    cx: &mut FunctionContext<'cx>,
+    cache: &mut HashMap<String, TsDeclaration<'cx>>,
 ) -> Result<(), Throw> {
     if root.is_api_response(cx)? {
         let response_args = root.get_arguments(cx)?;
@@ -96,14 +137,19 @@ fn add_operation_response(
             let response_options = get_response_options(response_options_arg, cx)?;
             let response = operation.response(response_options);
 
-            if let Some(response_type) = get_response_type(response_type_arg, cx)? {
-                let schema = response.content().schema().reference(response_type);
-                // TODO register schema so that component schema is created for ref type
+            if let Some(response_type) = response_type_arg {
+                let schema = response.content().schema();
+                // TODO if type is identifier, find the declaration
+                if let Some(ref_name) = response_type.get_identifier(cx)? {
+                    schema.reference(find_type_name(ref_name, cx, cache)?);
+                }
             }
+            // TODO modify schema and register references
         }
     } else {
         for mut child in root.get_children(cx)? {
-            add_operation_response(&mut child, operation, cx)?;
+            cache_declarations(&child, cx, cache)?;
+            add_operation_response(&mut child, operation, cx, cache)?;
         }
     }
     Ok(())
@@ -124,6 +170,7 @@ fn add_operation_parameter(
                     header.content().schema().primitive(type_name).format(format);
                 }
                 ValueType::Reference(ref_name) => {
+                    // TODO add correct ref name here
                     header.content().schema().reference(ref_name);
                 }
                 _ => {}
@@ -137,50 +184,79 @@ fn add_operation_parameter(
     Ok(())
 }
 
-fn add_operation_params(
-    root: &mut TsNode,
+fn add_operation_params<'cx>(
+    root: &TsNode,
     operation: &mut ApiPathOperation,
-    cx: &mut FunctionContext,
+    cx: &mut FunctionContext<'cx>,
+    cache: &mut HashMap<String, TsDeclaration<'cx>>,
 ) -> Result<(), Throw> {
-    match root.get_param(cx)? {
-        Param::Header(name, type_obj) => add_operation_parameter(name, "header", operation, type_obj, cx)?,
-        Param::Query(name, type_obj) => add_operation_parameter(name, "query", operation, type_obj, cx)?,
-        Param::Route(name, type_obj) => add_operation_parameter(name, "path", operation, type_obj, cx)?,
-        _ => {}
+    if let Some(request) = root.get_type_literal(cx)? {
+        for member in request.get_members(cx)? {
+            match member.get_api_param(cx)? {
+                Param::Header(name, type_obj) => add_operation_parameter(name, "header", operation, type_obj, cx)?,
+                Param::Query(name, type_obj) => add_operation_parameter(name, "query", operation, type_obj, cx)?,
+                Param::Route(name, type_obj) => add_operation_parameter(name, "path", operation, type_obj, cx)?,
+                _ => {}
+            }
+        }
+    } else {
+        for child in root.get_children(cx)? {
+            cache_declarations(&child, cx, cache)?;
+            add_operation_params(&child, operation, cx, cache)?;
+        }
     }
+
     Ok(())
 }
 
-fn add_api_paths<'cx>(open_api: &mut OpenApiV3, root: &mut TsNode, cx: &mut FunctionContext<'cx>) -> Result<(), Throw> {
+fn add_api_paths<'cx>(
+    open_api: &mut OpenApiV3,
+    root: &mut TsNode,
+    cx: &mut FunctionContext<'cx>,
+    cache: &mut HashMap<String, TsDeclaration<'cx>>,
+) -> Result<(), Throw> {
     if root.is_api_path(cx)? {
-        let path_args = get_path_args(root, cx)?;
+        let arguments = root.get_arguments(cx)?;
+        let path_args = get_path_args(&arguments, cx)?;
+        let route_handler = arguments.get(0).expect("Route handler required in Path");
         let route = path_args.path.expect("Property 'path' of PathOptions is required");
         let mut operation = open_api.path(route).method(path_args.method);
         operation.tags(path_args.tags);
 
-        for mut property in root.get_arguments(cx)? {
-            add_operation_params(&mut property, &mut operation, cx)?;
+        if let Some(parameters) = route_handler.get_parameters(cx)? {
+            if let Some(request) = parameters.get(0) {
+                add_operation_params(request, &mut operation, cx, cache)?;
+            }
         }
 
-        add_operation_response(&mut root.get_body(cx)?, &mut operation, cx)?;
+        add_operation_response(&mut route_handler.get_body(cx)?, &mut operation, cx, cache)?;
     } else {
         for mut child in root.get_children(cx)? {
-            add_api_paths(open_api, &mut child, cx)?;
+            cache_declarations(&child, cx, cache)?;
+            add_api_paths(open_api, &mut child, cx, cache)?;
         }
     }
 
     Ok(())
 }
 
-fn generate_schema(open_api_handle: Handle<JsObject>, cx: &mut FunctionContext) -> Result<String, Throw> {
-    let get_ast = open_api_handle.get::<JsFunction, FunctionContext, &str>(cx, "get_ast")?;
+fn generate_schema(
+    open_api_handle: Handle<JsObject>,
+    get_ast: Handle<JsFunction>,
+    cx: &mut FunctionContext,
+) -> Result<String, Throw> {
     let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "paths")?;
     let mut open_api = OpenApiV3::new();
+    let mut cache = HashMap::new();
 
     for path in paths.to_vec(cx)? {
         let path = path.downcast_or_throw::<JsString, FunctionContext>(cx)?;
         let ast = get_ast.call_with(cx).arg(path).apply::<JsObject, FunctionContext>(cx)?;
-        add_api_paths(&mut open_api, &mut TsNode::new(ast), cx)?;
+        let statements = ast.get::<JsArray, FunctionContext, &str>(cx, "statements")?;
+        for statement in statements.to_vec(cx)? {
+            let mut node = TsNode::new(statement.downcast_or_throw(cx)?);
+            add_api_paths(&mut open_api, &mut node, cx, &mut cache)?;
+        }
     }
 
     merge_schemas(&open_api, open_api_handle, cx)
@@ -192,8 +268,9 @@ pub fn generate_openapi(
     cx: &mut FunctionContext,
 ) -> Result<(), Throw> {
     let schema_result: Handle<JsObject> = cx.empty_object();
+    let get_ast = options_handle.get::<JsFunction, FunctionContext, &str>(cx, "getAst")?;
     if let Some(open_api_handle) = options_handle.get_opt(cx, "openApi")? as Option<Handle<JsObject>> {
-        let schema: String = generate_schema(open_api_handle, cx)?;
+        let schema: String = generate_schema(open_api_handle, get_ast, cx)?;
 
         if let Some(output_handle) = open_api_handle.get_opt::<JsString, FunctionContext, &str>(cx, "output")? {
             let filepath = match options_handle.get_opt::<JsString, FunctionContext, &str>(cx, "cwd")? {

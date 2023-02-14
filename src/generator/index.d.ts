@@ -2,13 +2,13 @@ interface OpenApiOptions {
     base: OpenAPIV3.Document & {
         openapi: "3.0.3";
     },
-    project: string;
-    output: string;
+    output?: string;
     paths: string[];
 }
 
 export interface TypeShiftOptions {
     cwd?: string;
+    getAst: (path: string) => ts.Node;
     openApi?: OpenApiOptions;
 }
 

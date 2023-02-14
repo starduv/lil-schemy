@@ -12,14 +12,14 @@
     "x64"
   ],
   "scripts": {
-    "build": "yarn build:app",
+    "build": "npm run build:app",
     "prebuild": "rimraf 'lib/*'",
-    "postbuild": "yarn build:addon && yarn copy:addon",
+    "postbuild": "npm run build:addon && npm run copy:addon",
     "build:addon": "node scripts/build-addon",
     "build:app": "tsc -b",
     "copy:addon": "copyfiles --error --up 2 src/generator/*.node lib/generator",
     "test": "mocha",
-    "pretest": "yarn build:addon",
+    "pretest": "npm run build:addon -- --debug",
     "start": "node -r ts-node/register ./src/typeshift.ts"
   },
   "repository": {
@@ -40,9 +40,13 @@
     "typescript": "^4.9.5"
   },
   "devDependencies": {
+    "@types/chai": "^4.3.4",
+    "@types/mocha": "^10.0.1",
     "@types/node": "^18.11.18",
     "cargo-cp-artifact": "^0.1.7",
+    "chai": "^4.3.7",
     "copyfiles": "^2.4.1",
+    "mocha": "^10.2.0",
     "rimraf": "^3.0.2",
     "ts-node": "^10.9.1"
   }
