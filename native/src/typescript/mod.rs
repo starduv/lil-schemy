@@ -1,8 +1,8 @@
+mod ast;
 mod syntax_kind;
 
-use std::vec;
-
-use neon::{object::PropertyKey, prelude::*, result::Throw};
+pub use ast::{AstCache, AstNode};
+use neon::{prelude::*, result::Throw};
 
 use crate::utils::dbg_js;
 

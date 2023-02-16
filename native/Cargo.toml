@@ -8,6 +8,8 @@ exclude = ["index.node"]
 [lib]
 crate-type=["cdylib"]
 
+[dependencies]
+
 [dependencies.ahash]
 version = "0.8.2"
 
@@ -23,3 +25,8 @@ features = ["derive"]
 version = "0.10.1"
 default-features = false
 features = ["napi-1"]
+
+
+
+
+

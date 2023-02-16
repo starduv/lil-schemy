@@ -5,13 +5,13 @@ import { getContext } from '../src/utils'
 
 describe('paths', () => {
     let schema: OpenAPIV3.Document;
-    let context = getContext(__dirname, ["test-api/routes/*.ts"], true, {
+    let context = getContext(__dirname, ["test-api/routes/*.ts"], {
         project: './tsconfig.json'
     })
 
     before(() => {
         const result = generateSchemas({
-            getAst: context.getAst,
+            asts: context.asts,
             openApi: {
                 base: JSON.stringify({}),
                 paths: context.rootFiles

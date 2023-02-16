@@ -104,17 +104,20 @@ fn get_response_options(options: Option<&TsNode>, cx: &mut FunctionContext) -> R
     Ok(response_args)
 }
 
-fn get_path_args(arguments: &Vec<TsNode>, cx: &mut FunctionContext) -> Result<PathArgs, Throw> {
+fn get_path_args(arguments: &Vec<AstNode>, cx: &mut FunctionContext) -> Result<PathArgs, Throw> {
     let mut path_args = PathArgs::new();
     if let Some(route_options) = arguments.get(1) {
-        for prop in route_options.get_properties(cx)? {
-            if let Some(arg_name) = prop.get_identifier(cx)? {
+        for prop in route_options
+            .get_properties()
+            .expect("Expected properties from PathOptions")
+        {
+            if let Some(arg_name) = prop.get_identifier() {
                 if arg_name == "method" {
-                    path_args.method = prop.get_initialized_string(cx)?;
+                    path_args.method = prop.get_initialized_string();
                 } else if arg_name == "path" {
-                    path_args.path = prop.get_initialized_string(cx)?;
+                    path_args.path = prop.get_initialized_string();
                 } else if arg_name == "tags" {
-                    path_args.tags = prop.get_initialized_array(cx)?;
+                    path_args.tags = prop.get_initialized_array();
                 }
             }
         }
@@ -211,12 +214,12 @@ fn add_operation_params<'cx>(
 
 fn add_api_paths<'cx>(
     open_api: &mut OpenApiV3,
-    root: &mut TsNode,
+    root: &AstNode,
     cx: &mut FunctionContext<'cx>,
     cache: &mut HashMap<String, TsDeclaration<'cx>>,
 ) -> Result<(), Throw> {
-    if root.is_api_path(cx)? {
-        let arguments = root.get_arguments(cx)?;
+    if root.is_api_path() {
+        let arguments = root.get_arguments().expect("Expected arguments for Paths node");
         let path_args = get_path_args(&arguments, cx)?;
         let route_handler = arguments.get(0).expect("Route handler required in Path");
         let route = path_args.path.expect("Property 'path' of PathOptions is required");
@@ -233,7 +236,7 @@ fn add_api_paths<'cx>(
     } else {
         for mut child in root.get_children(cx)? {
             cache_declarations(&child, cx, cache)?;
-            add_api_paths(open_api, &mut child, cx, cache)?;
+            add_api_paths(open_api, child, cx, cache)?;
         }
     }
 
@@ -242,7 +245,7 @@ fn add_api_paths<'cx>(
 
 fn generate_schema(
     open_api_handle: Handle<JsObject>,
-    get_ast: Handle<JsFunction>,
+    ast_cache: &AstCache,
     cx: &mut FunctionContext,
 ) -> Result<String, Throw> {
     let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "paths")?;
@@ -250,12 +253,12 @@ fn generate_schema(
     let mut cache = HashMap::new();
 
     for path in paths.to_vec(cx)? {
-        let path = path.downcast_or_throw::<JsString, FunctionContext>(cx)?;
-        let ast = get_ast.call_with(cx).arg(path).apply::<JsObject, FunctionContext>(cx)?;
-        let statements = ast.get::<JsArray, FunctionContext, &str>(cx, "statements")?;
-        for statement in statements.to_vec(cx)? {
-            let mut node = TsNode::new(statement.downcast_or_throw(cx)?);
-            add_api_paths(&mut open_api, &mut node, cx, &mut cache)?;
+        let path = path.downcast_or_throw::<JsString, _>(cx)?;
+        let node = ast_cache.get(&path.value(cx));
+        if let Some(statements) = node.get_statements() {
+            for statement in statements {
+                add_api_paths(&mut open_api, statement, cx, &mut cache)?;
+            }
         }
     }
 
@@ -265,12 +268,12 @@ fn generate_schema(
 pub fn generate_openapi(
     schemas_result: Handle<JsObject>,
     options_handle: Handle<JsObject>,
+    ast_cache: &AstCache,
     cx: &mut FunctionContext,
 ) -> Result<(), Throw> {
     let schema_result: Handle<JsObject> = cx.empty_object();
-    let get_ast = options_handle.get::<JsFunction, FunctionContext, &str>(cx, "getAst")?;
     if let Some(open_api_handle) = options_handle.get_opt(cx, "openApi")? as Option<Handle<JsObject>> {
-        let schema: String = generate_schema(open_api_handle, get_ast, cx)?;
+        let schema: String = generate_schema(open_api_handle, ast_cache, cx)?;
 
         if let Some(output_handle) = open_api_handle.get_opt::<JsString, FunctionContext, &str>(cx, "output")? {
             let filepath = match options_handle.get_opt::<JsString, FunctionContext, &str>(cx, "cwd")? {

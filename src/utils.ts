@@ -3,15 +3,15 @@ import { appendFileSync, readFileSync, writeFileSync } from 'fs';
 import ts, { ImportDeclaration, SourceFile } from 'typescript';
 
 export interface TypeShiftContext {
+    asts: string,
     rootFiles: string[],
-    getAst: (path: string) => ts.Node;
 }
 
 type RefPaths = [string | undefined, string | undefined];
 
 let cache: ts.ModuleResolutionCache;
 
-export const getContext = (cwd: string, globs: string[], includeParent: boolean = false, compilerOptions: ts.CompilerOptions): TypeShiftContext => {
+export const getContext = (cwd: string, globs: string[], compilerOptions: ts.CompilerOptions): TypeShiftContext => {
     if (!cache) {
         cache = ts.createModuleResolutionCache(
             cwd,
@@ -20,7 +20,7 @@ export const getContext = (cwd: string, globs: string[], includeParent: boolean 
         );
     }
 
-    const astMap = new Map();
+    const astMap: { [path: string]: ts.Node } = {};
     const masterCache: Map<string, ts.Node> = new Map();
     const files = fg(globs, {
         absolute: true,
@@ -32,11 +32,11 @@ export const getContext = (cwd: string, globs: string[], includeParent: boolean 
     while (fileNames.length) {
         const [rel, full] = fileNames.pop() as [string | null, string];
         if (!masterCache.has(full)) {
-            masterCache.set(full, getAst(full, includeParent));
+            masterCache.set(full, getAst(full));
         }
 
         const ast = masterCache.get(full);
-        astMap.set(rel || full, ast);
+        astMap[rel || full] = ast as ts.Node;
 
         for (const paths of getRefModules(ast as ts.Node, compilerOptions)) {
             if (paths[0] && paths[1]) {
@@ -45,18 +45,19 @@ export const getContext = (cwd: string, globs: string[], includeParent: boolean 
         }
     }
 
-    console.debug("generated ast(s) for ", astMap.keys());
+    console.debug("generated ast(s) for ", Object.keys(astMap));
+    // console.debug(astMap);
 
-    return { rootFiles: files, getAst: (path: string) => astMap.get(path) };
+    return { rootFiles: files, asts: JSON.stringify(astMap) };
 };
 
-const getAst = (p: string, includeParent: boolean): ts.Node => {
+const getAst = (p: string): ts.Node => {
     const file = readFileSync(p, {
         encoding: 'utf-8',
         flag: 'r'
     });
 
-    return ts.createSourceFile(p, file, ts.ScriptTarget.ES2015, includeParent);
+    return ts.createSourceFile(p, file, ts.ScriptTarget.ES2015, false);
 };
 
 function* getRefModules(ast: ts.Node, compilerOptions: ts.CompilerOptions) {

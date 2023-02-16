@@ -8,7 +8,7 @@ interface OpenApiOptions {
 
 export interface TypeShiftOptions {
     cwd?: string;
-    getAst: (path: string) => ts.Node;
+    asts: string;
     openApi?: OpenApiOptions;
 }
 

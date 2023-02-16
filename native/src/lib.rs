@@ -5,12 +5,14 @@ mod utils;
 
 use generators::generate_openapi;
 use neon::{prelude::*, result::Throw};
+use typescript::AstCache;
 
 fn generate_schemas(mut cx: FunctionContext) -> Result<Handle<JsObject>, Throw> {
     let schemas_result: Handle<JsObject> = cx.empty_object();
     let options_handle: Handle<JsObject> = cx.argument(0)?;
+    let asts = options_handle.get::<JsString, _, _>(&mut cx, "asts")?.value(&mut cx);
 
-    generate_openapi(schemas_result, options_handle, &mut cx)?;
+    generate_openapi(schemas_result, options_handle, &AstCache::new(asts), &mut cx)?;
 
     Ok(schemas_result)
 }
