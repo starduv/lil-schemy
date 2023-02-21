@@ -142,8 +142,8 @@ impl ApiPathOperation {
             .expect("Could not get recently set ApiResponse")
     }
 
-    pub(crate) fn param(&mut self, name: String, location: &str) -> &mut ApiParam {
-        let param = ApiParam::new(name.clone(), location.to_string());
+    pub(crate) fn param(&mut self, name: &str, location: &str) -> &mut ApiParam {
+        let param = ApiParam::new(name, location.to_string());
         self.parameters.get_or_insert_with(Default::default).push(param);
         self.parameters
             .get_or_insert_with(Default::default)
@@ -236,8 +236,8 @@ impl ApiSchema {
         self
     }
 
-    pub fn primitive(&mut self, type_name: String) -> &mut ApiSchema {
-        self.primitive = Some(type_name);
+    pub fn primitive(&mut self, type_name: &str) -> &mut ApiSchema {
+        self.primitive = Some(type_name.to_string());
         self
     }
 
@@ -268,11 +268,11 @@ pub struct ApiParam {
 }
 
 impl ApiParam {
-    fn new(name: String, location: String) -> ApiParam {
+    fn new(name: &str, location: String) -> ApiParam {
         ApiParam {
             content: None,
             location,
-            name,
+            name: name.to_string(),
             required: None,
         }
     }
@@ -287,8 +287,8 @@ impl ApiParam {
         self.content.get_or_insert(HashMap::new()).get_mut(key).unwrap()
     }
 
-    pub(crate) fn required(&mut self, required: Option<bool>) -> &mut ApiParam {
-        self.required = required;
+    pub(crate) fn required(&mut self, required: bool) -> &mut ApiParam {
+        self.required = Some(required);
         self
     }
 }

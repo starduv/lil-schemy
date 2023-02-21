@@ -8,8 +8,6 @@ exclude = ["index.node"]
 [lib]
 crate-type=["cdylib"]
 
-[dependencies]
-
 [dependencies.ahash]
 version = "0.8.2"
 
