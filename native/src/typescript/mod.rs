@@ -1,6 +1,8 @@
 mod ast;
 mod syntax_kind;
 
+use std::slice::Iter;
+
 pub use self::syntax_kind::*;
 pub use ast::{DeclarationType, TsDeclaration};
 use serde_json::Value;
@@ -38,12 +40,37 @@ impl ResponseOptions {
     }
 }
 
+pub struct AstCursorIter<'v> {
+    index: usize,
+    cursors: &'v Vec<AstCursor<'v>>,
+}
+impl<'v> Default for AstCursorIter<'v> {
+    fn default() -> Self {
+        AstCursorIter {
+            index: 0,
+            cursors: &Default::default(),
+        }
+    }
+}
+impl<'v> Iterator for AstCursorIter<'v> {
+    type Item = &'v AstCursor<'v>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.index = self.index + 1;
+        match self.cursors.get(self.index) {
+            Some(cursor) => Some(cursor),
+            None => None,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct AstCursor<'v> {
     root: &'v Value,
     current_name: Option<String>,
     pub current: &'v Value,
 }
+
 impl<'v> AstCursor<'v> {
     pub fn new(root: &Value) -> AstCursor {
         AstCursor {
@@ -53,15 +80,15 @@ impl<'v> AstCursor<'v> {
         }
     }
 
-    pub(crate) fn get_cursor(&self, name: &str) -> &mut AstCursor {
+    pub(crate) fn get_cursor(&self, name: &str) -> AstCursor {
         let child = self
             .current
             .get(name)
             .expect(&format!("Could not get property {}", name));
 
-        &mut AstCursor {
-            root: &child,
-            current: &child,
+        AstCursor {
+            root: child,
+            current: child,
             current_name: Some(String::from("root")),
         }
     }
@@ -79,21 +106,13 @@ impl<'v> AstCursor<'v> {
         self
     }
 
-    pub(crate) fn for_each<F>(&mut self, iteratee: F) -> ()
-    where
-        F: Fn(&mut AstCursor) -> (),
-    {
-        let list = self.current.as_array().expect(&format!(
-            "Cannot iterate {:?}, it's not an array {:?}",
-            self.current_name, self.current
-        ));
-
-        for node in list {
-            iteratee(&mut AstCursor {
-                current: node,
-                current_name: Some(String::from("root")),
-                root: node,
-            })
+    pub(crate) fn iter(&mut self) -> AstCursorIter {
+        AstCursorIter {
+            index: 0,
+            cursors: match self.current {
+                &Value::Array(ref arr) => arr.iter().map(|v| AstCursor::new(v)).collect::<Vec<_>>(),
+                obj => Vec::from([AstCursor::new(obj)]),
+            },
         }
     }
 
@@ -107,23 +126,25 @@ impl<'v> AstCursor<'v> {
         }
     }
 
-    pub(crate) fn for_each_child<F>(&mut self, iteratee: F) -> ()
-    where
-        F: Fn(&mut AstCursor) -> (),
-    {
+    pub(crate) fn for_each_child(&mut self) -> AstCursorIter {
         let kind = self.get_kind();
         match kind {
-            CLASS_DECLARATION => self.move_to("members").for_each(iteratee),
-            EXPRESSION_STATEMENT => iteratee(self.move_to("expression")),
-            INTERFACE_DECLARATION => self.move_to("members").for_each(iteratee),
-            SOURCE_FILE => self.move_to("statements").for_each(iteratee),
-            TYPE_ALIAS_DECLARATION => self.move_to("members").for_each(iteratee),
+            CLASS_DECLARATION => self.move_to("members").iter(),
+            EXPRESSION_STATEMENT => self.move_to("expression").iter(),
+            INTERFACE_DECLARATION => self.move_to("members").iter().into_iter(),
+            SOURCE_FILE => self.move_to("statements").iter().into_iter(),
+            TYPE_ALIAS_DECLARATION => self.move_to("members").iter().into_iter(),
             VARIABLE_STATEMENT => self
                 .move_to("declarationList")
                 .move_to("declarations")
-                .for_each(iteratee),
+                .iter()
+                .into_iter(),
             _ => Default::default(),
         }
+    }
+
+    fn to_iterable(&self) -> impl Iterator<Item = AstCursor> {
+        vec![self.clone()].into_iter()
     }
 
     pub fn get_kind(&self) -> u64 {
