@@ -42,13 +42,13 @@ impl ResponseOptions {
 
 pub struct AstCursorIter<'v> {
     index: usize,
-    cursors: &'v Vec<AstCursor<'v>>,
+    cursors: Vec<AstCursor<'v>>,
 }
 impl<'v> Default for AstCursorIter<'v> {
     fn default() -> Self {
         AstCursorIter {
             index: 0,
-            cursors: &Default::default(),
+            cursors: Default::default(),
         }
     }
 }
