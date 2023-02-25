@@ -5,6 +5,11 @@ pub struct SourceFile {
     pub kind: u16,
     pub statements: Vec<AstNode>,
 }
+impl SourceFile {
+    pub(crate) fn do_recursively(&self, func: impl Fn(&AstNode)) -> () {
+        todo!()
+    }
+}
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

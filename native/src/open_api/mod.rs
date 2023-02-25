@@ -1,3 +1,4 @@
+mod generator;
 mod open_api;
 
 use std::{fs::File, io::Write, path::PathBuf};
@@ -6,7 +7,9 @@ use ahash::HashMap;
 use neon::{prelude::*, result::Throw};
 use serde_json::json;
 
-use self::open_api::OpenApi;
+use crate::typescript::SourceFile;
+
+use self::{generator::OpenApiGenerator, open_api::OpenApi};
 
 fn merge_schemas(
     open_api: &OpenApi,
@@ -39,24 +42,24 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
 
 fn generate_schema(
     open_api_handle: Handle<JsObject>,
-    ast_map: &HashMap<String, serde_json::Value>,
+    ast_map: &HashMap<String, SourceFile>,
     cx: &mut FunctionContext,
 ) -> Result<String, Throw> {
     let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "paths")?;
-    let mut open_api = OpenApi::new();
+    let generator = OpenApiGenerator::new(ast_map);
 
     for path in paths.to_vec(cx)? {
         let path = path.downcast_or_throw::<JsString, _>(cx)?.value(cx);
-        let source_file = ast_map.get(&path);
+        generator.api_paths_from(path);
     }
 
-    merge_schemas(&open_api, open_api_handle, cx)
+    merge_schemas(generator.result(), open_api_handle, cx)
 }
 
 pub fn generate_openapi(
     schemas_result: Handle<JsObject>,
     options_handle: Handle<JsObject>,
-    asts: &HashMap<String, serde_json::Value>,
+    asts: &HashMap<String, SourceFile>,
     cx: &mut FunctionContext,
 ) -> Result<(), Throw> {
     let schema_result: Handle<JsObject> = cx.empty_object();
