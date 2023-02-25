@@ -46,7 +46,7 @@ export const getContext = (cwd: string, globs: string[], compilerOptions: ts.Com
     }
 
     console.debug("generated ast(s) for ", Object.keys(astMap));
-    // console.debug(astMap);
+    // writeFileSync("/home/captainrdubb/dev/serde_strong/types.json", JSON.stringify(astMap));
 
     return { rootFiles: files, asts: JSON.stringify(astMap) };
 };

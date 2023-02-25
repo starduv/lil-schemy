@@ -238,33 +238,33 @@
 //     }
 // }
 
-use super::AstCursor;
+// use super::AstCursor;
 
-pub enum Param {
-    Header,
-    Query,
-    Route,
-    None,
-}
+// pub enum Param {
+//     Header,
+//     Query,
+//     Route,
+//     None,
+// }
 
-pub enum ValueType {
-    Number,
-    String,
-    Literal,
-    Reference,
-    None,
-}
+// pub enum ValueType {
+//     Number,
+//     String,
+//     Literal,
+//     Reference,
+//     None,
+// }
 
-pub struct TsDeclaration<'n> {
-    pub declaration_type: DeclarationType,
-    pub name: String,
-    pub node: AstCursor<'n>,
-}
+// pub struct TsDeclaration<'n> {
+//     pub declaration_type: DeclarationType,
+//     pub name: String,
+//     pub node: AstCursor<'n>,
+// }
 
-pub enum DeclarationType {
-    DefaultImport,
-    NamedImport,
-    Alias,
-    Variable,
-    Structual,
-}
+// pub enum DeclarationType {
+//     DefaultImport,
+//     NamedImport,
+//     Alias,
+//     Variable,
+//     Structual,
+// }

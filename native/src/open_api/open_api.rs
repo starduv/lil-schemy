@@ -1,16 +1,14 @@
 use ahash::{HashMap, HashMapExt};
 use serde::Serialize;
 
-use crate::typescript::ResponseOptions;
-
 #[derive(Serialize, Debug)]
-pub struct OpenApiV3 {
+pub struct OpenApi {
     components: ApiComponents,
     paths: HashMap<String, ApiPath>,
 }
-impl OpenApiV3 {
+impl<'v> OpenApi {
     pub(crate) fn new() -> Self {
-        OpenApiV3 {
+        OpenApi {
             components: ApiComponents {},
             paths: HashMap::new(),
         }
@@ -18,7 +16,7 @@ impl OpenApiV3 {
 
     pub(crate) fn path(&mut self, key: String) -> &mut ApiPath {
         let path = ApiPath::new();
-        self.paths.insert(key.clone(), path);
+        self.paths.insert(key.to_string(), path);
         self.paths.get_mut(&key).expect("Could access ApiPath")
     }
 }
@@ -56,7 +54,7 @@ pub struct ApiPath {
     parameters: Option<ApiPathParameter>,
 }
 
-impl ApiPath {
+impl<'v> ApiPath {
     fn new() -> ApiPath {
         ApiPath {
             schema_ref: None,
@@ -142,8 +140,8 @@ impl ApiPathOperation {
             .expect("Could not get recently set ApiResponse")
     }
 
-    pub(crate) fn param(&mut self, name: &str, location: &str) -> &mut ApiParam {
-        let param = ApiParam::new(name, location.to_string());
+    pub(crate) fn param(&mut self, api_param: ApiParam) -> &mut ApiParam {
+        let param = ApiParam::new(&api_param.name, api_param.location.to_string());
         self.parameters.get_or_insert_with(Default::default).push(param);
         self.parameters
             .get_or_insert_with(Default::default)
@@ -290,5 +288,38 @@ impl ApiParam {
     pub(crate) fn required(&mut self, required: bool) -> &mut ApiParam {
         self.required = Some(required);
         self
+    }
+}
+
+pub struct PathArgs {
+    pub method: Option<String>,
+    pub path: Option<String>,
+    pub tags: Option<Vec<String>>,
+}
+
+impl PathArgs {
+    pub(crate) fn new() -> Self {
+        PathArgs {
+            method: None,
+            path: None,
+            tags: None,
+        }
+    }
+}
+
+pub struct ResponseOptions {
+    pub description: Option<String>,
+    pub example: Option<String>,
+    pub namespace: Option<String>,
+    pub status_code: Option<String>,
+}
+impl ResponseOptions {
+    pub(crate) fn new() -> Self {
+        ResponseOptions {
+            description: None,
+            example: None,
+            namespace: None,
+            status_code: None,
+        }
     }
 }

@@ -1,4 +1,5 @@
 import { expect } from 'chai';
+import { writeFileSync } from 'fs';
 import { OpenAPIV3 } from 'openapi-types'
 import { generateSchemas } from '../src/generator'
 import { getContext } from '../src/utils'
