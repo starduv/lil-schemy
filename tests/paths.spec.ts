@@ -13,11 +13,14 @@ describe('paths', () => {
     before(() => {
         const result = generateSchemas({
             asts: context.asts,
+            modules: JSON.stringify(context.moduleNames),
             openApi: {
                 base: JSON.stringify({}),
-                paths: context.rootFiles
+                paths: context.rootFiles,
             }
         })
+
+        console.log(result.openApi.schema)
 
         schema = JSON.parse(result.openApi.schema || "");
     })
@@ -31,7 +34,7 @@ describe('paths', () => {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "User"
+                                    "$ref": "#/components/schemas/v1/properties/User"
                                 }
                             }
                         }
@@ -61,6 +64,18 @@ describe('paths', () => {
                             }
                         },
                         "required": false
+                    },
+                    {
+                        "name": "user",
+                        "in": "header",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/v1/properties/User"
+                                }
+                            }
+                        },
+                        "required": true
                     }
                 ],
                 "tags": [

@@ -140,8 +140,8 @@ impl ApiPathOperation {
             .expect("Could not get recently set ApiResponse")
     }
 
-    pub(crate) fn param(&mut self, api_param: ApiParam) -> &mut ApiParam {
-        let param = ApiParam::new(&api_param.name, api_param.location.to_string());
+    pub(crate) fn param(&mut self, name: &str, location: &str) -> &mut ApiParam {
+        let param = ApiParam::new(name, location.to_string());
         self.parameters.get_or_insert_with(Default::default).push(param);
         self.parameters
             .get_or_insert_with(Default::default)

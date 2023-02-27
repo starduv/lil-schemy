@@ -9,6 +9,7 @@ interface OpenApiOptions {
 export interface TypeShiftOptions {
     cwd?: string;
     asts: string;
+    modules: string;
     openApi?: OpenApiOptions;
 }
 

@@ -7,7 +7,7 @@ use ahash::HashMap;
 use neon::{prelude::*, result::Throw};
 use serde_json::json;
 
-use crate::typescript::SourceFile;
+use crate::typescript::AstNode;
 
 use self::{generator::OpenApiGenerator, open_api::OpenApi};
 
@@ -42,11 +42,12 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
 
 fn generate_schema(
     open_api_handle: Handle<JsObject>,
-    ast_map: &HashMap<String, SourceFile>,
+    ast_map: &HashMap<String, AstNode>,
+    module_map: &HashMap<String, String>,
     cx: &mut FunctionContext,
 ) -> Result<String, Throw> {
     let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "paths")?;
-    let generator = OpenApiGenerator::new(ast_map);
+    let mut generator = OpenApiGenerator::new(module_map, ast_map);
 
     for path in paths.to_vec(cx)? {
         let path = path.downcast_or_throw::<JsString, _>(cx)?.value(cx);
@@ -59,12 +60,13 @@ fn generate_schema(
 pub fn generate_openapi(
     schemas_result: Handle<JsObject>,
     options_handle: Handle<JsObject>,
-    asts: &HashMap<String, SourceFile>,
+    asts: &HashMap<String, AstNode>,
+    module_map: &HashMap<String, String>,
     cx: &mut FunctionContext,
 ) -> Result<(), Throw> {
     let schema_result: Handle<JsObject> = cx.empty_object();
     if let Some(open_api_handle) = options_handle.get_opt(cx, "openApi")? as Option<Handle<JsObject>> {
-        let schema: String = generate_schema(open_api_handle, asts, cx)?;
+        let schema: String = generate_schema(open_api_handle, asts, module_map, cx)?;
 
         if let Some(output_handle) = open_api_handle.get_opt::<JsString, FunctionContext, &str>(cx, "output")? {
             let filepath = match options_handle.get_opt::<JsString, FunctionContext, &str>(cx, "cwd")? {

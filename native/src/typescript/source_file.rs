@@ -1,20 +1,14 @@
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
-pub struct SourceFile {
-    pub kind: u16,
-    pub statements: Vec<AstNode>,
-}
-impl SourceFile {
-    pub(crate) fn do_recursively(&self, func: impl Fn(&AstNode)) -> () {
-        todo!()
-    }
-}
+use super::{
+    BLOCK, CALL_EXPRESSION, CLASS_DECLARATION, EXPRESSION_STATEMENT, IMPORT_CLAUSE, INTERFACE_DECLARATION,
+    NAMED_IMPORTS, SOURCE_FILE, TYPE_ALIAS_DECLARATION, TYPE_LITERAL, VARIABLE_DECLARATION, VARIABLE_DECLARATION_LIST,
+    VARIABLE_STATEMENT,
+};
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AstNode {
-    pub named_bindings: Option<Box<AstNode>>,
     pub arguments: Option<Vec<AstNode>>,
     pub body: Option<Box<AstNode>>,
     pub declaration_list: Option<Box<AstNode>>,
@@ -27,13 +21,106 @@ pub struct AstNode {
     pub literal: Option<Box<AstNode>>,
     pub kind: u16,
     pub members: Option<Vec<AstNode>>,
+    pub module_specifier: Option<Box<AstNode>>,
     pub name: Option<Box<AstNode>>,
+    pub named_bindings: Option<Box<AstNode>>,
     pub parameters: Option<Vec<AstNode>>,
     pub statements: Option<Vec<AstNode>>,
     pub properties: Option<Vec<AstNode>>,
     pub property_name: Option<Box<AstNode>>,
     pub text: Option<String>,
-    pub type_description: Option<Box<AstNode>>,
+    #[serde(rename = "type")]
+    pub _type: Option<Box<AstNode>>,
     pub type_name: Option<Box<AstNode>>,
     pub type_arguments: Option<Vec<AstNode>>,
+}
+
+impl AstNode {
+    pub(crate) fn for_each_child(&self, mut func: impl FnMut(&AstNode)) -> () {
+        match self.kind {
+            BLOCK => {
+                for ref node in self.statements.as_ref().unwrap() {
+                    func(node)
+                }
+            }
+            CALL_EXPRESSION => {
+                if let Some(ref args) = self.arguments {
+                    for arg in args {
+                        func(arg)
+                    }
+                }
+            }
+            CLASS_DECLARATION => {
+                if let Some(ref members) = self.members {
+                    for member in members {
+                        func(member)
+                    }
+                }
+            }
+            INTERFACE_DECLARATION => {
+                if let Some(ref members) = self.members {
+                    for member in members {
+                        func(member)
+                    }
+                }
+            }
+            EXPRESSION_STATEMENT => func(self.expression.as_ref().unwrap()),
+            IMPORT_CLAUSE => {
+                if let Some(ref bindings) = self.named_bindings {
+                    func(bindings)
+                }
+            }
+            NAMED_IMPORTS => {
+                if let Some(ref elements) = self.elements {
+                    for element in elements {
+                        func(element)
+                    }
+                }
+            }
+            SOURCE_FILE => {
+                for ref node in self.statements.as_ref().unwrap() {
+                    func(node)
+                }
+            }
+            TYPE_ALIAS_DECLARATION => {
+                if let Some(ref members) = self.members {
+                    for member in members {
+                        func(member)
+                    }
+                }
+            }
+            TYPE_LITERAL => {
+                if let Some(ref members) = self.members {
+                    for member in members {
+                        func(member)
+                    }
+                }
+            }
+            VARIABLE_DECLARATION => {
+                if let Some(ref initializer) = self.initializer {
+                    func(initializer)
+                }
+            }
+            VARIABLE_DECLARATION_LIST => {
+                if let Some(ref declarations) = self.declarations {
+                    for declaration in declarations {
+                        func(declaration)
+                    }
+                }
+            }
+            VARIABLE_STATEMENT => {
+                let list = self.declaration_list.as_ref().unwrap();
+                list.for_each_child(func);
+            }
+            _ => {}
+        }
+    }
+}
+
+pub enum Declaration {
+    Alias { from: String, to: String },
+    DefaultImport { file: String },
+    Import { name: String, file: String },
+    ComplexType { node: AstNode },
+    SimpleType(String),
 }
