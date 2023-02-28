@@ -164,6 +164,64 @@ impl<'m> OpenApiGenerator<'m> {
         }
     }
 
+    fn add_operation_response(&mut self, route: &str, method: &str, node: &AstNode) -> () {
+        if let Some(ref expression) = node.expression {
+            if let Some(ref text) = expression.escaped_text {
+                if text.eq("Response") {
+                    let arguments = node.arguments.as_ref().unwrap();
+                    let response_type_arg = arguments.first();
+                    let response_options = arguments.last();
+                    if response_type_arg.is_some() && response_options.is_some() {
+                        let response_type_arg = response_type_arg.unwrap();
+                        let response_options = get_response_options(response_options.unwrap());
+                        let operation = self.open_api.path(route).method(method);
+
+                        let response = operation.response(response_options);
+                        let schema = response.content().schema();
+                        if let Some(ref_name) = get_identifier(&response_type_arg) {
+                            schema.reference(ref_name);
+                        }
+                        // TODO register need for references
+                    }
+                }
+            }
+        } else {
+            node.for_each_child(|node| self.add_operation_response(route, method, node))
+        }
+    }
+
+    fn add_operation_params<'cx>(&mut self, route: &str, method: &str, node: &AstNode) -> () {
+        if let Some(ref _type) = node._type {
+            if let Some(ref type_name) = _type.type_name {
+                if let Some(ref text) = type_name.escaped_text {
+                    let operation = self.open_api.path(&route).method(&method);
+
+                    if text.eq("QueryParam") {
+                        let property_name = node.name.as_ref().unwrap();
+                        let name = property_name.escaped_text.as_ref().unwrap();
+                        add_operation_parameter(&name, "query", operation, _type)
+                    }
+
+                    if text.eq("RouteParam") {
+                        let property_name = node.name.as_ref().unwrap();
+                        let name = property_name.escaped_text.as_ref().unwrap();
+                        add_operation_parameter(&name, "path", operation, _type)
+                    }
+
+                    if text.eq("Header") {
+                        let property_name = node.name.as_ref().unwrap();
+                        let name = property_name.escaped_text.as_ref().unwrap();
+                        add_operation_parameter(&name, "header", operation, _type)
+                    }
+                }
+            } else {
+                _type.for_each_child(|node| self.add_operation_params(route, method, node))
+            }
+        } else {
+            node.for_each_child(|node| self.add_operation_params(route, method, node))
+        }
+    }
+
     fn is_api_path(&self, node: &AstNode) -> bool {
         match node.expression {
             Some(ref expression) => match expression.escaped_text {
@@ -183,14 +241,11 @@ impl<'m> OpenApiGenerator<'m> {
             let path_options = get_path_args(arguments.get(1).unwrap());
 
             let route = path_options.path.unwrap();
-            let mut operation = self
-                .open_api
-                .path(route)
-                .method(path_options.method)
-                .tags(path_options.tags);
+            let method = path_options.method.unwrap();
+            self.open_api.path(&route).method(&method).tags(path_options.tags);
 
-            add_operation_params(request_param, operation);
-            add_operation_response(&*route_handler_body, &mut operation);
+            self.add_operation_params(&route, &method, request_param);
+            self.add_operation_response(&route, &method, &*route_handler_body);
         } else {
             self.cache_declarations(node);
             node.for_each_child(|node| self.find_api_paths(node))
@@ -238,36 +293,6 @@ fn get_path_args(node: &AstNode) -> PathArgs {
     path_args
 }
 
-fn add_operation_params<'cx>(node: &AstNode, operation: &mut ApiPathOperation) -> () {
-    if let Some(ref _type) = node._type {
-        if let Some(ref type_name) = _type.type_name {
-            if let Some(ref text) = type_name.escaped_text {
-                if text.eq("QueryParam") {
-                    let property_name = node.name.as_ref().unwrap();
-                    let name = property_name.escaped_text.as_ref().unwrap();
-                    add_operation_parameter(&name, "query", operation, _type)
-                }
-
-                if text.eq("RouteParam") {
-                    let property_name = node.name.as_ref().unwrap();
-                    let name = property_name.escaped_text.as_ref().unwrap();
-                    add_operation_parameter(&name, "path", operation, _type)
-                }
-
-                if text.eq("Header") {
-                    let property_name = node.name.as_ref().unwrap();
-                    let name = property_name.escaped_text.as_ref().unwrap();
-                    add_operation_parameter(&name, "header", operation, _type)
-                }
-            }
-        } else {
-            _type.for_each_child(|node| add_operation_params(node, operation))
-        }
-    } else {
-        node.for_each_child(|node| add_operation_params(node, operation))
-    }
-}
-
 fn add_operation_parameter(name: &str, location: &str, operation: &mut ApiPathOperation, node: &AstNode) -> () {
     let param = operation.param(name, location);
     let arguments = node.type_arguments.as_ref().unwrap();
@@ -284,31 +309,6 @@ fn add_operation_parameter(name: &str, location: &str, operation: &mut ApiPathOp
     if let Some(required) = arguments.get(1) {
         let literal = required.literal.as_ref().unwrap();
         param.required(literal.kind == TRUE_KEYWORD);
-    }
-}
-
-fn add_operation_response(node: &AstNode, operation: &mut ApiPathOperation) -> () {
-    if let Some(ref expression) = node.expression {
-        if let Some(ref text) = expression.escaped_text {
-            if text.eq("Response") {
-                let arguments = node.arguments.as_ref().unwrap();
-                let response_type_arg = arguments.first();
-                let response_options = arguments.last();
-                if response_type_arg.is_some() && response_options.is_some() {
-                    let response_type_arg = response_type_arg.unwrap();
-                    let response_options = get_response_options(response_options.unwrap());
-
-                    let response = operation.response(response_options);
-                    let schema = response.content().schema();
-                    if let Some(ref_name) = get_identifier(&response_type_arg) {
-                        schema.reference(ref_name);
-                    }
-                    // TODO register need for references
-                }
-            }
-        }
-    } else {
-        node.for_each_child(|node| add_operation_response(node, operation))
     }
 }
 

@@ -14,10 +14,11 @@ impl<'v> OpenApi {
         }
     }
 
-    pub(crate) fn path(&mut self, key: String) -> &mut ApiPath {
-        let path = ApiPath::new();
-        self.paths.insert(key.to_string(), path);
-        self.paths.get_mut(&key).expect("Could access ApiPath")
+    pub(crate) fn path(&mut self, key: &str) -> &mut ApiPath {
+        self.paths.entry(key.to_string()).or_insert(ApiPath::new())
+        // let path = ApiPath::new();
+        // self.paths.insert(key.to_string(), path);
+        // self.paths.get_mut(key).expect("Could access ApiPath")
     }
 }
 
@@ -73,20 +74,17 @@ impl<'v> ApiPath {
         }
     }
 
-    pub(crate) fn method(&mut self, method: Option<String>) -> &mut ApiPathOperation {
-        match method {
-            Some(m) => match m.to_lowercase().as_str() {
-                "get" => self.get.get_or_insert(ApiPathOperation::new()),
-                "put" => self.put.get_or_insert(ApiPathOperation::new()),
-                "post" => self.post.get_or_insert(ApiPathOperation::new()),
-                "delete" => self.delete.get_or_insert(ApiPathOperation::new()),
-                "options" => self.options.get_or_insert(ApiPathOperation::new()),
-                "head" => self.head.get_or_insert(ApiPathOperation::new()),
-                "patch" => self.patch.get_or_insert(ApiPathOperation::new()),
-                "trace" => self.trace.get_or_insert(ApiPathOperation::new()),
-                other => panic!("Unsupported http method '{}'", other),
-            },
-            None => panic!("Property 'method' of PathOptions is required "),
+    pub(crate) fn method(&mut self, method: &str) -> &mut ApiPathOperation {
+        match method.to_lowercase().as_str() {
+            "get" => self.get.get_or_insert(ApiPathOperation::new()),
+            "put" => self.put.get_or_insert(ApiPathOperation::new()),
+            "post" => self.post.get_or_insert(ApiPathOperation::new()),
+            "delete" => self.delete.get_or_insert(ApiPathOperation::new()),
+            "options" => self.options.get_or_insert(ApiPathOperation::new()),
+            "head" => self.head.get_or_insert(ApiPathOperation::new()),
+            "patch" => self.patch.get_or_insert(ApiPathOperation::new()),
+            "trace" => self.trace.get_or_insert(ApiPathOperation::new()),
+            other => panic!("Unsupported http method '{}'", other),
         }
     }
 }
