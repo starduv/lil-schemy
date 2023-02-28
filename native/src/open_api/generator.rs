@@ -165,6 +165,7 @@ impl<'m> OpenApiGenerator<'m> {
     }
 
     fn add_operation_response(&mut self, route: &str, method: &str, node: &AstNode) -> () {
+        self.cache_declarations(node);
         if let Some(ref expression) = node.expression {
             if let Some(ref text) = expression.escaped_text {
                 if text.eq("Response") {
