@@ -34,7 +34,10 @@ describe('paths', () => {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/v1/properties/User"
+                                    "$ref": "#/components/schemas/v1/properties/User",
+                                },
+                                "example": {
+                                    "$ref": "#/components/examples/v1.User"
                                 }
                             }
                         }

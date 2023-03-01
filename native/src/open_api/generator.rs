@@ -30,7 +30,7 @@ impl<'m> OpenApiGenerator<'m> {
                 let initializer = declaration.initializer.as_ref().unwrap();
                 let name = declaration.name.as_ref().unwrap();
                 let text = name.escaped_text.as_ref().unwrap();
-                match declaration.kind {
+                match initializer.kind {
                     AS_EXPRESSION => {
                         let _type = initializer._type.as_ref().unwrap();
                         let type_name = _type.type_name.as_ref().unwrap();
@@ -174,15 +174,10 @@ impl<'m> OpenApiGenerator<'m> {
                     let response_options = arguments.last();
                     if response_type_arg.is_some() && response_options.is_some() {
                         let response_type_arg = response_type_arg.unwrap();
-                        let response_options = get_response_options(response_options.unwrap());
+                        let response_options = get_response_options(response_options.unwrap(), &self.declarations);
                         let operation = self.open_api.path(route).method(method);
-
-                        let response = operation.response(response_options);
-                        let schema = response.content().schema();
-                        if let Some(ref_name) = get_identifier(&response_type_arg) {
-                            schema.reference(ref_name);
-                        }
-                        // TODO register need for references
+                        let ref_name = get_identifier(&response_type_arg, &self.declarations);
+                        operation.response(&ref_name, response_options);
                     }
                 }
             }
@@ -200,19 +195,19 @@ impl<'m> OpenApiGenerator<'m> {
                     if text.eq("QueryParam") {
                         let property_name = node.name.as_ref().unwrap();
                         let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "query", operation, _type)
+                        add_operation_parameter(&name, "query", operation, _type, &self.declarations)
                     }
 
                     if text.eq("RouteParam") {
                         let property_name = node.name.as_ref().unwrap();
                         let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "path", operation, _type)
+                        add_operation_parameter(&name, "path", operation, _type, &self.declarations)
                     }
 
                     if text.eq("Header") {
                         let property_name = node.name.as_ref().unwrap();
                         let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "header", operation, _type)
+                        add_operation_parameter(&name, "header", operation, _type, &self.declarations)
                     }
                 }
             } else {
@@ -294,15 +289,25 @@ fn get_path_args(node: &AstNode) -> PathArgs {
     path_args
 }
 
-fn add_operation_parameter(name: &str, location: &str, operation: &mut ApiPathOperation, node: &AstNode) -> () {
+fn add_operation_parameter(
+    name: &str,
+    location: &str,
+    operation: &mut ApiPathOperation,
+    node: &AstNode,
+    cache: &HashMap<String, Declaration>,
+) -> () {
     let param = operation.param(name, location);
     let arguments = node.type_arguments.as_ref().unwrap();
     if let Some(type_arg) = arguments.get(0) {
         match type_arg.kind {
             // TODO add format option to operation parameters
-            NUMBER_KEYWORD => param.content().schema().primitive("number").format(None),
-            STRING_KEYWORD => param.content().schema().primitive("string").format(None),
-            _ => param.content().schema().reference(String::from("")),
+            NUMBER_KEYWORD => param.content().schema().primitive("number"),
+            STRING_KEYWORD => param.content().schema().primitive("string"),
+            BOOLEAN_KEYWORD => param.content().schema().primitive("boolean"),
+            _ => param
+                .content()
+                .schema()
+                .reference(get_identifier(type_arg, cache), false),
             // TODO this probably needs the root type reference
         };
     }
@@ -311,40 +316,83 @@ fn add_operation_parameter(name: &str, location: &str, operation: &mut ApiPathOp
         let literal = required.literal.as_ref().unwrap();
         param.required(literal.kind == TRUE_KEYWORD);
     }
+
+    if let Some(namespace) = arguments.get(2) {
+        let literal = namespace.literal.as_ref().unwrap();
+        let text = literal.text.clone();
+        param.content().schema().namespace(text);
+    }
 }
 
-fn get_response_options(node: &AstNode) -> ResponseOptions {
+fn get_response_options(node: &AstNode, cache: &HashMap<String, Declaration>) -> ResponseOptions {
     let mut response_args = ResponseOptions::new();
     let properties = node.properties.as_ref().unwrap();
     for prop in properties {
-        if let Some(prop_name) = get_identifier(prop) {
-            if prop_name == "description" {
-                response_args.description = prop.initializer.as_ref().unwrap().text.clone();
-            } else if prop_name == "example" {
-                response_args.example = prop.initializer.as_ref().unwrap().text.clone();
-            } else if prop_name == "namespace" {
-                response_args.namespace = prop.initializer.as_ref().unwrap().text.clone();
-            } else if prop_name == "statusCode" {
-                response_args.status_code = prop.initializer.as_ref().unwrap().text.clone();
-            }
+        match get_identifier(prop, cache).as_str() {
+            "description" => response_args.description = prop.initializer.as_ref().unwrap().text.clone(),
+            "example" => response_args.example = prop.initializer.as_ref().unwrap().text.clone(),
+            "namespace" => response_args.namespace = prop.initializer.as_ref().unwrap().text.clone(),
+            "statusCode" => response_args.status_code = prop.initializer.as_ref().unwrap().text.clone(),
+            _ => {}
         }
     }
 
     response_args
 }
 
-fn get_identifier(cursor: &AstNode) -> Option<String> {
-    if let Some(ref text) = cursor.escaped_text {
-        return Some(text.clone());
+fn get_identifier(node: &AstNode, cache: &HashMap<String, Declaration>) -> String {
+    if let Some(ref text) = node.escaped_text {
+        return find_type_name(text, cache);
     }
 
-    if let Some(ref name) = cursor.name {
-        return get_identifier(&*name);
+    if let Some(ref name) = node.name {
+        let text = name.escaped_text.as_ref().unwrap();
+        return find_type_name(text, cache);
     }
 
-    if let Some(ref expression) = cursor.expression {
-        return get_identifier(&*expression);
+    if let Some(ref expression) = node.expression {
+        let text = expression.escaped_text.as_ref().unwrap();
+        return find_type_name(text, cache);
     }
 
-    None
+    if let Some(ref type_name) = node.type_name {
+        let text = type_name.escaped_text.as_ref().unwrap();
+        return find_type_name(text, cache);
+    }
+
+    panic!("Could not find name of node {:?}", node);
 }
+
+fn find_type_name(name: &str, cache: &HashMap<String, Declaration>) -> String {
+    let mut key = name;
+    let mut previous = "";
+    while previous != key && cache.contains_key(key) {
+        match cache.get(key) {
+            Some(Declaration::Alias { from: _, to }) => {
+                previous = key;
+                key = to;
+            }
+            _ => previous = key,
+        }
+    }
+
+    key.to_string()
+}
+
+// if cursor.has_property("escpaedText") {
+//     return Some(find_type_name(cursor.get_str("escapedText"), resolver));
+// }
+
+// if cursor.has_property("name") {
+//     return Some(find_type_name(
+//         cursor.move_to("name").get_str("escapedText"),
+//         resolver,
+//     ));
+// }
+
+// if cursor.has_property("expression") {
+//     return Some(find_type_name(
+//         cursor.move_to("expression").get_str("escapedText"),
+//         resolver,
+//     ));
+// }
