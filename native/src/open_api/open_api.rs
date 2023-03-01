@@ -1,10 +1,5 @@
 use ahash::{HashMap, HashMapExt};
-use serde::{
-    ser::{Error, SerializeStruct},
-    Serialize, Serializer,
-};
-
-use crate::typescript::{AstNode, Declaration};
+use serde::{ser::SerializeStruct, Serialize, Serializer};
 
 #[derive(Serialize, Debug)]
 pub struct OpenApi {
