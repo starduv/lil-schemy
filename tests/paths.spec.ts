@@ -1,5 +1,4 @@
 import { expect } from 'chai';
-import { writeFileSync } from 'fs';
 import { OpenAPIV3 } from 'openapi-types'
 import { generateSchemas } from '../src/generator'
 import { getContext } from '../src/utils'
@@ -84,9 +83,62 @@ describe('paths', () => {
                 "tags": [
                     "space"
                 ]
+            },
+            post: {
+                requestBody: {
+                    content: {
+                        "application/json": {
+                            schema: {
+                                $ref: "#/components/schemas/v1/properties/CreateUserRequest"
+                            }
+                        }
+                    },
+                    required: true
+                },
+                responses: {
+                    201: {
+                        description: "Create a new user",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    $ref: "#/components/schemas/v1/properties/User"
+                                }
+                            }
+                        }
+                    }
+                },
+                tags: ["Admin"]
             }
         });
         expect(schema.paths["/user/{id}"]).to.deep.eq({
+            get: {
+                parameters: [
+                    {
+                        in: "path",
+                        name: "id",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "string",
+                                }
+                            }
+                        },
+                        required: true
+                    }
+                ],
+                responses: {
+                    200: {
+                        description: "a specific admin user",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    $ref: "#/components/schemas/AdminUser"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             patch: {
                 parameters: [
                     {
@@ -127,6 +179,35 @@ describe('paths', () => {
                         }
                     }
                 }
+            },
+            delete: {
+                parameters: [
+                    {
+                        in: "path",
+                        name: "id",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "string",
+                                }
+                            }
+                        },
+                        required: true
+                    }
+                ],
+                responses: {
+                    204: {
+                        description: "no content",
+                        content: {
+                            "application/json": {
+                                example: {
+                                    $ref: "#/components/examples/v1.NoContent"
+                                }
+                            }
+                        }
+                    }
+                },
+                tags: ["Admin", "Users"],
             }
         })
     })

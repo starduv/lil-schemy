@@ -88,12 +88,14 @@ impl<'v> ApiPath {
 
 #[derive(Serialize, Debug)]
 pub struct ApiPathOperation {
+    #[serde(rename = "requestBody", skip_serializing_if = "Option::is_none")]
+    body_parameter: Option<BodyParam>,
     #[serde(skip_serializing_if = "Option::is_none")]
     examples: Option<HashMap<String, ApiSchema>>,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    responses: HashMap<String, ApiResponse>,
     #[serde(skip_serializing_if = "Option::is_none")]
     parameters: Option<Vec<ApiParam>>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    responses: HashMap<String, ApiResponse>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tags: Option<Vec<String>>,
 }
@@ -101,6 +103,7 @@ pub struct ApiPathOperation {
 impl ApiPathOperation {
     pub fn new() -> Self {
         ApiPathOperation {
+            body_parameter: None,
             examples: None,
             responses: HashMap::new(),
             parameters: None,
@@ -113,7 +116,7 @@ impl ApiPathOperation {
         self
     }
 
-    pub(crate) fn response(&mut self, name: &str, response_args: ResponseOptions) -> &mut ApiResponse {
+    pub(crate) fn response(&mut self, name: &Option<String>, response_args: ResponseOptions) -> &mut ApiResponse {
         let status_code = response_args
             .status_code
             .expect("An ApiResponse must have a status code");
@@ -124,12 +127,16 @@ impl ApiPathOperation {
 
         let mut response = ApiResponse::new(description);
 
-        response
+        let cotent = response
             .content()
-            .example(response_args.example, response_args.namespace.clone())
-            .schema()
-            .reference(name.to_string(), false)
-            .namespace(response_args.namespace);
+            .example(response_args.example, response_args.namespace.clone());
+
+        if name.is_some() {
+            cotent
+                .schema()
+                .reference(name.clone(), false)
+                .namespace(response_args.namespace);
+        }
 
         self.responses.entry(status_code).or_insert(response)
     }
@@ -141,6 +148,10 @@ impl ApiPathOperation {
             .get_or_insert_with(Default::default)
             .last_mut()
             .expect("Could not get parameter from ApiOperation")
+    }
+
+    pub(crate) fn body(&mut self) -> &mut BodyParam {
+        self.body_parameter.get_or_insert(BodyParam::new())
     }
 }
 
@@ -182,24 +193,25 @@ impl ApiResponse {
 
 #[derive(Serialize, Debug)]
 pub struct ApiConent {
-    schema: ApiSchema,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    schema: Option<ApiSchema>,
     #[serde(skip_serializing_if = "Option::is_none")]
     example: Option<Box<ApiSchema>>,
 }
 impl ApiConent {
     pub fn new() -> Self {
         ApiConent {
-            schema: ApiSchema::new(),
+            schema: None,
             example: None,
         }
     }
 
     pub fn schema(&mut self) -> &mut ApiSchema {
-        &mut self.schema
+        self.schema.get_or_insert(ApiSchema::new())
     }
 
     pub fn example(&mut self, example: Option<String>, namespace: Option<String>) -> &mut ApiConent {
-        if let Some(example) = example {
+        if example.is_some() {
             let mut schema = ApiSchema::new();
             schema.reference(example, true).namespace(namespace);
             self.example = Some(Box::new(schema));
@@ -277,9 +289,9 @@ impl ApiSchema {
         self
     }
 
-    pub fn reference(&mut self, reference: String, is_example: bool) -> &mut ApiSchema {
+    pub fn reference(&mut self, reference: Option<String>, is_example: bool) -> &mut ApiSchema {
         self.is_example = is_example;
-        self.reference = Some(reference);
+        self.reference = reference;
         self
     }
 }
@@ -314,6 +326,35 @@ impl ApiParam {
     }
 
     pub(crate) fn required(&mut self, required: bool) -> &mut ApiParam {
+        self.required = Some(required);
+        self
+    }
+}
+#[derive(Serialize, Debug)]
+pub struct BodyParam {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<HashMap<String, ApiConent>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    required: Option<bool>,
+}
+
+impl BodyParam {
+    fn new() -> BodyParam {
+        BodyParam {
+            content: None,
+            required: None,
+        }
+    }
+
+    pub(crate) fn content(&mut self) -> &mut ApiConent {
+        let key = "application/json";
+        self.content
+            .get_or_insert(HashMap::new())
+            .entry(key.to_owned())
+            .or_insert(ApiConent::new())
+    }
+
+    pub(crate) fn required(&mut self, required: bool) -> &mut BodyParam {
         self.required = Some(required);
         self
     }
