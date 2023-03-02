@@ -378,21 +378,3 @@ fn find_type_name(name: &str, cache: &HashMap<String, Declaration>) -> String {
 
     key.to_string()
 }
-
-// if cursor.has_property("escpaedText") {
-//     return Some(find_type_name(cursor.get_str("escapedText"), resolver));
-// }
-
-// if cursor.has_property("name") {
-//     return Some(find_type_name(
-//         cursor.move_to("name").get_str("escapedText"),
-//         resolver,
-//     ));
-// }
-
-// if cursor.has_property("expression") {
-//     return Some(find_type_name(
-//         cursor.move_to("expression").get_str("escapedText"),
-//         resolver,
-//     ));
-// }

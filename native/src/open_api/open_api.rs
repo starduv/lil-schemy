@@ -16,9 +16,6 @@ impl<'v> OpenApi {
 
     pub(crate) fn path(&mut self, key: &str) -> &mut ApiPath {
         self.paths.entry(key.to_string()).or_insert(ApiPath::new())
-        // let path = ApiPath::new();
-        // self.paths.insert(key.to_string(), path);
-        // self.paths.get_mut(key).expect("Could access ApiPath")
     }
 }
 
