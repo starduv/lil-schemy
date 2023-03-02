@@ -318,9 +318,17 @@ fn add_operation_parameter(
     }
 
     if let Some(namespace) = arguments.get(2) {
-        let literal = namespace.literal.as_ref().unwrap();
-        let text = literal.text.clone();
-        param.content().schema().namespace(text);
+        if let Some(ref literal) = namespace.literal {
+            let text = literal.text.clone();
+            param.content().schema().namespace(text);
+        }
+    }
+
+    if let Some(format) = arguments.get(3) {
+        if let Some(ref literal) = format.literal {
+            let text = literal.text.clone();
+            param.content().schema().format(text);
+        }
     }
 }
 

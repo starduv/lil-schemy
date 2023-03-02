@@ -23,7 +23,32 @@ export function Response<ResponseType>(response: ResponseType, options: Response
     return response;
 }
 
-export type BodyParam<Param, Required extends boolean, Namespace extends string | undefined = undefined> = Param;
-export type Header<Param, Required extends boolean, Namespace extends string | undefined = undefined> = Param;
-export type QueryParam<Param, Required extends boolean, Namespace extends string | undefined = undefined> = Param;
-export type RouteParam<Param, Required extends true, Namespace extends string | undefined = undefined> = Param;
+export type BodyParam<Param, Required extends boolean, Namespace extends NS = undefined> = Param;
+export type Header<Param, Required extends boolean, Namespace extends NS = undefined, Format extends F = undefined> = Param;
+export type QueryParam<Param, Required extends boolean, Namespace extends NS = undefined, Format extends F = undefined> = Param;
+export type RouteParam<Param, Required extends true, Namespace extends NS = undefined, Format extends F = undefined> = Param;
+
+type NS = string | undefined;
+type F = StringFormat | NumberFormat;
+type StringFormat = "date-time" |
+    "time" |
+    "date" |
+    "duration" |
+    "email" |
+    "idn-email" |
+    "hostname" |
+    "idn-hostname" |
+    "ipv4" |
+    "ipv6" |
+    "uuid" |
+    "uri" |
+    "uri-reference" |
+    "uri-template" |
+    "json-pointer" |
+    "relative-json-pointer" |
+    "regex" |
+    "iri" |
+    "iri-reference" |
+    undefined;
+
+type NumberFormat = "int32" | "int64" | "float" | "double"

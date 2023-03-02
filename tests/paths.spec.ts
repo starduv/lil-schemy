@@ -86,5 +86,48 @@ describe('paths', () => {
                 ]
             }
         });
+        expect(schema.paths["/user/{id}"]).to.deep.eq({
+            patch: {
+                parameters: [
+                    {
+                        in: "path",
+                        name: "id",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "string",
+                                }
+                            }
+                        },
+                        required: true
+                    },
+                    {
+                        in: "query",
+                        name: "date",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "string",
+                                    format: "date"
+                                }
+                            }
+                        },
+                        required: false
+                    }
+                ],
+                responses: {
+                    202: {
+                        description: "a modified admin user",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    $ref: "#/components/schemas/AdminUser",
+                                },
+                            }
+                        }
+                    }
+                }
+            }
+        })
     })
 })

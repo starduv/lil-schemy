@@ -1,5 +1,5 @@
 import { BodyParam, Header, Path, QueryParam, Response, RouteParam } from '../../../src';
-import admin, { CreateUserRequest, User, UserPatch } from '../dtos';
+import AdminUser, { CreateUserRequest, User, UserPatch } from '../dtos';
 
 interface Reply<T> {
     send: (responseType: T) => void;
@@ -40,19 +40,19 @@ router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: 
     tags: ['space'],
 }));
 
-// router.patch("", {}, Path(async (request: { id: RouteParam<string, true>; date: QueryParam<string, false>; }, reply: any): Promise<void> => {
-//     let admin = new AdminUser();
+router.patch("", {}, Path(async (request: { id: RouteParam<string, true>; date: QueryParam<string, false, undefined, "date">; }, reply: any): Promise<void> => {
+    let admin = new AdminUser();
 
-//     let response = Response(admin, {
-//         statusCode: 202,
-//         description: "a modified admin user"
-//     });
+    let response = Response(admin, {
+        statusCode: 202,
+        description: "a modified admin user"
+    });
 
-//     reply.send(response);
-// }, {
-//     method: 'PATCH',
-//     path: '/user/{id}',
-// }));
+    reply.send(response);
+}, {
+    method: 'PATCH',
+    path: '/user/{id}',
+}));
 
 // router.get("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
 //     let response = Response(new AdminUser(), {

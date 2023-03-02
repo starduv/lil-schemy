@@ -261,16 +261,14 @@ impl ApiSchema {
         }
     }
 
-    pub fn format(&mut self, format: String) -> &mut ApiSchema {
+    pub fn format(&mut self, format: Option<String>) -> &mut ApiSchema {
         // TODO add format tests
-        self.format = Some(format);
+        self.format = format.clone();
         self
     }
 
     pub fn namespace(&mut self, namespace: Option<String>) -> &mut ApiSchema {
-        if let Some(namespace) = namespace {
-            self.namespace = Some(namespace);
-        }
+        self.namespace = namespace.clone();
         self
     }
 
