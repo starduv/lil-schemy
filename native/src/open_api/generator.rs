@@ -178,6 +178,10 @@ impl<'m> OpenApiGenerator<'m> {
                                 response_type = response_type._type.as_ref().unwrap();
                             }
 
+                            if response_type.kind == AS_EXPRESSION {
+                                response_type = response_type._type.as_ref().unwrap();
+                            }
+
                             let response_options = get_response_options(response_options, &self.declarations);
                             let operation = self.open_api.path(route).method(method);
                             let ref_name = get_identifier(&response_type, &self.declarations);

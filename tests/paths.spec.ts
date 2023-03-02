@@ -108,6 +108,31 @@ describe('paths', () => {
                     }
                 },
                 tags: ["Admin"]
+            },
+            put: {
+                requestBody: {
+                    content: {
+                        "application/json": {
+                            schema: {
+                                $ref: "#/components/schemas/v1/properties/UserPatch"
+                            }
+                        }
+                    },
+                    required: false
+                },
+                responses: {
+                    202: {
+                        description: "Updated User",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    $ref: "#/components/schemas/v1/properties/AdminUser"
+                                }
+                            }
+                        }
+                    }
+                },
+                tags: ["User"]
             }
         });
         expect(schema.paths["/user/{id}"]).to.deep.eq({

@@ -1,5 +1,10 @@
 use ahash::{HashMap, HashMapExt};
-use serde::{ser::SerializeStruct, Serialize, Serializer};
+use serde::{ser::SerializeStruct, Serialize, Serializer, __private::de::ContentDeserializer};
+
+use crate::typescript::{
+    AstNode, ARRAY_LITERAL_EXPRESSION, AS_EXPRESSION, FALSE_KEYWORD, OBJECT_KEYWORD, OBJECT_LITERAL_EXPRESSION,
+    PROPERTY_ASSIGNMENT, STRING_LITERAL, TRUE_KEYWORD,
+};
 
 #[derive(Serialize, Debug)]
 pub struct OpenApi {
@@ -127,12 +132,12 @@ impl ApiPathOperation {
 
         let mut response = ApiResponse::new(description);
 
-        let cotent = response
+        let content = response
             .content()
             .example(response_args.example, response_args.namespace.clone());
 
         if name.is_some() {
-            cotent
+            content
                 .schema()
                 .reference(name.clone(), false)
                 .namespace(response_args.namespace);
@@ -222,11 +227,13 @@ impl ApiConent {
 
 #[derive(Debug)]
 pub struct ApiSchema {
+    items: Option<Box<ApiSchema>>,
     format: Option<String>,
-    primitive: Option<String>,
+    _type: Option<String>,
     reference: Option<String>,
     namespace: Option<String>,
     is_example: bool,
+    properties: Option<HashMap<String, ApiSchema>>,
 }
 
 impl Serialize for ApiSchema {
@@ -238,8 +245,8 @@ impl Serialize for ApiSchema {
         if let Some(ref format) = self.format {
             state.serialize_field("format", format)?;
         }
-        if let Some(ref primitive) = self.primitive {
-            state.serialize_field("type", primitive)?;
+        if let Some(ref _type) = self._type {
+            state.serialize_field("type", _type)?;
         }
         if let Some(ref reference) = self.reference {
             let mut path = String::from(match self.is_example {
@@ -266,10 +273,12 @@ impl ApiSchema {
     pub fn new() -> Self {
         ApiSchema {
             format: None,
-            primitive: None,
+            _type: None,
             reference: None,
             namespace: None,
             is_example: false,
+            items: None,
+            properties: None,
         }
     }
 
@@ -285,7 +294,7 @@ impl ApiSchema {
     }
 
     pub fn primitive(&mut self, type_name: &str) -> &mut ApiSchema {
-        self.primitive = Some(type_name.to_string());
+        self._type = Some(type_name.to_string());
         self
     }
 
@@ -293,6 +302,27 @@ impl ApiSchema {
         self.is_example = is_example;
         self.reference = reference;
         self
+    }
+
+    fn object(&mut self) -> &mut ApiSchema {
+        self._type = Some(String::from("object"));
+        self
+    }
+
+    fn property(&mut self, name_text: &str) -> &mut ApiSchema {
+        self.properties
+            .get_or_insert(HashMap::new())
+            .entry(name_text.to_string())
+            .or_insert(ApiSchema::new())
+    }
+
+    fn array(&mut self) -> &mut ApiSchema {
+        self._type = Some(String::from("array"));
+        self
+    }
+
+    fn items(&mut self) -> &mut ApiSchema {
+        self.items.get_or_insert(Box::new(ApiSchema::new()))
     }
 }
 

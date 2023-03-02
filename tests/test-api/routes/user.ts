@@ -95,16 +95,16 @@ router.post("", {}, Path(async (request: { user: BodyParam<CreateUserRequest, tr
     tags: ["Admin"]
 }));
 
-// router.put("", {}, Path(async (request: { tomato: BodyParam<UserPatch, false, "v1">; }, reply: any): Promise<void> => {
-//     let response = Response({ first: 'John', title: 'Sr. Manager' }, {
-//         statusCode: 202,
-//         description: "Patched User",
-//         namespace: "v1"
-//     });
+router.put("", {}, Path(async (request: { tomato: BodyParam<UserPatch, false, "v1">; }, reply: any): Promise<void> => {
+    let response = Response({} as AdminUser, {
+        statusCode: 202,
+        description: "Updated User",
+        namespace: "v1"
+    });
 
-//     reply.send(response);
-// }, {
-//     method: 'PUT',
-//     path: '/user',
-//     tags: ["User"]
-// }));
+    reply.send(response);
+}, {
+    method: 'PUT',
+    path: '/user',
+    tags: ["User"]
+}));
