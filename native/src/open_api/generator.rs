@@ -4,6 +4,174 @@ use crate::typescript::*;
 
 use super::open_api::{ApiPathOperation, OpenApi, PathArgs, ResponseOptions};
 
+fn add_body_parameter(operation: &mut ApiPathOperation, node: &AstNode, cache: &HashMap<String, Declaration>) -> () {
+    let param = operation.body();
+    let arguments = node.type_arguments.as_ref().unwrap();
+    if let Some(type_arg) = arguments.get(0) {
+        match type_arg.kind {
+            // TODO add format option to operation parameters
+            NUMBER_KEYWORD => param.content().schema().primitive("number"),
+            STRING_KEYWORD => param.content().schema().primitive("string"),
+            BOOLEAN_KEYWORD => param.content().schema().primitive("boolean"),
+            _ => param
+                .content()
+                .schema()
+                .reference(get_identifier(type_arg, cache), false),
+            // TODO this probably needs the root type reference
+        };
+    }
+
+    if let Some(required) = arguments.get(1) {
+        let literal = required.literal.as_ref().unwrap();
+        param.required(literal.kind == TRUE_KEYWORD);
+    }
+
+    if let Some(namespace) = arguments.get(2) {
+        if let Some(ref literal) = namespace.literal {
+            let text = literal.text.clone();
+            param.content().schema().namespace(text);
+        }
+    }
+
+    if let Some(format) = arguments.get(3) {
+        if let Some(ref literal) = format.literal {
+            let text = literal.text.clone();
+            param.content().schema().format(text);
+        }
+    }
+}
+
+fn add_operation_parameter(
+    name: &str,
+    location: &str,
+    operation: &mut ApiPathOperation,
+    node: &AstNode,
+    cache: &HashMap<String, Declaration>,
+) -> () {
+    let param = operation.param(name, location);
+    let arguments = node.type_arguments.as_ref().unwrap();
+    if let Some(type_arg) = arguments.get(0) {
+        match type_arg.kind {
+            // TODO add format option to operation parameters
+            NUMBER_KEYWORD => param.content().schema().primitive("number"),
+            STRING_KEYWORD => param.content().schema().primitive("string"),
+            BOOLEAN_KEYWORD => param.content().schema().primitive("boolean"),
+            _ => param
+                .content()
+                .schema()
+                .reference(get_identifier(type_arg, cache), false),
+            // TODO this probably needs the root type reference
+        };
+    }
+
+    if let Some(required) = arguments.get(1) {
+        let literal = required.literal.as_ref().unwrap();
+        param.required(literal.kind == TRUE_KEYWORD);
+    }
+
+    if let Some(namespace) = arguments.get(2) {
+        if let Some(ref literal) = namespace.literal {
+            let text = literal.text.clone();
+            param.content().schema().namespace(text);
+        }
+    }
+
+    if let Some(format) = arguments.get(3) {
+        if let Some(ref literal) = format.literal {
+            let text = literal.text.clone();
+            param.content().schema().format(text);
+        }
+    }
+}
+
+fn find_type_name(name: &str, cache: &HashMap<String, Declaration>) -> String {
+    let mut key = name;
+    let mut previous = "";
+    while previous != key && cache.contains_key(key) {
+        match cache.get(key) {
+            Some(Declaration::Alias { from: _, to }) => {
+                previous = key;
+                key = to;
+            }
+            _ => previous = key,
+        }
+    }
+
+    key.to_string()
+}
+
+fn get_identifier(node: &AstNode, cache: &HashMap<String, Declaration>) -> Option<String> {
+    if let Some(ref text) = node.escaped_text {
+        return find_type_name(text, cache).into();
+    }
+
+    if let Some(ref name) = node.name {
+        let text = name.escaped_text.as_ref().unwrap();
+        return find_type_name(text, cache).into();
+    }
+
+    if let Some(ref expression) = node.expression {
+        let text = expression.escaped_text.as_ref().unwrap();
+        return find_type_name(text, cache).into();
+    }
+
+    if let Some(ref type_name) = node.type_name {
+        let text = type_name.escaped_text.as_ref().unwrap();
+        return find_type_name(text, cache).into();
+    }
+
+    None
+}
+
+fn get_path_args(node: &AstNode) -> PathArgs {
+    let mut path_args = PathArgs::new();
+    let properties = node.properties.as_ref().unwrap();
+    for prop in properties {
+        let name = prop.name.as_ref().unwrap().escaped_text.as_ref().unwrap();
+        let initializer = prop.initializer.as_ref().unwrap();
+        if name == "method" {
+            path_args.method = match initializer.text {
+                Some(ref text) => Some(text.clone()),
+                None => None,
+            };
+        } else if name == "path" {
+            path_args.path = match initializer.text {
+                Some(ref text) => Some(text.clone()),
+                None => None,
+            };
+        } else if name == "tags" {
+            path_args.tags = match initializer.elements {
+                Some(ref elements) => Some(elements.iter().map(|e| e.text.as_ref().unwrap().clone()).collect()),
+                None => None,
+            };
+        }
+    }
+    path_args
+}
+
+fn get_request_parameter<'n>(node: &'n AstNode) -> &'n AstNode {
+    let parameters = node.parameters.as_ref().unwrap();
+    parameters.first().unwrap()
+}
+
+fn get_response_options(node: &AstNode, cache: &HashMap<String, Declaration>) -> ResponseOptions {
+    let mut response_args = ResponseOptions::new();
+    let properties = node.properties.as_ref().unwrap();
+    for prop in properties {
+        if let Some(ref_name) = get_identifier(prop, cache) {
+            match ref_name.as_str() {
+                "description" => response_args.description = prop.initializer.as_ref().unwrap().text.clone(),
+                "example" => response_args.example = prop.initializer.as_ref().unwrap().text.clone(),
+                "namespace" => response_args.namespace = prop.initializer.as_ref().unwrap().text.clone(),
+                "statusCode" => response_args.status_code = prop.initializer.as_ref().unwrap().text.clone(),
+                _ => {}
+            }
+        }
+    }
+
+    response_args
+}
+
 pub struct OpenApiGenerator<'m> {
     ast_map: &'m HashMap<String, AstNode>,
     declarations: HashMap<String, Declaration>,
@@ -269,172 +437,4 @@ impl<'m> OpenApiGenerator<'m> {
 
         source_file.for_each_child(|node| self.find_api_paths(node));
     }
-}
-
-fn get_request_parameter<'n>(node: &'n AstNode) -> &'n AstNode {
-    let parameters = node.parameters.as_ref().unwrap();
-    parameters.first().unwrap()
-}
-
-fn get_path_args(node: &AstNode) -> PathArgs {
-    let mut path_args = PathArgs::new();
-    let properties = node.properties.as_ref().unwrap();
-    for prop in properties {
-        let name = prop.name.as_ref().unwrap().escaped_text.as_ref().unwrap();
-        let initializer = prop.initializer.as_ref().unwrap();
-        if name == "method" {
-            path_args.method = match initializer.text {
-                Some(ref text) => Some(text.clone()),
-                None => None,
-            };
-        } else if name == "path" {
-            path_args.path = match initializer.text {
-                Some(ref text) => Some(text.clone()),
-                None => None,
-            };
-        } else if name == "tags" {
-            path_args.tags = match initializer.elements {
-                Some(ref elements) => Some(elements.iter().map(|e| e.text.as_ref().unwrap().clone()).collect()),
-                None => None,
-            };
-        }
-    }
-    path_args
-}
-
-fn add_body_parameter(operation: &mut ApiPathOperation, node: &AstNode, cache: &HashMap<String, Declaration>) -> () {
-    let param = operation.body();
-    let arguments = node.type_arguments.as_ref().unwrap();
-    if let Some(type_arg) = arguments.get(0) {
-        match type_arg.kind {
-            // TODO add format option to operation parameters
-            NUMBER_KEYWORD => param.content().schema().primitive("number"),
-            STRING_KEYWORD => param.content().schema().primitive("string"),
-            BOOLEAN_KEYWORD => param.content().schema().primitive("boolean"),
-            _ => param
-                .content()
-                .schema()
-                .reference(get_identifier(type_arg, cache), false),
-            // TODO this probably needs the root type reference
-        };
-    }
-
-    if let Some(required) = arguments.get(1) {
-        let literal = required.literal.as_ref().unwrap();
-        param.required(literal.kind == TRUE_KEYWORD);
-    }
-
-    if let Some(namespace) = arguments.get(2) {
-        if let Some(ref literal) = namespace.literal {
-            let text = literal.text.clone();
-            param.content().schema().namespace(text);
-        }
-    }
-
-    if let Some(format) = arguments.get(3) {
-        if let Some(ref literal) = format.literal {
-            let text = literal.text.clone();
-            param.content().schema().format(text);
-        }
-    }
-}
-
-fn add_operation_parameter(
-    name: &str,
-    location: &str,
-    operation: &mut ApiPathOperation,
-    node: &AstNode,
-    cache: &HashMap<String, Declaration>,
-) -> () {
-    let param = operation.param(name, location);
-    let arguments = node.type_arguments.as_ref().unwrap();
-    if let Some(type_arg) = arguments.get(0) {
-        match type_arg.kind {
-            // TODO add format option to operation parameters
-            NUMBER_KEYWORD => param.content().schema().primitive("number"),
-            STRING_KEYWORD => param.content().schema().primitive("string"),
-            BOOLEAN_KEYWORD => param.content().schema().primitive("boolean"),
-            _ => param
-                .content()
-                .schema()
-                .reference(get_identifier(type_arg, cache), false),
-            // TODO this probably needs the root type reference
-        };
-    }
-
-    if let Some(required) = arguments.get(1) {
-        let literal = required.literal.as_ref().unwrap();
-        param.required(literal.kind == TRUE_KEYWORD);
-    }
-
-    if let Some(namespace) = arguments.get(2) {
-        if let Some(ref literal) = namespace.literal {
-            let text = literal.text.clone();
-            param.content().schema().namespace(text);
-        }
-    }
-
-    if let Some(format) = arguments.get(3) {
-        if let Some(ref literal) = format.literal {
-            let text = literal.text.clone();
-            param.content().schema().format(text);
-        }
-    }
-}
-
-fn get_response_options(node: &AstNode, cache: &HashMap<String, Declaration>) -> ResponseOptions {
-    let mut response_args = ResponseOptions::new();
-    let properties = node.properties.as_ref().unwrap();
-    for prop in properties {
-        if let Some(ref_name) = get_identifier(prop, cache) {
-            match ref_name.as_str() {
-                "description" => response_args.description = prop.initializer.as_ref().unwrap().text.clone(),
-                "example" => response_args.example = prop.initializer.as_ref().unwrap().text.clone(),
-                "namespace" => response_args.namespace = prop.initializer.as_ref().unwrap().text.clone(),
-                "statusCode" => response_args.status_code = prop.initializer.as_ref().unwrap().text.clone(),
-                _ => {}
-            }
-        }
-    }
-
-    response_args
-}
-
-fn get_identifier(node: &AstNode, cache: &HashMap<String, Declaration>) -> Option<String> {
-    if let Some(ref text) = node.escaped_text {
-        return find_type_name(text, cache).into();
-    }
-
-    if let Some(ref name) = node.name {
-        let text = name.escaped_text.as_ref().unwrap();
-        return find_type_name(text, cache).into();
-    }
-
-    if let Some(ref expression) = node.expression {
-        let text = expression.escaped_text.as_ref().unwrap();
-        return find_type_name(text, cache).into();
-    }
-
-    if let Some(ref type_name) = node.type_name {
-        let text = type_name.escaped_text.as_ref().unwrap();
-        return find_type_name(text, cache).into();
-    }
-
-    None
-}
-
-fn find_type_name(name: &str, cache: &HashMap<String, Declaration>) -> String {
-    let mut key = name;
-    let mut previous = "";
-    while previous != key && cache.contains_key(key) {
-        match cache.get(key) {
-            Some(Declaration::Alias { from: _, to }) => {
-                previous = key;
-                key = to;
-            }
-            _ => previous = key,
-        }
-    }
-
-    key.to_string()
 }
