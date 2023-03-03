@@ -1,7 +1,5 @@
-import fg from 'fast-glob'
 import { Command } from 'commander';
 import path from 'path';
-import { CompilerOptions } from 'typescript';
 import { generateSchemas, OpenApiOptions } from '../generator'
 import { getContext } from '../utils';
 

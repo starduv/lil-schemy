@@ -3,7 +3,7 @@ import { OpenAPIV3 } from 'openapi-types'
 import { generateSchemas } from '../src/generator'
 import { getContext } from '../src/utils'
 
-describe('paths', () => {
+describe('open api generator', () => {
     let schema: OpenAPIV3.Document;
     let context = getContext(__dirname, ["test-api/routes/*.ts"], {
         project: './tsconfig.json'
@@ -19,221 +19,249 @@ describe('paths', () => {
             }
         })
 
-        console.log(result.openApi.schema)
-
         schema = JSON.parse(result.openApi.schema || "");
     })
 
-    it('generates api paths', () => {
-        expect(schema.paths["/user"]).to.deep.equal({
-            "get": {
-                "responses": {
-                    "200": {
-                        "description": "Who am I",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/v1/properties/User",
-                                },
-                                "example": {
-                                    "$ref": "#/components/examples/v1.User"
-                                }
+    it('generates schemas', () => {
+        expect(schema.components?.schemas).to.deep.equal({
+            v1: {
+                type: "object",
+                properties: {
+                    User: {
+                        type: "object",
+                        properties: {
+                            name: {
+                                type: "string"
                             }
-                        }
+                        },
+                        required: ["name"]
                     }
                 },
-                "parameters": [
-                    {
-                        "name": "lat",
-                        "in": "query",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "number"
-                                }
-                            }
-                        },
-                        "required": false
-                    },
-                    {
-                        "name": "long",
-                        "in": "query",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "number"
-                                }
-                            }
-                        },
-                        "required": false
-                    },
-                    {
-                        "name": "user",
-                        "in": "header",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/v1/properties/User"
-                                }
-                            }
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "space"
-                ]
             },
-            post: {
-                requestBody: {
-                    content: {
-                        "application/json": {
-                            schema: {
-                                $ref: "#/components/schemas/v1/properties/CreateUserRequest"
-                            }
-                        }
-                    },
-                    required: true
-                },
-                responses: {
-                    201: {
-                        description: "Create a new user",
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    $ref: "#/components/schemas/v1/properties/User"
-                                }
-                            }
-                        }
+            User: {
+                type: "object",
+                properties: {
+                    name: {
+                        type: "string"
                     }
                 },
-                tags: ["Admin"]
-            },
-            put: {
-                requestBody: {
-                    content: {
-                        "application/json": {
-                            schema: {
-                                $ref: "#/components/schemas/v1/properties/UserPatch"
-                            }
-                        }
-                    },
-                    required: false
-                },
-                responses: {
-                    202: {
-                        description: "Updated User",
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    $ref: "#/components/schemas/v1/properties/AdminUser"
-                                }
-                            }
-                        }
-                    }
-                },
-                tags: ["User"]
+                required: ["name"]
             }
-        });
-        expect(schema.paths["/user/{id}"]).to.deep.eq({
-            get: {
-                parameters: [
-                    {
-                        in: "path",
-                        name: "id",
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    type: "string",
-                                }
-                            }
-                        },
-                        required: true
-                    }
-                ],
-                responses: {
-                    200: {
-                        description: "a specific admin user",
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    $ref: "#/components/schemas/AdminUser"
+        })
+    })
+
+    it('generates api paths', () => {
+        expect(schema.paths).to.deep.equal({
+            "/user": {
+                get: {
+                    responses: {
+                        200: {
+                            description: "Who am I",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/v1/properties/User",
+                                    },
+                                    example: {
+                                        $ref: "#/components/examples/v1.User"
+                                    }
                                 }
                             }
                         }
-                    }
-                }
-            },
-            patch: {
-                parameters: [
-                    {
-                        in: "path",
-                        name: "id",
+                    },
+                    parameters: [
+                        {
+                            name: "lat",
+                            in: "query",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "number"
+                                    }
+                                }
+                            },
+                            required: false
+                        },
+                        {
+                            name: "long",
+                            in: "query",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "number"
+                                    }
+                                }
+                            },
+                            required: false
+                        },
+                        {
+                            name: "user",
+                            in: "header",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        "$ref": "#/components/schemas/v1/properties/User"
+                                    }
+                                }
+                            },
+                            required: true
+                        }
+                    ],
+                    tags: [
+                        "space"
+                    ]
+                },
+                post: {
+                    requestBody: {
                         content: {
                             "application/json": {
                                 schema: {
-                                    type: "string",
+                                    $ref: "#/components/schemas/v1/properties/CreateUserRequest"
                                 }
                             }
                         },
                         required: true
                     },
-                    {
-                        in: "query",
-                        name: "date",
+                    responses: {
+                        201: {
+                            description: "Create a new user",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/v1/properties/User"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    tags: ["Admin"]
+                },
+                put: {
+                    requestBody: {
                         content: {
                             "application/json": {
                                 schema: {
-                                    type: "string",
-                                    format: "date"
+                                    $ref: "#/components/schemas/v1/properties/UserPatch"
                                 }
                             }
                         },
                         required: false
-                    }
-                ],
-                responses: {
-                    202: {
-                        description: "a modified admin user",
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    $ref: "#/components/schemas/AdminUser",
-                                },
-                            }
-                        }
-                    }
-                }
-            },
-            delete: {
-                parameters: [
-                    {
-                        in: "path",
-                        name: "id",
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    type: "string",
+                    },
+                    responses: {
+                        202: {
+                            description: "Updated User",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/v1/properties/AdminUser"
+                                    }
                                 }
                             }
-                        },
-                        required: true
-                    }
-                ],
-                responses: {
-                    204: {
-                        description: "no content",
-                        content: {
-                            "application/json": {
-                                example: {
-                                    $ref: "#/components/examples/v1.NoContent"
+                        }
+                    },
+                    tags: ["User"]
+                }
+            },
+            "/user/{id}": {
+                get: {
+                    parameters: [
+                        {
+                            in: "path",
+                            name: "id",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "string",
+                                    }
+                                }
+                            },
+                            required: true
+                        }
+                    ],
+                    responses: {
+                        200: {
+                            description: "a specific admin user",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/AdminUser"
+                                    }
                                 }
                             }
                         }
                     }
                 },
-                tags: ["Admin", "Users"],
+                patch: {
+                    parameters: [
+                        {
+                            in: "path",
+                            name: "id",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "string",
+                                    }
+                                }
+                            },
+                            required: true
+                        },
+                        {
+                            in: "query",
+                            name: "date",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "string",
+                                        format: "date"
+                                    }
+                                }
+                            },
+                            required: false
+                        }
+                    ],
+                    responses: {
+                        202: {
+                            description: "a modified admin user",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/AdminUser",
+                                    },
+                                }
+                            }
+                        }
+                    }
+                },
+                delete: {
+                    parameters: [
+                        {
+                            in: "path",
+                            name: "id",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "string",
+                                    }
+                                }
+                            },
+                            required: true
+                        }
+                    ],
+                    responses: {
+                        204: {
+                            description: "no content",
+                            content: {
+                                "application/json": {
+                                    example: {
+                                        $ref: "#/components/examples/v1.NoContent"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    tags: ["Admin", "Users"],
+                }
             }
-        })
+        });
     })
 })

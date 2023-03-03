@@ -177,6 +177,7 @@ pub struct OpenApiGenerator<'m> {
     declarations: HashMap<String, Declaration>,
     open_api: OpenApi,
     module_map: &'m HashMap<String, String>,
+    references: Vec<String>,
 }
 impl<'m> OpenApiGenerator<'m> {
     pub fn new(module_map: &'m HashMap<String, String>, ast_map: &'m HashMap<String, AstNode>) -> Self {
@@ -185,11 +186,18 @@ impl<'m> OpenApiGenerator<'m> {
             open_api: OpenApi::new(),
             declarations: HashMap::new(),
             module_map,
+            references: Vec::new(),
         }
     }
 
     pub(crate) fn result(&self) -> &super::open_api::OpenApi {
         &self.open_api
+    }
+
+    fn add_schemas(&mut self) -> () {
+        for ref_type in &self.references {
+            println!("{}", ref_type)
+        }
     }
 
     fn cache_variables(&mut self, node: &AstNode) -> () {
@@ -436,5 +444,7 @@ impl<'m> OpenApiGenerator<'m> {
             .expect(&format!("Could not find ast for path '{}'", path));
 
         source_file.for_each_child(|node| self.find_api_paths(node));
+
+        self.add_schemas();
     }
 }
