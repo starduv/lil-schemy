@@ -21,9 +21,8 @@ export const getContext = (cwd: string, globs: string[], compilerOptions: ts.Com
         );
     }
 
-    const astMap: { [path: string]: ts.Node } = {};
     const moduleNames: { [alias: string]: string } = {}
-    const masterCache: Map<string, ts.Node> = new Map();
+    const astMap: { [path: string]: ts.Node } = {};
     const files = fg(globs, {
         absolute: true,
         cwd
@@ -33,16 +32,14 @@ export const getContext = (cwd: string, globs: string[], compilerOptions: ts.Com
 
     while (fileNames.length) {
         const [rel, full] = fileNames.pop() as [string | null, string];
-        if (!masterCache.has(full)) {
-            masterCache.set(full, getAst(full));
-        }
 
         if (rel) moduleNames[rel] = full;
 
-        const ast = masterCache.get(full);
-        astMap[rel || full] = ast as ts.Node;
+        if (!astMap[full]) {
+            astMap[full] = getAst(full);
+        }
 
-        for (const paths of getRefModules(ast as ts.Node, compilerOptions)) {
+        for (const paths of getRefModules(astMap[full] as ts.Node, compilerOptions)) {
             if (paths[0] && paths[1]) {
                 fileNames.push(paths as RefPaths);
             }

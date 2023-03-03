@@ -15,7 +15,9 @@ pub struct AstNode {
     pub declarations: Option<Vec<AstNode>>,
     pub elements: Option<Vec<AstNode>>,
     pub escaped_text: Option<String>,
+    pub export_clause: Option<Box<AstNode>>,
     pub expression: Option<Box<AstNode>>,
+    pub file_name: Option<String>,
     pub import_clause: Option<Box<AstNode>>,
     pub initializer: Option<Box<AstNode>>,
     pub literal: Option<Box<AstNode>>,
@@ -117,6 +119,7 @@ impl AstNode {
     }
 }
 
+#[derive(Debug)]
 pub enum Declaration {
     Alias { from: String, to: String },
     DefaultImport { file: String },
