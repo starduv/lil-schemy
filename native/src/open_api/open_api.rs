@@ -139,7 +139,7 @@ impl ApiPathOperation {
         if name.is_some() {
             content
                 .schema()
-                .reference(name.clone(), false)
+                .reference(name.to_owned(), false)
                 .namespace(response_args.namespace);
         }
 

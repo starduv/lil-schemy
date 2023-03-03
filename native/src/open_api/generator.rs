@@ -1,23 +1,36 @@
-use ahash::{HashMap, HashMapExt};
+use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
 
 use crate::typescript::*;
 
 use super::open_api::{ApiPathOperation, OpenApi, PathArgs, ResponseOptions};
 
-fn add_body_parameter(operation: &mut ApiPathOperation, node: &AstNode, cache: &HashMap<String, Declaration>) -> () {
+fn add_body_parameter(
+    operation: &mut ApiPathOperation,
+    node: &AstNode,
+    cache: &HashMap<String, Declaration>,
+    type_refs: &mut HashSet<String>,
+) -> () {
     let param = operation.body();
     let arguments = node.type_arguments.as_ref().unwrap();
     if let Some(type_arg) = arguments.get(0) {
         match type_arg.kind {
             // TODO add format option to operation parameters
-            NUMBER_KEYWORD => param.content().schema().primitive("number"),
-            STRING_KEYWORD => param.content().schema().primitive("string"),
-            BOOLEAN_KEYWORD => param.content().schema().primitive("boolean"),
-            _ => param
-                .content()
-                .schema()
-                .reference(get_identifier(type_arg, cache), false),
-            // TODO this probably needs the root type reference
+            NUMBER_KEYWORD => {
+                param.content().schema().primitive("number");
+            }
+            STRING_KEYWORD => {
+                param.content().schema().primitive("string");
+            }
+            BOOLEAN_KEYWORD => {
+                param.content().schema().primitive("boolean");
+            }
+            _ => {
+                let type_ref = get_identifier(type_arg, cache);
+                param.content().schema().reference(type_ref.clone(), false);
+                if let Some(type_ref) = type_ref {
+                    type_refs.insert(type_ref);
+                }
+            }
         };
     }
 
@@ -47,20 +60,29 @@ fn add_operation_parameter(
     operation: &mut ApiPathOperation,
     node: &AstNode,
     cache: &HashMap<String, Declaration>,
+    type_refs: &mut HashSet<String>,
 ) -> () {
     let param = operation.param(name, location);
     let arguments = node.type_arguments.as_ref().unwrap();
     if let Some(type_arg) = arguments.get(0) {
         match type_arg.kind {
             // TODO add format option to operation parameters
-            NUMBER_KEYWORD => param.content().schema().primitive("number"),
-            STRING_KEYWORD => param.content().schema().primitive("string"),
-            BOOLEAN_KEYWORD => param.content().schema().primitive("boolean"),
-            _ => param
-                .content()
-                .schema()
-                .reference(get_identifier(type_arg, cache), false),
-            // TODO this probably needs the root type reference
+            NUMBER_KEYWORD => {
+                param.content().schema().primitive("number");
+            }
+            STRING_KEYWORD => {
+                param.content().schema().primitive("string");
+            }
+            BOOLEAN_KEYWORD => {
+                param.content().schema().primitive("boolean");
+            }
+            _ => {
+                let type_ref = get_identifier(type_arg, cache);
+                param.content().schema().reference(type_ref.clone(), false);
+                if let Some(type_ref) = type_ref {
+                    type_refs.insert(type_ref);
+                }
+            } // TODO this probably needs the root type reference
         };
     }
 
@@ -177,7 +199,7 @@ pub struct OpenApiGenerator<'m> {
     declarations: HashMap<String, Declaration>,
     open_api: OpenApi,
     module_map: &'m HashMap<String, String>,
-    references: Vec<String>,
+    references: HashSet<String>,
 }
 impl<'m> OpenApiGenerator<'m> {
     pub fn new(module_map: &'m HashMap<String, String>, ast_map: &'m HashMap<String, AstNode>) -> Self {
@@ -186,7 +208,7 @@ impl<'m> OpenApiGenerator<'m> {
             open_api: OpenApi::new(),
             declarations: HashMap::new(),
             module_map,
-            references: Vec::new(),
+            references: HashSet::new(),
         }
     }
 
@@ -362,6 +384,10 @@ impl<'m> OpenApiGenerator<'m> {
                             let operation = self.open_api.path(route).method(method);
                             let ref_name = get_identifier(&response_type, &self.declarations);
                             operation.response(&ref_name, response_options);
+
+                            if let Some(ref ref_name) = ref_name {
+                                self.references.insert(ref_name.to_owned());
+                            }
                         }
                     }
                 }
@@ -380,23 +406,44 @@ impl<'m> OpenApiGenerator<'m> {
                     if text.eq("QueryParam") {
                         let property_name = node.name.as_ref().unwrap();
                         let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "query", operation, _type, &self.declarations)
+                        add_operation_parameter(
+                            &name,
+                            "query",
+                            operation,
+                            _type,
+                            &self.declarations,
+                            &mut self.references,
+                        )
                     }
 
                     if text.eq("RouteParam") {
                         let property_name = node.name.as_ref().unwrap();
                         let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "path", operation, _type, &self.declarations)
+                        add_operation_parameter(
+                            &name,
+                            "path",
+                            operation,
+                            _type,
+                            &self.declarations,
+                            &mut self.references,
+                        )
                     }
 
                     if text.eq("Header") {
                         let property_name = node.name.as_ref().unwrap();
                         let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "header", operation, _type, &self.declarations)
+                        add_operation_parameter(
+                            &name,
+                            "header",
+                            operation,
+                            _type,
+                            &self.declarations,
+                            &mut self.references,
+                        )
                     }
 
                     if text.eq("BodyParam") {
-                        add_body_parameter(operation, _type, &self.declarations)
+                        add_body_parameter(operation, _type, &self.declarations, &mut self.references)
                     }
                 }
             } else {
