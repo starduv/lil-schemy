@@ -1,9 +1,9 @@
 use serde::Deserialize;
 
 use super::{
-    BLOCK, CALL_EXPRESSION, CLASS_DECLARATION, EXPRESSION_STATEMENT, IMPORT_CLAUSE, INTERFACE_DECLARATION,
-    NAMED_IMPORTS, SOURCE_FILE, TYPE_ALIAS_DECLARATION, TYPE_LITERAL, VARIABLE_DECLARATION, VARIABLE_DECLARATION_LIST,
-    VARIABLE_STATEMENT,
+    ARROW_FUNCTION, ASYNC_KEYWORD, BLOCK, CALL_EXPRESSION, CLASS_DECLARATION, EXPRESSION_STATEMENT, IMPORT_CLAUSE,
+    INTERFACE_DECLARATION, NAMED_IMPORTS, SOURCE_FILE, TYPE_ALIAS_DECLARATION, TYPE_LITERAL, VARIABLE_DECLARATION,
+    VARIABLE_DECLARATION_LIST, VARIABLE_STATEMENT,
 };
 
 #[derive(Clone, Deserialize, Debug)]
@@ -24,6 +24,7 @@ pub struct AstNode {
     pub kind: u16,
     pub members: Option<Vec<AstNode>>,
     pub module_specifier: Option<Box<AstNode>>,
+    pub modifiers: Option<Vec<AstNode>>,
     pub name: Option<Box<AstNode>>,
     pub named_bindings: Option<Box<AstNode>>,
     pub parameters: Option<Vec<AstNode>>,
@@ -40,6 +41,13 @@ pub struct AstNode {
 impl AstNode {
     pub(crate) fn for_each_child(&self, mut func: impl FnMut(&AstNode)) -> () {
         match self.kind {
+            ARROW_FUNCTION => {
+                for ref node in self.parameters.as_ref().unwrap() {
+                    func(node)
+                }
+
+                func(self.body.as_ref().unwrap());
+            }
             BLOCK => {
                 for ref node in self.statements.as_ref().unwrap() {
                     func(node)
@@ -122,8 +130,7 @@ impl AstNode {
 #[derive(Debug)]
 pub enum Declaration {
     Alias { from: String, to: String },
-    DefaultImport { file: String },
+    Type { node: AstNode },
+    Export { name: String, file: String },
     Import { name: String, file: String },
-    ComplexType { node: AstNode },
-    SimpleType(String),
 }

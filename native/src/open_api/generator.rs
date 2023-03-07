@@ -1,15 +1,13 @@
-use std::sync::Mutex;
+use std::collections::BTreeMap;
 
 use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
-use lazy_static::lazy_static;
+use serde::__private::de;
 
 use crate::typescript::*;
 
 use super::open_api::{ApiPathOperation, OpenApi, PathArgs, ResponseOptions};
 
-lazy_static! {
-    static ref DECLARATIONS: Mutex<HashMap<String, HashMap<String, Declaration>>> = Mutex::new(HashMap::new());
-}
+static mut DECLARATIONS: BTreeMap<String, HashMap<String, Declaration>> = BTreeMap::new();
 
 fn add_body_parameter(
     operation: &mut ApiPathOperation,
@@ -111,163 +109,204 @@ fn add_operation_parameter(
     }
 }
 
-fn cache_declarations(node: &AstNode, file_name: &String, module_map: &HashMap<String, String>) -> () {
+fn cache_declarations(node: &AstNode, file_name: &str, module_map: &HashMap<String, String>) -> () {
     match node.kind {
         CLASS_DECLARATION => cache_object_type(node, file_name),
         IMPORT_DECLARATION => cache_import_declaration(node, file_name, module_map),
+        EXPORT_DECLARATION => cache_export_declaration(node, file_name, module_map),
         INTERFACE_DECLARATION => cache_object_type(node, file_name),
         TYPE_ALIAS_DECLARATION => cache_object_type(node, file_name),
         VARIABLE_STATEMENT => cache_variables(node, file_name),
-        _ => {}
+        _ => node.for_each_child(|n| cache_declarations(n, file_name, module_map)),
+        // _ => {}
     }
 }
 
-fn cache_object_type(node: &AstNode, file_name: &String) -> () {
-    let mut cache = DECLARATIONS.lock().unwrap();
-    let declarations = cache.get_mut(file_name).unwrap();
-    node.for_each_child(|child| {
-        let name = child.name.as_ref().unwrap();
-        let text = name.escaped_text.as_ref().unwrap();
-        declarations.insert(text.to_string(), Declaration::ComplexType { node: node.clone() });
-    })
-}
-
-fn cache_import_declaration(node: &AstNode, file_name: &String, module_map: &HashMap<String, String>) -> () {
-    let mut cache = DECLARATIONS.lock().unwrap();
-    let declarations = cache.entry(file_name.to_owned()).or_insert(HashMap::new());
-    let module_specifier = node.module_specifier.as_ref().unwrap();
-    let module_reference = module_specifier.text.as_ref().unwrap();
-    let absolute = module_map.get(module_reference).expect("Could not find module");
-
-    let import_clause = node.import_clause.as_ref().unwrap();
-    if let Some(ref name) = import_clause.name {
-        let text = name.escaped_text.as_ref().unwrap();
-        declarations.insert(
-            text.to_string(),
-            Declaration::DefaultImport {
-                file: absolute.to_string(),
+fn cache_object_type(node: &AstNode, file_name: &str) -> () {
+    unsafe {
+        let name = node.name.as_ref().unwrap();
+        let text = match node.modifiers {
+            Some(ref modifiers) => match modifiers.iter().find(|n| n.kind == DEFAULT_KEYWORD) {
+                Some(_) => "default",
+                None => name.escaped_text.as_ref().unwrap(),
             },
-        );
-    }
+            None => name.escaped_text.as_ref().unwrap(),
+        };
 
-    import_clause.for_each_child(|bindings| {
-        bindings.for_each_child(|element| {
-            let name = element.name.as_ref().unwrap();
-            let name_text = name.escaped_text.as_ref().unwrap();
-            if let Some(ref property_name) = element.property_name {
-                let text = property_name.escaped_text.as_ref().unwrap();
-                declarations.insert(
-                    name_text.to_string(),
-                    Declaration::Import {
-                        name: text.to_string(),
-                        file: absolute.to_string(),
-                    },
-                );
-            } else {
-                declarations.insert(
-                    name_text.to_string(),
-                    Declaration::Import {
-                        name: name_text.to_string(),
-                        file: absolute.to_string(),
-                    },
-                );
-            }
-        })
-    })
+        let declarations = DECLARATIONS.entry(file_name.to_string()).or_insert(HashMap::new());
+        declarations.insert(text.to_string(), Declaration::Type { node: node.clone() });
+    }
 }
 
-fn cache_variables(node: &AstNode, file_name: &String) -> () {
-    let mut cache = DECLARATIONS.lock().unwrap();
-    let declarations = cache.get_mut(file_name).unwrap();
-    if let Some(ref list) = node.declaration_list {
-        list.for_each_child(|declaration| {
-            let initializer = declaration.initializer.as_ref().unwrap();
-            let name = declaration.name.as_ref().unwrap();
+fn cache_import_declaration(node: &AstNode, file_name: &str, module_map: &HashMap<String, String>) -> () {
+    unsafe {
+        let declarations = DECLARATIONS.entry(file_name.to_owned()).or_insert(HashMap::new());
+        let module_specifier = node.module_specifier.as_ref().unwrap();
+        let module_reference = module_specifier.text.as_ref().unwrap();
+        let absolute = module_map.get(module_reference).expect("Could not find module");
+
+        let import_clause = node.import_clause.as_ref().unwrap();
+        if let Some(ref name) = import_clause.name {
             let text = name.escaped_text.as_ref().unwrap();
-            match initializer.kind {
-                AS_EXPRESSION => {
-                    let _type = initializer._type.as_ref().unwrap();
-                    let type_name = _type.type_name.as_ref().unwrap();
-                    let type_name_text = type_name.escaped_text.as_ref().unwrap();
-                    declarations.insert(
-                        text.to_string(),
-                        Declaration::Alias {
-                            from: text.to_string(),
-                            to: type_name_text.to_string(),
-                        },
-                    );
-                }
-                TYPE_ASSERTION_EXPRESSION => {
-                    let _type = initializer._type.as_ref().unwrap();
-                    let type_name = _type.type_name.as_ref().unwrap();
-                    let type_name_text = type_name.escaped_text.as_ref().unwrap();
-                    declarations.insert(
-                        text.to_string(),
-                        Declaration::Alias {
-                            from: text.to_string(),
-                            to: type_name_text.to_string(),
-                        },
-                    );
-                }
-                CALL_EXPRESSION => {
-                    let expression = initializer.expression.as_ref().unwrap();
-                    let expression_text = expression.escaped_text.as_ref().unwrap();
-                    declarations.insert(
-                        text.to_string(),
-                        Declaration::Alias {
-                            from: text.to_string(),
-                            to: expression_text.to_string(),
-                        },
-                    );
-                }
-                NEW_EXPRESSION => {
-                    let expression = initializer.expression.as_ref().unwrap();
-                    let expression_text = expression.escaped_text.as_ref().unwrap();
-                    declarations.insert(
-                        text.to_string(),
-                        Declaration::Alias {
-                            from: text.to_string(),
-                            to: expression_text.to_string(),
-                        },
-                    );
-                }
-                FALSE_KEYWORD => {
-                    declarations.insert(text.to_string(), Declaration::SimpleType(String::from("boolean")));
-                }
-                NUMERIC_LITERAL => {
-                    declarations.insert(text.to_string(), Declaration::SimpleType(String::from("number")));
-                }
-                STRING_LITERAL => {
-                    declarations.insert(text.to_string(), Declaration::SimpleType(String::from("string")));
-                }
-                TRUE_KEYWORD => {
-                    declarations.insert(text.to_string(), Declaration::SimpleType(String::from("boolean")));
-                }
-                _ => {
-                    declarations.insert(text.to_string(), Declaration::ComplexType { node: node.clone() });
-                }
-            }
+            declarations.insert(
+                text.to_string(),
+                Declaration::Import {
+                    name: String::from("default"),
+                    file: absolute.to_string(),
+                },
+            );
+        }
+
+        import_clause.for_each_child(|bindings| {
+            bindings.for_each_child(|element| {
+                let name = element.name.as_ref().unwrap();
+                let name_text = name.escaped_text.as_ref().unwrap();
+                let alias = match element.property_name {
+                    Some(ref node) => node.escaped_text.as_ref().unwrap(),
+                    None => name_text,
+                };
+
+                declarations.insert(
+                    name_text.to_string(),
+                    Declaration::Import {
+                        name: alias.to_string(),
+                        file: absolute.to_string(),
+                    },
+                );
+            })
         })
+    }
+}
+
+fn cache_export_declaration(node: &AstNode, file_name: &str, module_map: &HashMap<String, String>) -> () {
+    unsafe {
+        let declarations = DECLARATIONS.entry(file_name.to_owned()).or_insert(HashMap::new());
+        let module_specifier = node.module_specifier.as_ref().unwrap();
+        let module_reference = module_specifier.text.as_ref().unwrap();
+        let absolute = module_map.get(module_reference).expect("Could not find module");
+
+        let export_clause = node.export_clause.as_ref().unwrap();
+
+        export_clause.for_each_child(|exports| {
+            exports.for_each_child(|element| {
+                let name = element.name.as_ref().unwrap();
+                let name_text = name.escaped_text.as_ref().unwrap();
+                let alias = match element.property_name {
+                    Some(ref node) => node.escaped_text.as_ref().unwrap(),
+                    None => name_text,
+                };
+
+                declarations.insert(
+                    name_text.to_string(),
+                    Declaration::Export {
+                        name: alias.to_string(),
+                        file: absolute.to_string(),
+                    },
+                );
+            })
+        })
+    }
+}
+
+fn cache_variables(node: &AstNode, file_name: &str) -> () {
+    unsafe {
+        let declarations = DECLARATIONS.get_mut(file_name).unwrap();
+        if let Some(ref list) = node.declaration_list {
+            list.for_each_child(|declaration| {
+                let initializer = declaration.initializer.as_ref().unwrap();
+                let name = declaration.name.as_ref().unwrap();
+                let text = name.escaped_text.as_ref().unwrap();
+                match initializer.kind {
+                    AS_EXPRESSION => {
+                        let _type = initializer._type.as_ref().unwrap();
+                        let type_name = _type.type_name.as_ref().unwrap();
+                        let type_name_text = type_name.escaped_text.as_ref().unwrap();
+                        declarations.insert(
+                            text.to_string(),
+                            Declaration::Alias {
+                                from: text.to_string(),
+                                to: type_name_text.to_string(),
+                            },
+                        );
+                    }
+                    TYPE_ASSERTION_EXPRESSION => {
+                        let _type = initializer._type.as_ref().unwrap();
+                        let type_name = _type.type_name.as_ref().unwrap();
+                        let type_name_text = type_name.escaped_text.as_ref().unwrap();
+                        declarations.insert(
+                            text.to_string(),
+                            Declaration::Alias {
+                                from: text.to_string(),
+                                to: type_name_text.to_string(),
+                            },
+                        );
+                    }
+                    CALL_EXPRESSION => {
+                        let expression = initializer.expression.as_ref().unwrap();
+                        let expression_text = expression.escaped_text.as_ref().unwrap();
+                        declarations.insert(
+                            text.to_string(),
+                            Declaration::Alias {
+                                from: text.to_string(),
+                                to: expression_text.to_string(),
+                            },
+                        );
+                    }
+                    NEW_EXPRESSION => {
+                        let expression = initializer.expression.as_ref().unwrap();
+                        let expression_text = expression.escaped_text.as_ref().unwrap();
+                        declarations.insert(
+                            text.to_string(),
+                            Declaration::Alias {
+                                from: text.to_string(),
+                                to: expression_text.to_string(),
+                            },
+                        );
+                    }
+                    _ => {
+                        declarations.insert(text.to_string(), Declaration::Type { node: node.clone() });
+                    }
+                }
+            })
+        }
     }
 }
 
 fn find_type_name(name: &str, file_name: &String) -> String {
-    let mut key = name;
-    let mut previous = "";
-    let mut cache = DECLARATIONS.lock().unwrap();
-    let declarations = cache.get_mut(file_name).unwrap();
-    while previous != key && declarations.contains_key(key) {
-        match declarations.get(key) {
-            Some(Declaration::Alias { from: _, to }) => {
-                previous = key;
-                key = to;
+    unsafe {
+        let mut key = name;
+        let mut previous = "";
+        let declarations = DECLARATIONS.get(file_name).unwrap();
+        while previous != key && declarations.contains_key(key) {
+            match declarations.get(key) {
+                Some(Declaration::Alias { from: _, to }) => {
+                    previous = key;
+                    key = to;
+                }
+                _ => previous = key,
             }
-            _ => previous = key,
         }
-    }
 
-    key.to_string()
+        key.to_string()
+    }
 }
+
+// fn get_declaration(reference: &str, file_name: &str) -> Option<&'static Declaration> {
+//     let cache = DECLARATIONS.lock().unwrap();
+//     let declarations = cache.get(file_name).unwrap();
+//     let mut key = reference;
+//     let mut previous = "";
+//     while key != previous && declarations.contains_key(key) {
+//         match declarations.get(key) {
+//             Some(Declaration::Alias { from: _, to }) => {
+//                 previous = key;
+//                 key = to;
+//             }
+//             _ => previous = key,
+//         }
+//     }
+
+// }
 
 fn get_identifier(node: &AstNode, file_name: &String) -> Option<String> {
     if let Some(ref text) = node.escaped_text {
@@ -361,29 +400,7 @@ impl<'m> OpenApiGenerator<'m> {
         &self.open_api
     }
 
-    fn add_schemas(&mut self, file_name: &String) -> () {
-        let declarations = DECLARATIONS.lock().unwrap();
-        for ref_type in &self.references {
-            match declarations.get(file_name).unwrap().get(ref_type) {
-                Some(Declaration::DefaultImport { file }) => {
-                    let ast = self.ast_map.get(file).expect(&format!("AST not found for '{}'", file));
-                    if !declarations.contains_key(file) {
-                        cache_declarations(ast, file, self.module_map);
-                    }
-                }
-                Some(Declaration::Import { name: _, file }) => {
-                    let ast = self.ast_map.get(file).expect(&format!("AST not found for '{}'", file));
-                    if !declarations.contains_key(file) {
-                        cache_declarations(ast, file, self.module_map);
-                    }
-                }
-                _ => {}
-            };
-        }
-    }
-
     fn add_operation_response(&mut self, route: &str, method: &str, node: &AstNode, file_name: &String) -> () {
-        cache_declarations(node, file_name, self.module_map);
         if let Some(ref expression) = node.expression {
             if let Some(ref text) = expression.escaped_text {
                 if text.eq("Response") {
@@ -478,7 +495,6 @@ impl<'m> OpenApiGenerator<'m> {
             self.add_operation_params(&route, &method, request_param, file_name);
             self.add_operation_response(&route, &method, &*route_handler_body, file_name);
         } else {
-            cache_declarations(node, file_name, self.module_map);
             node.for_each_child(|node| self.find_api_paths(node, file_name))
         }
     }
@@ -489,8 +505,43 @@ impl<'m> OpenApiGenerator<'m> {
             .get(&path)
             .expect(&format!("Could not find ast for path '{}'", path));
 
+        cache_declarations(source_file, &path, self.module_map);
+
         source_file.for_each_child(|node| self.find_api_paths(node, &path));
 
-        self.add_schemas(&path);
+        let mut references = self.references.iter().collect::<Vec<&String>>();
+        while references.is_empty() == false {
+            let reference = references.pop().unwrap();
+            let node = self.get_declaration(reference, &path);
+            // add_schema(reference, declaration, &path);
+        }
+    }
+    fn get_declaration(&self, reference: &str, file_name: &str) -> Option<&AstNode> {
+        unsafe {
+            if !DECLARATIONS.contains_key(file_name) {
+                let source_file = self.ast_map.get(file_name).unwrap();
+                cache_declarations(source_file, file_name, self.module_map);
+            }
+
+            let mut key = reference;
+            let mut previous: &str = "";
+            let declarations = DECLARATIONS.get(file_name).unwrap();
+            while key != previous && declarations.contains_key(key) {
+                match declarations.get(key) {
+                    Some(Declaration::Alias { from: _, to }) => {
+                        previous = key;
+                        key = to;
+                    }
+                    _ => previous = key,
+                }
+            }
+
+            match declarations.get(key) {
+                Some(Declaration::Export { name, file }) => self.get_declaration(name, file),
+                Some(Declaration::Import { name, file }) => self.get_declaration(name, file),
+                Some(Declaration::Type { node }) => Some(node),
+                _ => None,
+            }
+        }
     }
 }
