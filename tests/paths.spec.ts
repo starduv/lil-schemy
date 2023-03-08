@@ -1,7 +1,11 @@
-import { expect } from 'chai';
+import { expect, use } from 'chai';
+import { writeFileSync } from 'fs';
 import { OpenAPIV3 } from 'openapi-types'
 import { generateSchemas } from '../src/generator'
 import { getContext } from '../src/utils'
+import deepEqual from 'deep-equal-in-any-order';
+
+use(deepEqual);
 
 describe('open api generator', () => {
     let schema: OpenAPIV3.Document;
@@ -20,10 +24,12 @@ describe('open api generator', () => {
         })
 
         schema = JSON.parse(result.openApi.schema || "");
+
+        writeFileSync('/home/captainrdubb/dev/schema.json', result.openApi.schema as string)
     })
 
     it('generates schemas', () => {
-        expect(schema.components?.schemas).to.deep.equal({
+        expect(schema.components?.schemas).to.deep.equalInAnyOrder({
             v1: {
                 type: "object",
                 properties: {
@@ -35,17 +41,42 @@ describe('open api generator', () => {
                             }
                         },
                         required: ["name"]
+                    },
+                    AdminUser: {
+                        type: 'object',
+                        properties: {
+                            permissions: {
+                                type: 'array',
+                                items: {
+                                    type: 'string'
+                                }
+                            },
+                            name: {
+                                type: 'string'
+                            }
+                        },
+                        required: ['permissions', 'name']
                     }
                 },
+                required: [
+                    "User",
+                    "AdminUser"
+                ]
             },
-            User: {
-                type: "object",
+            AdminUser: {
+                type: 'object',
                 properties: {
+                    permissions: {
+                        type: 'array',
+                        items: {
+                            type: 'string'
+                        }
+                    },
                     name: {
-                        type: "string"
+                        type: 'string'
                     }
                 },
-                required: ["name"]
+                required: ['permissions', 'name']
             }
         })
     })

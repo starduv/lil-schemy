@@ -1,20 +1,15 @@
 use ahash::{HashMap, HashMapExt};
-use serde::{ser::SerializeStruct, Serialize, Serializer, __private::de::ContentDeserializer};
-
-use crate::typescript::{
-    AstNode, ARRAY_LITERAL_EXPRESSION, AS_EXPRESSION, FALSE_KEYWORD, OBJECT_KEYWORD, OBJECT_LITERAL_EXPRESSION,
-    PROPERTY_ASSIGNMENT, STRING_LITERAL, TRUE_KEYWORD,
-};
+use serde::{ser::SerializeStruct, Serialize, Serializer};
 
 #[derive(Serialize, Debug)]
 pub struct OpenApi {
-    components: ApiComponents,
+    pub components: ApiComponents,
     paths: HashMap<String, ApiPath>,
 }
 impl<'v> OpenApi {
     pub(crate) fn new() -> Self {
         OpenApi {
-            components: ApiComponents {},
+            components: ApiComponents::new(),
             paths: HashMap::new(),
         }
     }
@@ -25,7 +20,21 @@ impl<'v> OpenApi {
 }
 
 #[derive(Serialize, Debug)]
-pub struct ApiComponents {}
+pub struct ApiComponents {
+    schemas: HashMap<String, ApiSchema>,
+}
+
+impl ApiComponents {
+    pub fn new() -> Self {
+        ApiComponents {
+            schemas: HashMap::new(),
+        }
+    }
+
+    pub fn schema(&mut self, name: &str) -> &mut ApiSchema {
+        self.schemas.entry(name.to_string()).or_insert(ApiSchema::new())
+    }
+}
 
 #[derive(Serialize, Debug)]
 pub struct ApiPath {
@@ -234,6 +243,7 @@ pub struct ApiSchema {
     namespace: Option<String>,
     is_example: bool,
     properties: Option<HashMap<String, ApiSchema>>,
+    required: Vec<String>,
 }
 
 impl Serialize for ApiSchema {
@@ -244,6 +254,15 @@ impl Serialize for ApiSchema {
         let mut state = serializer.serialize_struct("ApiSchema", 5)?;
         if let Some(ref format) = self.format {
             state.serialize_field("format", format)?;
+        }
+        if let Some(ref items) = self.items {
+            state.serialize_field("items", items)?;
+        }
+        if let Some(ref properties) = self.properties {
+            state.serialize_field("properties", properties)?;
+        }
+        if !self.required.is_empty() {
+            state.serialize_field("required", &self.required)?;
         }
         if let Some(ref _type) = self._type {
             state.serialize_field("type", _type)?;
@@ -279,6 +298,7 @@ impl ApiSchema {
             is_example: false,
             items: None,
             properties: None,
+            required: Vec::new(),
         }
     }
 
@@ -304,24 +324,26 @@ impl ApiSchema {
         self
     }
 
-    fn object(&mut self) -> &mut ApiSchema {
+    pub fn object(&mut self) -> &mut ApiSchema {
         self._type = Some(String::from("object"));
         self
     }
 
-    fn property(&mut self, name_text: &str) -> &mut ApiSchema {
+    pub fn property(&mut self, name_text: &str) -> &mut ApiSchema {
+        self.required.push(name_text.to_string());
+
         self.properties
             .get_or_insert(HashMap::new())
             .entry(name_text.to_string())
             .or_insert(ApiSchema::new())
     }
 
-    fn array(&mut self) -> &mut ApiSchema {
+    pub fn array(&mut self) -> &mut ApiSchema {
         self._type = Some(String::from("array"));
         self
     }
 
-    fn items(&mut self) -> &mut ApiSchema {
+    pub fn items(&mut self) -> &mut ApiSchema {
         self.items.get_or_insert(Box::new(ApiSchema::new()))
     }
 }

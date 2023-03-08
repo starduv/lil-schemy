@@ -41,11 +41,13 @@
   },
   "devDependencies": {
     "@types/chai": "^4.3.4",
+    "@types/deep-equal-in-any-order": "^1.0.1",
     "@types/mocha": "^10.0.1",
     "@types/node": "^18.11.18",
     "cargo-cp-artifact": "^0.1.7",
     "chai": "^4.3.7",
     "copyfiles": "^2.4.1",
+    "deep-equal-in-any-order": "^2.0.5",
     "mocha": "^10.2.0",
     "rimraf": "^3.0.2",
     "ts-node": "^10.9.1"

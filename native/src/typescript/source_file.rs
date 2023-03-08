@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 use super::{
-    ARROW_FUNCTION, ASYNC_KEYWORD, BLOCK, CALL_EXPRESSION, CLASS_DECLARATION, EXPRESSION_STATEMENT, IMPORT_CLAUSE,
+    ARROW_FUNCTION, BLOCK, CALL_EXPRESSION, CLASS_DECLARATION, EXPRESSION_STATEMENT, IMPORT_CLAUSE,
     INTERFACE_DECLARATION, NAMED_IMPORTS, SOURCE_FILE, TYPE_ALIAS_DECLARATION, TYPE_LITERAL, VARIABLE_DECLARATION,
     VARIABLE_DECLARATION_LIST, VARIABLE_STATEMENT,
 };
@@ -14,6 +14,7 @@ pub struct AstNode {
     pub declaration_list: Option<Box<AstNode>>,
     pub declarations: Option<Vec<AstNode>>,
     pub elements: Option<Vec<AstNode>>,
+    pub element_type: Option<Box<AstNode>>,
     pub escaped_text: Option<String>,
     pub export_clause: Option<Box<AstNode>>,
     pub expression: Option<Box<AstNode>>,
@@ -133,4 +134,10 @@ pub enum Declaration {
     Type { node: AstNode },
     Export { name: String, file: String },
     Import { name: String, file: String },
+}
+
+#[derive(PartialEq, Eq, Hash)]
+pub struct TypeReference {
+    pub name: String,
+    pub namespace: Option<String>,
 }
