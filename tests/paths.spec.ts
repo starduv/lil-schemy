@@ -24,8 +24,6 @@ describe('open api generator', () => {
         })
 
         schema = JSON.parse(result.openApi.schema || "");
-
-        writeFileSync('/home/captainrdubb/dev/schema.json', result.openApi.schema as string)
     })
 
     it('generates schemas', () => {
