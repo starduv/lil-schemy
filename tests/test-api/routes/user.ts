@@ -1,29 +1,8 @@
 import { BodyParam, Header, Path, QueryParam, Response, RouteParam } from '../../../src';
 import AdminUser, { CreateUserRequest, User, UserPatch } from '../dtos';
+import { Router } from './router'
 
-interface Reply<T> {
-    send: (responseType: T) => void;
-}
-
-const router = {
-    get: (path: string, stuff: unknown, handler: (request: any, reply: any) => Promise<void>) => {
-        return null;
-    },
-    delete: (path: string, stuff: unknown, handler: (request: any, reply: any) => Promise<void>) => {
-        return null;
-    },
-    patch: (path: string, stuff: unknown, handler: (request: any, reply: any) => Promise<void>) => {
-        return null;
-    },
-    post: (path: string, stuff: unknown, handler: (request: any, reply: any) => Promise<void>) => {
-        return null;
-    },
-    put: (path: string, stuff: unknown, handler: (request: any, reply: any) => Promise<void>) => {
-        return null;
-    }
-};
-
-router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: QueryParam<number, false>; headers: { user: Header<User, true, "v1">; }; }, reply: any): Promise<void> => {
+Router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: QueryParam<number, false>; headers: { user: Header<User, true, "v1">; }; }, reply: any): Promise<void> => {
     let success = {} as User;
 
     let response = Response(success, {
@@ -40,7 +19,7 @@ router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: 
     tags: ['space'],
 }));
 
-router.patch("", {}, Path(async (request: { id: RouteParam<string, true>; date: QueryParam<string, false, undefined, "date">; }, reply: any): Promise<void> => {
+Router.patch("", {}, Path(async (request: { id: RouteParam<string, true>; date: QueryParam<string, false, undefined, "date">; }, reply: any): Promise<void> => {
     let admin = new AdminUser();
 
     let response = Response(admin, {
@@ -54,7 +33,7 @@ router.patch("", {}, Path(async (request: { id: RouteParam<string, true>; date: 
     path: '/user/{id}',
 }));
 
-router.get("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
+Router.get("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
     let response = Response(new AdminUser(), {
         statusCode: 200,
         description: "a specific admin user"
@@ -66,7 +45,7 @@ router.get("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply
     path: '/user/{id}',
 }));
 
-router.delete("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
+Router.delete("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
     let response = Response(null, {
         statusCode: 204,
         description: "no content",
@@ -81,7 +60,7 @@ router.delete("", {}, Path(async (request: { id: RouteParam<string, true>; }, re
     tags: ["Admin", "Users"],
 }));
 
-router.post("", {}, Path(async (request: { user: BodyParam<CreateUserRequest, true, "v1">; }, reply: any): Promise<void> => {
+Router.post("", {}, Path(async (request: { user: BodyParam<CreateUserRequest, true, "v1">; }, reply: any): Promise<void> => {
     let response = Response(<User>{}, {
         statusCode: 201,
         description: "Create a new user",
@@ -95,7 +74,7 @@ router.post("", {}, Path(async (request: { user: BodyParam<CreateUserRequest, tr
     tags: ["Admin"]
 }));
 
-router.put("", {}, Path(async (request: { tomato: BodyParam<UserPatch, false, "v1">; }, reply: any): Promise<void> => {
+Router.put("", {}, Path(async (request: { tomato: BodyParam<UserPatch, false, "v1">; }, reply: any): Promise<void> => {
     let response = Response({} as AdminUser, {
         statusCode: 202,
         description: "Updated User",
