@@ -8,7 +8,7 @@ const createConfiguration = (cwd: string) => {
 
     copyFileSync(src, dest);
 
-    console.info('Configuration written to %d', dest);
+    console.info('Configuration written to %s', dest);
 };
 
 export default new Command('init')
