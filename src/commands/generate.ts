@@ -1,22 +1,27 @@
 import { Command } from 'commander';
 import path from 'path';
-import { generateSchemas, OpenApiOptions } from '../generator'
+import { generateSchemas, OpenApiOptions, TypeShiftOptions } from '../generator'
 import { getContext } from '../utils';
 
-const generateOpenApi = (cwd: string, config: OpenApiOptions, project: string) => {
-    const context = getContext(cwd, config.paths, {
-        project
-    })
+const generateOpenApi = (config: TypeShiftOptions) => {
+    const { openApi, project } = config;
 
-    generateSchemas({
-        asts: context.asts,
-        modules: JSON.stringify(context.moduleNames),
-        openApi: {
-            base: JSON.stringify(config.base),
-            paths: context.rootFiles,
-            output: config.output
-        }
-    });
+    if (openApi) {
+        const context = getContext(config.cwd, openApi.paths, {
+            project
+        })
+
+        generateSchemas({
+            asts: JSON.stringify(context.asts),
+            modules: JSON.stringify(context.moduleNames),
+            openApi: {
+                base: JSON.stringify(openApi.base),
+                paths: context.rootFiles,
+                output: openApi.output
+            }
+        });
+    }
+
 };
 
 export default new Command('generate')
@@ -24,5 +29,5 @@ export default new Command('generate')
     .action(async (_, command: Command) => {
         let parentOptions = command.parent?.opts();
         const config = await import(path.resolve(parentOptions?.cwd, parentOptions?.config));
-        generateOpenApi(parentOptions?.cwd, config.openApi, config.project);
+        generateOpenApi(config);
     });

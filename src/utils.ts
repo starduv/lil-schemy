@@ -3,9 +3,9 @@ import { appendFileSync, readFileSync, writeFileSync } from 'fs';
 import ts, { ImportDeclaration, SourceFile } from 'typescript';
 
 export interface TypeShiftContext {
-    asts: string,
-    rootFiles: string[],
+    asts: { [path: string]: ts.Node },
     moduleNames: { [alias: string]: string }
+    rootFiles: string[],
 }
 
 type RefPaths = [string | undefined, string | undefined];
@@ -49,7 +49,7 @@ export const getContext = (cwd: string, globs: string[], compilerOptions: ts.Com
     console.debug("generated ast(s) for ", Object.keys(astMap));
     // writeFileSync("/home/captainrdubb/dev/serde_strong/types.json", JSON.stringify(astMap));
 
-    return { rootFiles: files, asts: JSON.stringify(astMap), moduleNames };
+    return { rootFiles: files, asts: astMap, moduleNames };
 };
 
 const getAst = (p: string): ts.Node => {

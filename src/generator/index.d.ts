@@ -1,16 +1,18 @@
+import { OpenAPIV3 } from 'openapi-types'
+
+export interface TypeShiftOptions {
+    cwd: string;
+    openApi?: OpenApiOptions;
+    project: string;
+}
+
 interface OpenApiOptions {
-    base: OpenAPIV3.Document & {
+    base: Omit<OpenAPIV3.Document, "paths"> & {
         openapi: "3.0.3";
+        paths?: OpenAPIV3.PathsObject
     },
     output?: string;
     paths: string[];
-}
-
-export interface TypeShiftOptions {
-    cwd?: string;
-    asts: string;
-    modules: string;
-    openApi?: OpenApiOptions;
 }
 
 export interface SchemasResult {
@@ -21,7 +23,9 @@ export interface SchemasResult {
     };
 }
 
-interface GenerateSchemaArgs extends TypeShiftOptions {
+interface GenerateSchemaArgs extends Omit<TypeShiftOptions, "cwd", "project"> {
+    asts: string;
+    modules: string;
     openApi?: Omit<OpenApiOptions, "base"> & {
         base: string;
     }

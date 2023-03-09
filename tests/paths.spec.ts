@@ -15,7 +15,7 @@ describe('open api generator', () => {
 
     before(() => {
         const result = generateSchemas({
-            asts: context.asts,
+            asts: JSON.stringify(context.asts),
             modules: JSON.stringify(context.moduleNames),
             openApi: {
                 base: JSON.stringify({}),
