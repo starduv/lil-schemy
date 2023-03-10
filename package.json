@@ -1,7 +1,7 @@
 {
   "name": "typeshift",
   "version": "0.0.1",
-  "description": "TypeShift is a cli tool that enables \"code first\" schema generation from TypeScript",
+  "description": "TypeShift is a cli tool that enables code first schema generation from TypeScript",
   "main": "index.js",
   "os": [
     "darwin",
@@ -17,8 +17,8 @@
     "postbuild": "npm run build:addon && npm run copy:addon && npm run copy:config",
     "build:addon": "node scripts/build-addon",
     "build:app": "tsc -b",
-    "copy:addon": "copyfiles --error --up 2 src/generator/*.node lib/generator",
-    "copy:config": "copyfiles --error --up 2 src/commands/default-config.txt lib/commands",
+    "copy:addon": "copyfiles --error **/*.node lib/generator",
+    "copy:config": "copyfiles --error /default-config.txt lib/commands",
     "test": "mocha",
     "pretest": "npm run build:addon -- --debug",
     "start": "node -r ts-node/register ./src/typeshift.ts"
