@@ -58,5 +58,5 @@ jobs:
         shell: bash
         working-directory: "${{ github.workspace }}/native"
         run: |
-          cargo build --release --locked --target ${{ matrix.build.TARGET }}
+          cargo build --release --frozen --target ${{ matrix.build.TARGET }}
           ls "${{ github.workspace }}/native/target/release"
