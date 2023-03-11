@@ -16,30 +16,30 @@ jobs:
             TOOLCHAIN: stable
             TARGET: x86_64-unknown-linux-gnu
 
-          - NAME: linux-arm64-glibc
-            OS: ubuntu-20.04
-            TOOLCHAIN: stable
-            TARGET: aarch64-unknown-linux-gnu
+          # - NAME: linux-arm64-glibc
+          #   OS: ubuntu-20.04
+          #   TOOLCHAIN: stable
+          #   TARGET: aarch64-unknown-linux-gnu
 
-          - NAME: win32-x64-msvc
-            OS: windows-2022
-            TOOLCHAIN: stable
-            TARGET: x86_64-pc-windows-msvc
+          # - NAME: win32-x64-msvc
+          #   OS: windows-2022
+          #   TOOLCHAIN: stable
+          #   TARGET: x86_64-pc-windows-msvc
 
-          - NAME: win32-arm64-msvc
-            OS: windows-2022
-            TOOLCHAIN: stable
-            TARGET: aarch64-pc-windows-msvc
+          # - NAME: win32-arm64-msvc
+          #   OS: windows-2022
+          #   TOOLCHAIN: stable
+          #   TARGET: aarch64-pc-windows-msvc
 
-          - NAME: darwin-x64
-            OS: macos-11
-            TOOLCHAIN: stable
-            TARGET: x86_64-apple-darwin
+          # - NAME: darwin-x64
+          #   OS: macos-11
+          #   TOOLCHAIN: stable
+          #   TARGET: x86_64-apple-darwin
 
-          - NAME: darwin-arm64
-            OS: macos-11
-            TOOLCHAIN: stable
-            TARGET: aarch64-apple-darwin
+          # - NAME: darwin-arm64
+          #   OS: macos-11
+          #   TOOLCHAIN: stable
+          #   TARGET: aarch64-apple-darwin
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -58,5 +58,5 @@ jobs:
         shell: bash
         working-directory: "${{ github.workspace }}/native"
         run: |
-          cargo build --release --frozen --target ${{ matrix.build.TARGET }}
+          cargo build --release --locked --target ${{ matrix.build.TARGET }}
           ls "${{ github.workspace }}/native/target/release"
