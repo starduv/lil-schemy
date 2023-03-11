@@ -6,7 +6,7 @@ on:
 jobs:
   publish-binaries:
     name: Publish binaries
-    runs-on: ${{ matrix-build.os }}
+    runs-on: ${{ matrix.build.OS }}
     strategy:
       fail-fast: false
       matrix:
@@ -40,20 +40,20 @@ jobs:
             OS: macos-11
             TOOLCHAIN: stable
             TARGET: aarch64-apple-darwin
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
 
-        - name: Intall Rust toolchain
-          uses: actions-rs/toolchain@v1
-          with:
-            toolchain: ${{ matrix.build.TOOLCHAIN }}
-            target: ${{ matrix.build.target }}
-            override: true
+      - name: Intall Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.build.TOOLCHAIN }}
+          target: ${{ matrix.build.target }}
+          override: true
 
-        - name: Build binary
-          shell: bash
-          working-directory: "${{ github.workspace }}/native"
-          run: |
-            cargo build --release --locked --target ${{ matrix.build.TARGET }}
-            ls "${{ github.workspace }}/native/target/release"
+      - name: Build binary
+        shell: bash
+        working-directory: "${{ github.workspace }}/native"
+        run: |
+          cargo build --release --locked --target ${{ matrix.build.TARGET }}
+          ls "${{ github.workspace }}/native/target/release"
