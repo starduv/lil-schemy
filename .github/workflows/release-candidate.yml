@@ -4,9 +4,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  publish-binaries:
+  persist-binaries:
     name: Publish binaries
     runs-on: ${{ matrix.build.OS }}
+    defaults:
+      run:  
+        shell: bash
+        working-directory: "${{ github.workspace }}/native"
     strategy:
       fail-fast: false
       matrix:
@@ -46,7 +50,6 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install dependencies
-        shell: bash
         run: |
           if [[ "${{ matrix.build.NAME }}" = *"-musl" ]]; then
             sudo apt-get update
@@ -71,7 +74,6 @@ jobs:
 
       - name: Build (linux/macos)
         uses: actions-rs/cargo@v1
-        working-directory: "${{ github.workspace }}/native"
         with:
           use-cross: true
           command: build
