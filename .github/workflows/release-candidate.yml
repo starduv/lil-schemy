@@ -70,9 +70,9 @@ jobs:
           override: true
 
       - name: Build (linux/macos)
-        if: matrix.build.OS != 'windows-2022'
         uses: actions-rs/cargo@v1
+        working-directory: "${{ github.workspace }}/native"
         with:
-          use-cross: true
+          use-cross: ${{ contains(matrix.build.NAME, "aarch64") }}
           command: build
           args: --release --message-format=json-render-diagnostics --target ${{ matrix.build.TARGET }}
