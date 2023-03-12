@@ -15,11 +15,12 @@ jobs:
             OS: ubuntu-20.04
             TOOLCHAIN: stable
             TARGET: x86_64-unknown-linux-gnu
+            # EXE: libtypeshift.so
 
-          # - NAME: linux-arm64-glibc
-          #   OS: ubuntu-20.04
-          #   TOOLCHAIN: stable
-          #   TARGET: aarch64-unknown-linux-gnu
+          - NAME: linux-arm64-glibc
+            OS: ubuntu-20.04
+            TOOLCHAIN: stable
+            TARGET: aarch64-unknown-linux-gnu
 
           # - NAME: win32-x64-msvc
           #   OS: windows-2022
@@ -59,3 +60,4 @@ jobs:
         working-directory: "${{ github.workspace }}/native"
         run: |
           cargo build --release --message-format=json-render-diagnostics --target ${{ matrix.build.TARGET }}
+          ls "${{ github.workspace }}/native/target/${{ matrix.build.TARGET }}/release"
