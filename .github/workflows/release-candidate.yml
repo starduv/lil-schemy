@@ -77,4 +77,4 @@ jobs:
         with:
           use-cross: true
           command: build
-          args: --release --manifest-path ${{ github.workspace }}/native --message-format=json-render-diagnostics --target ${{ matrix.build.TARGET }}
+          args: --release --manifest-path ${{ github.workspace }}/native/Cargo.toml --message-format=json-render-diagnostics --target ${{ matrix.build.TARGET }}
