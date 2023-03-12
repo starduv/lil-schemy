@@ -3,6 +3,9 @@ name: Release Candidate
 on:
   workflow_dispatch:
 
+env:
+  CARGO_INCREMENTAL: 0
+
 jobs:
   persist-binaries:
     name: Publish binaries
@@ -65,7 +68,7 @@ jobs:
           target: ${{ matrix.build.TARGET }}
           override: true
 
-      - name: Build (linux/macos)
+      - name: Build
         uses: actions-rs/cargo@v1
         with:
           use-cross: true
