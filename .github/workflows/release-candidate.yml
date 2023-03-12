@@ -18,33 +18,38 @@ jobs:
       fail-fast: false
       matrix:
         build:
-          - NAME: linux-x64-glibc
+          - BIN: libtypeshift.so
+            NAME: typeshift-x64-linux.node
             OS: ubuntu-20.04
             TOOLCHAIN: stable
             TARGET: x86_64-unknown-linux-gnu
-            # EXE: libtypeshift.so
 
-          - NAME: linux-arm64-glibc
+          - BIN: libtypeshift.so
+            NAME: typeshift-arm64-linux.node
             OS: ubuntu-20.04
             TOOLCHAIN: stable
             TARGET: aarch64-unknown-linux-gnu
 
-          - NAME: win32-x64-msvc
+          - BIN: typeshift.dll
+            NAME: typeshift-x64-win32.node
             OS: windows-2022
             TOOLCHAIN: stable
             TARGET: x86_64-pc-windows-msvc
 
-          - NAME: win32-arm64-msvc
+          - BIN: typeshift.dll
+            NAME: typeshift-arm64-win32.node
             OS: windows-2022
             TOOLCHAIN: stable
             TARGET: aarch64-pc-windows-msvc
 
-          - NAME: darwin-x64
+          - BIN: libtypeshift.dylib
+            NAME: typeshift-x64-darwin.node
             OS: macos-11
             TOOLCHAIN: stable
             TARGET: x86_64-apple-darwin
 
-          - NAME: darwin-arm64
+          - BIN: libtypeshift.dylib
+            NAME: typeshift-arm64-darwin.node
             OS: macos-11
             TOOLCHAIN: stable
             TARGET: aarch64-apple-darwin
@@ -68,9 +73,15 @@ jobs:
           target: ${{ matrix.build.TARGET }}
           override: true
 
-      - name: Build
+      - name: Build ${{ matrix.build.TARGET }} Binary
         uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: build
           args: --release --manifest-path ${{ github.workspace }}/native/Cargo.toml --message-format=json-render-diagnostics --target ${{ matrix.build.TARGET }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "${{ matrix.build.NAME }}"
+          path: "${{ github.workspace }}/native/target/${{ matrix.build.TARGET }}/release/${{ matrix.build.BIN }}"
