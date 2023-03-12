@@ -45,25 +45,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - uses: actions/cache@v3
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if [[ "${{ matrix.build.NAME }}" = *"-musl" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends \
+              --allow-unauthenticated musl-tools
+          fi
+
+      - id: cache-rustup
+        name: Cache Rust toolchain
+        uses: actions/cache@v3
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          path: ~/.rustup
+          key: toolchain-${{ matrix.build.TARGET }}
 
-      - name: Add Tools
-        shell: bash
-        if: ${{ matrix.build.TARGET }} == aarch64-unknown-linux-gnu
-        run: |
-          rustup target add ${{ matrix.build.TARGET }}
+      - if: ${{ steps.cache-rustup.outputs.cache-hit != 'true' }}
+        name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust-version }}
+          override: true
 
-      - name: Build binary
-        shell: bash
-        working-directory: "${{ github.workspace }}/native"
-        run: |
-          cargo build --release --message-format=json-render-diagnostics --target ${{ matrix.build.TARGET }}
-          ls "${{ github.workspace }}/native/target/${{ matrix.build.TARGET }}/release"
+      - name: Build (linux/macos)
+        if: matrix.build.OS != 'windows-2022'
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --message-format=json-render-diagnostics --target ${{ matrix.build.TARGET }}
