@@ -73,6 +73,6 @@ jobs:
         uses: actions-rs/cargo@v1
         working-directory: "${{ github.workspace }}/native"
         with:
-          use-cross: ${{ contains(matrix.build.NAME, "aarch64") }}
+          use-cross: true
           command: build
           args: --release --message-format=json-render-diagnostics --target ${{ matrix.build.TARGET }}
