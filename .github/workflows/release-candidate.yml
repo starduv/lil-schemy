@@ -59,14 +59,14 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.rustup
-          key: toolchain-${{ matrix.build.TARGET }}
+          key: toolchain-${{ matrix.build.TARGET }}-${{ matrix.build.TOOLCHAIN }}
 
       - if: ${{ steps.cache-rustup.outputs.cache-hit != 'true' }}
         name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.rust-version }}
+          toolchain: ${{ matrix.build.TOOLCHAIN }}
           override: true
 
       - name: Build (linux/macos)
