@@ -1,5 +1,5 @@
 {
-  "name": "typeshift",
+  "name": "@starduv/typeshift",
   "version": "0.0.1",
   "description": "TypeShift is a cli tool that enables code first schema generation from TypeScript",
   "main": "lib/index.js",

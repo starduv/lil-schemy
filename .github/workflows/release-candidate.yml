@@ -8,7 +8,7 @@ env:
 
 jobs:
   persist-binaries:
-    name: Publish binaries
+    name: Persist Binaries
     runs-on: ${{ matrix.build.OS }}
     defaults:
       run:  
@@ -86,7 +86,7 @@ jobs:
           name: "${{ matrix.build.NAME }}"
           path: "${{ github.workspace }}/native/target/${{ matrix.build.TARGET }}/release/${{ matrix.build.BIN }}"
   
-  publish-npm:
+  publish-package:
     needs: persist-binaries
     runs-on: ubuntu-20.04
     steps:
@@ -105,18 +105,15 @@ jobs:
           npm install
           npm run build:app
 
-      - name: Download binaries
+      - name: Download Binaries
         uses: actions/download-artifact@v3
         with:
-          path: "${{ github.workspace }}/lib"
+          path: "${{ github.workspace }}/lib/generator"
 
-      - name: Display structure of downloaded files
-        run: ls -R
-        working-directory: ${{ github.workspace }}/lib
-
-      # - name: Publish Package
-      #   shell: bash
-      #   run: |
+      - name: Publish Package
+        shell: bash
+        run: |
+          npm publish ${{ github.workspace }} --access public --dry-run
           
 
 
