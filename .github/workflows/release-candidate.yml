@@ -108,10 +108,22 @@ jobs:
       - name: Download Binaries
         uses: actions/download-artifact@v3
         with:
-          path: "${{ github.workspace }}/lib/generator"
+          path: "${{ github.workspace }}"
 
+      - name: Move Binaries
+        shell: bash
+        run: |
+          mv "${{ github.workspace }}/typeshift-x64-linux.node/libtypeshift.so" "${{ github.workspace }}/lib/generator/typeshift-x64-linux.node"
+          mv "${{ github.workspace }}/typeshift-arm64-linux.node/libtypeshift.so" "${{ github.workspace }}/lib/generator/typeshift-arm64-linux.node"
+          mv "${{ github.workspace }}/typeshift-x64-win32.node/typeshift.dll" "${{ github.workspace }}/lib/generator/typeshift-x64-win32.node"
+          mv "${{ github.workspace }}/typeshift-arm64-win32.node/typeshift.dll" "${{ github.workspace }}/lib/generator/typeshift-arm64-win32.node"
+          mv "${{ github.workspace }}/typeshift-x64-darwin.node/libtypeshift.dylib" "${{ github.workspace }}/lib/generator/typeshift-x64-darwin.node"
+          mv "${{ github.workspace }}/typeshift-arm64-darwin.node/libtypeshift.dylib" "${{ github.workspace }}/lib/generator/typeshift-arm64-darwin.node"
+           
       - name: Publish Package
         shell: bash
+        env:
+          NODE_AUTH_TOKEN: "${{ secrets.NPM_AUTH_TOKEN }}"
         run: |
           npm publish ${{ github.workspace }} --access public --dry-run
           
