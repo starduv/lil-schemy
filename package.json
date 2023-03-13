@@ -2,7 +2,14 @@
   "name": "typeshift",
   "version": "0.0.1",
   "description": "TypeShift is a cli tool that enables code first schema generation from TypeScript",
-  "main": "index.js",
+  "main": "lib/index.js",
+  "bin": {
+    "typeshift": "bin/typeshift.js"
+  },
+  "files": [
+    "lib/**/*",
+    "bin/**/*"
+  ],
   "os": [
     "darwin",
     "linux",
