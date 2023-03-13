@@ -16,7 +16,8 @@
     "win32"
   ],
   "cpu": [
-    "x64"
+    "x64",
+    "arm64"
   ],
   "scripts": {
     "build": "npm run build:app",
@@ -59,13 +60,5 @@
     "mocha": "^10.2.0",
     "rimraf": "^3.0.2",
     "ts-node": "^10.9.1"
-  },
-  "optionalDependencies": {
-    "app-linux-x64": "0.0.1",
-    "app-linux-arm64": "0.0.1",
-    "app-darwin-x64": "0.0.1",
-    "app-darwin-arm64": "0.0.1",
-    "app-windows-x64": "0.0.1",
-    "app-windows-arm64": "0.0.1"
   }
 }
