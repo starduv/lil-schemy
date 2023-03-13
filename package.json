@@ -1,15 +1,23 @@
 {
-  "name": "typeshift",
+  "name": "@starduv/typeshift",
   "version": "0.0.1",
   "description": "TypeShift is a cli tool that enables code first schema generation from TypeScript",
-  "main": "index.js",
+  "main": "lib/index.js",
+  "bin": {
+    "typeshift": "bin/typeshift.js"
+  },
+  "files": [
+    "lib/**/*",
+    "bin/**/*"
+  ],
   "os": [
     "darwin",
     "linux",
     "win32"
   ],
   "cpu": [
-    "x64"
+    "x64",
+    "arm64"
   ],
   "scripts": {
     "build": "npm run build:app",
@@ -52,13 +60,5 @@
     "mocha": "^10.2.0",
     "rimraf": "^3.0.2",
     "ts-node": "^10.9.1"
-  },
-  "optionalDependencies": {
-    "app-linux-x64": "0.0.1",
-    "app-linux-arm64": "0.0.1",
-    "app-darwin-x64": "0.0.1",
-    "app-darwin-arm64": "0.0.1",
-    "app-windows-x64": "0.0.1",
-    "app-windows-arm64": "0.0.1"
   }
 }

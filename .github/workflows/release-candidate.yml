@@ -2,58 +2,162 @@ name: Release Candidate
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'release/v*.*.*-rc.*'
+
+env:
+  CARGO_INCREMENTAL: 0
 
 jobs:
-  publish-binaries:
-    name: Publish binaries
-    runs-on: ${{ matrix-build.os }}
+  check-version:
+    name: Compare branch to package version
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get Branch Version
+        id: branch_version
+        uses: battila7/get-version-action@v2
+
+      - name: Get Package Version
+        id: package_version
+        uses: martinbeentjes/npm-get-version-action@main
+
+      - name: Version Check
+        env: 
+          BRANCH_VERSION: ${{ steps.branch_version.outputs.version-without-v }} 
+          PACKAGE_VERSION: ${{ steps.package_version.outputs.current-version }}
+        shell: bash
+        run: |
+          if [ "$BRANCH_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "Version mismatch! Package version is $PACKAGE_VERSION, but branch version is $BRANCH_VERSION."
+            exit 1
+          fi
+
+  persist-binaries:
+    name: Persist Binaries
+    needs: check-version
+    runs-on: ${{ matrix.build.OS }}
+    defaults:
+      run:  
+        shell: bash
+        working-directory: "${{ github.workspace }}/native"
     strategy:
       fail-fast: false
       matrix:
         build:
-          - NAME: linux-x64-glibc
+          - BIN: libtypeshift.so
+            NAME: typeshift-x64-linux.node
             OS: ubuntu-20.04
             TOOLCHAIN: stable
             TARGET: x86_64-unknown-linux-gnu
 
-          - NAME: linux-arm64-glibc
+          - BIN: libtypeshift.so
+            NAME: typeshift-arm64-linux.node
             OS: ubuntu-20.04
             TOOLCHAIN: stable
             TARGET: aarch64-unknown-linux-gnu
 
-          - NAME: win32-x64-msvc
+          - BIN: typeshift.dll
+            NAME: typeshift-x64-win32.node
             OS: windows-2022
             TOOLCHAIN: stable
             TARGET: x86_64-pc-windows-msvc
 
-          - NAME: win32-arm64-msvc
+          - BIN: typeshift.dll
+            NAME: typeshift-arm64-win32.node
             OS: windows-2022
             TOOLCHAIN: stable
             TARGET: aarch64-pc-windows-msvc
 
-          - NAME: darwin-x64
+          - BIN: libtypeshift.dylib
+            NAME: typeshift-x64-darwin.node
             OS: macos-11
             TOOLCHAIN: stable
             TARGET: x86_64-apple-darwin
 
-          - NAME: darwin-arm64
+          - BIN: libtypeshift.dylib
+            NAME: typeshift-arm64-darwin.node
             OS: macos-11
             TOOLCHAIN: stable
             TARGET: aarch64-apple-darwin
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
 
-        - name: Intall Rust toolchain
-          uses: actions-rs/toolchain@v1
-          with:
-            toolchain: ${{ matrix.build.TOOLCHAIN }}
-            target: ${{ matrix.build.target }}
-            override: true
+      - id: cache-rustup
+        name: Cache Rust toolchain
+        uses: actions/cache@v3
+        with:
+          path: ~/.rustup
+          key: toolchain-${{ matrix.build.TARGET }}
 
-        - name: Build binary
-          shell: bash
-          working-directory: "${{ github.workspace }}/native"
-          run: |
-            cargo build --release --locked --target ${{ matrix.build.TARGET }}
-            ls "${{ github.workspace }}/native/target/release"
+      - if: ${{ steps.cache-rustup.outputs.cache-hit != 'true' }}
+        name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.build.TOOLCHAIN }}
+          target: ${{ matrix.build.TARGET }}
+          override: true
+
+      - name: Build ${{ matrix.build.TARGET }} Binary
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --manifest-path ${{ github.workspace }}/native/Cargo.toml --message-format=json-render-diagnostics --target ${{ matrix.build.TARGET }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: "${{ matrix.build.NAME }}"
+          path: "${{ github.workspace }}/native/target/${{ matrix.build.TARGET }}/release/${{ matrix.build.BIN }}"
+  
+  publish-package:
+    needs: persist-binaries
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          registry-url: "https://registry.npmjs.org"
+      
+      - name: Build App
+        shell: bash
+        run: |
+          npm install
+          npm run build:app
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v3
+        with:
+          path: "${{ github.workspace }}"
+
+      - name: Move Binaries
+        shell: bash
+        run: |
+          mv "${{ github.workspace }}/typeshift-x64-linux.node/libtypeshift.so" "${{ github.workspace }}/lib/generator/typeshift-x64-linux.node"
+          mv "${{ github.workspace }}/typeshift-arm64-linux.node/libtypeshift.so" "${{ github.workspace }}/lib/generator/typeshift-arm64-linux.node"
+          mv "${{ github.workspace }}/typeshift-x64-win32.node/typeshift.dll" "${{ github.workspace }}/lib/generator/typeshift-x64-win32.node"
+          mv "${{ github.workspace }}/typeshift-arm64-win32.node/typeshift.dll" "${{ github.workspace }}/lib/generator/typeshift-arm64-win32.node"
+          mv "${{ github.workspace }}/typeshift-x64-darwin.node/libtypeshift.dylib" "${{ github.workspace }}/lib/generator/typeshift-x64-darwin.node"
+          mv "${{ github.workspace }}/typeshift-arm64-darwin.node/libtypeshift.dylib" "${{ github.workspace }}/lib/generator/typeshift-arm64-darwin.node"
+           
+      - name: Publish Package
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: "${{ secrets.NPM_AUTH_TOKEN }}"
+        run: |
+          npm publish ${{ github.workspace }} --access public
+          
+
+
+
+
