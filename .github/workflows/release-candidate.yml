@@ -31,8 +31,10 @@ jobs:
           PACKAGE_VERSION: ${{ steps.package_version.outputs.current-version }}
         shell: bash
         run: |
-          [[ $BRANCH_VERSOIN != $PACKAGE_VERSION ]] || \
-          { echo "Version mismatch! Package version is $PACKAGE_VERSION, but branch version is $BRANCH_VERSION."; exit 1; }
+          if [ $BRANCH_VERSOIN != $PACKAGE_VERSION ]; then
+            echo "Version mismatch! Package version is $PACKAGE_VERSION, but branch version is $BRANCH_VERSION."
+            exit 1
+          fi
 
   persist-binaries:
     name: Persist Binaries
