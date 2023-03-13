@@ -2,6 +2,9 @@ name: Release Candidate
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'release/v*.*.*-rc.*'
 
 env:
   CARGO_INCREMENTAL: 0
