@@ -1,6 +1,6 @@
 {
   "name": "@starduv/typeshift",
-  "version": "0.0.1",
+  "version": "0.0.1-rc.1",
   "description": "TypeShift is a cli tool that enables code first schema generation from TypeScript",
   "main": "lib/index.js",
   "bin": {
