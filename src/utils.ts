@@ -21,7 +21,6 @@ export const getContext = (cwd: string, globs: string[], compilerOptions: ts.Com
         );
     }
 
-    console.log(cwd)
     const moduleNames: { [alias: string]: string } = {}
     const astMap: { [path: string]: ts.Node } = {};
     const files = fg(globs, {
@@ -47,7 +46,6 @@ export const getContext = (cwd: string, globs: string[], compilerOptions: ts.Com
     }
 
     console.debug("generated ast(s) for ", Object.keys(astMap));
-    // writeFileSync("/home/captainrdubb/dev/serde_strong/types.json", JSON.stringify(astMap));
 
     return { rootFiles: files, asts: astMap, moduleNames };
 };

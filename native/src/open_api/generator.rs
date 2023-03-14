@@ -161,6 +161,15 @@ fn update_schema(schema: &mut ApiSchema, node: &AstNode) -> () {
         STRING_KEYWORD => {
             schema.primitive("string");
         }
+        BOOLEAN_KEYWORD => {
+            schema.primitive("boolean");
+        }
+        NUMBER_KEYWORD => {
+            schema.primitive("number");
+        }
+        BIG_INT_KEYWORD => {
+            schema.primitive("number");
+        }
         _ => {}
     }
 }

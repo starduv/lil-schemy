@@ -1,6 +1,6 @@
-import { Command, Option } from 'commander';
+import { Command } from 'commander';
 import path from 'path';
-import { generateSchemas, OpenApiOptions, TypeShiftOptions } from '../generator'
+import { generateSchemas, TypeShiftOptions } from '../generator'
 import { getContext } from '../utils';
 
 const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
