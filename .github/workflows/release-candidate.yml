@@ -134,6 +134,7 @@ jobs:
         run: |
           npm install
           npm run build:app
+          npm run copy:config
 
       - name: Download Binaries
         uses: actions/download-artifact@v3
