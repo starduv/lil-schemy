@@ -1,4 +1,4 @@
-import { OpenAPIV3 } from 'openapi-types'
+import { OpenAPIV3 } from 'openapi-types';
 
 export interface TypeShiftOptions {
     cwd: string;
@@ -9,7 +9,7 @@ export interface TypeShiftOptions {
 interface OpenApiOptions {
     base: Omit<OpenAPIV3.Document, "paths"> & {
         openapi: "3.0.3";
-        paths?: OpenAPIV3.PathsObject
+        paths?: OpenAPIV3.PathsObject;
     },
     output?: string;
     paths: string[];
@@ -18,7 +18,6 @@ interface OpenApiOptions {
 export interface SchemasResult {
     openApi: {
         schema?: string;
-        isFile: boolean;
         filepath?: string;
     };
 }
@@ -28,7 +27,7 @@ interface GenerateSchemaArgs extends Omit<TypeShiftOptions, "cwd", "project"> {
     modules: string;
     openApi?: Omit<OpenApiOptions, "base"> & {
         base: string;
-    }
+    };
 }
 
 export function generateSchemas(options: GenerateSchemaArgs): SchemasResult;

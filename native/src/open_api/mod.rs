@@ -81,14 +81,10 @@ pub fn generate_openapi(
             let mut file: File = File::create(filepath.clone()).expect("Could not create filepath: ");
             file.write_all(schema.as_bytes()).expect("Could not write to file");
 
-            let is_file = cx.boolean(true);
             let filepath = cx.string(filepath.to_str().unwrap());
-            schema_result.set(cx, "isFile", is_file)?;
             schema_result.set(cx, "filepath", filepath)?;
         } else {
-            let is_file = cx.boolean(false);
             let schema = cx.string(schema);
-            schema_result.set(cx, "isFile", is_file)?;
             schema_result.set(cx, "schema", schema)?;
         }
     }
