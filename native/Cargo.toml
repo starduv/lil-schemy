@@ -1,6 +1,6 @@
 [package]
 name = "typeshift"
-version = "0.0.1-rc.2"
+version = "0.0.1-rc.3"
 edition = "2021"
 authors = ["Joel C Rainear-Wills <starshiprdubb@gmail.com>"]
 exclude = ["index.node"]
