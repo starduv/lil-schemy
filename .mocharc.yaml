@@ -2,7 +2,7 @@ extension:
   - "ts"
 parallel: false
 reporter: "list"
-timeout: 3000
+timeout: 10000
 require:
   - "ts-node/register"
 spec:

@@ -1,4 +1,4 @@
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import path from 'path';
 import { generateSchemas, OpenApiOptions, TypeShiftOptions } from '../generator'
 import { getContext } from '../utils';
@@ -26,8 +26,9 @@ const generateOpenApi = (config: TypeShiftOptions) => {
 
 export default new Command('generate')
     .description('Generate one or more schemas')
+    .option('-c, --config <config>', 'configuration module', 'typeshift')
     .action(async (_, command: Command) => {
         let parentOptions = command.parent?.opts();
-        const config = await import(path.resolve(parentOptions?.cwd, parentOptions?.config));
+        const config = await import(path.resolve(parentOptions?.cwd, command.getOptionValue('config')));
         generateOpenApi(config);
     });
