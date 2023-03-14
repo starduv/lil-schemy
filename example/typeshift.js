@@ -1,4 +1,4 @@
-export default {
+module.exports = {
     // Path to primary tsconfig.json
     project: "./tsconfig.json",
     openApi: {
@@ -19,4 +19,4 @@ export default {
         // Where the resultanat OpenApi schema is written.
         output: ""
     }
-}
+};

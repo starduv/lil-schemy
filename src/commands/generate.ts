@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import path from 'path';
-import { generateSchemas, TypeShiftOptions } from '../generator'
+import { generateSchemas, TypeShiftOptions } from '../generator';
 import { getContext } from '../utils';
 
 const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
@@ -9,7 +9,7 @@ const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
 
         const context = getContext(cwd, openApi.paths, {
             project
-        })
+        });
 
         const result = generateSchemas({
             asts: JSON.stringify(context.asts),
@@ -22,7 +22,7 @@ const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
         });
 
         if (result.openApi?.schema) {
-            console.log(result.openApi.schema)
+            console.log(result.openApi.schema);
         }
     }
 };
