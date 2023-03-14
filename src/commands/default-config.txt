@@ -1,4 +1,4 @@
-module.exports = {
+export default {
     // Path to primary tsconfig.json
     project: "",
     openApi: {

@@ -1,5 +1,5 @@
 import { sync as fg } from 'fast-glob';
-import { appendFileSync, readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import ts, { ImportDeclaration, SourceFile } from 'typescript';
 
 export interface TypeShiftContext {
@@ -21,13 +21,13 @@ export const getContext = (cwd: string, globs: string[], compilerOptions: ts.Com
         );
     }
 
+    console.log(cwd)
     const moduleNames: { [alias: string]: string } = {}
     const astMap: { [path: string]: ts.Node } = {};
     const files = fg(globs, {
         absolute: true,
         cwd
     });
-
     const fileNames: Array<RefPaths> = files.map(fullPath => [undefined, fullPath]);
 
     while (fileNames.length) {

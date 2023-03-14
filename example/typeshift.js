@@ -1,6 +1,6 @@
-module.exports = {
+export default {
     // Path to primary tsconfig.json
-    project: "",
+    project: "./tsconfig.json",
     openApi: {
         base: {
             // The only supported version.
@@ -13,7 +13,9 @@ module.exports = {
             paths: {}
         },
         // Glob patterns to modules declaring api paths.
-        paths: [],
+        paths: [
+            "src/routes/*.ts"
+        ],
         // Where the resultanat OpenApi schema is written.
         output: ""
     }
