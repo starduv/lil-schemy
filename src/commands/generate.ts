@@ -3,7 +3,7 @@ import path from 'path';
 import { generateSchemas, TypeShiftOptions } from '../generator';
 import { getAst, getRootFiles } from '../utils';
 
-const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
+export const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
     if (config?.openApi) {
         const { openApi, project } = config;
 

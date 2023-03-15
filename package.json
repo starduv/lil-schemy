@@ -33,15 +33,24 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/engagedtheory/typeshift.git"
+    "url": "git+https://github.com/starduv/typeshift.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "code",
+    "first",
+    "schema",
+    "generator",
+    "OpenApi",
+    "Swagger",
+    "TypeScript",
+    "Node"
+  ],
+  "author": "Joel Rainear-Wills <starshiprdubb@gmail.com>",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/engagedtheory/typeshift/issues"
+    "url": "https://github.com/starduv/typeshift/issues"
   },
-  "homepage": "https://github.com/engagedtheory/typeshift#readme",
+  "homepage": "https://github.com/starduv/typeshift#readme",
   "dependencies": {
     "commander": "^10.0.0",
     "fast-glob": "^3.2.12",

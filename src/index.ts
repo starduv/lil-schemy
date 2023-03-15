@@ -1,3 +1,5 @@
+export { generateOpenApi } from './commands/generate';
+export { getAst, getRootFiles } from './utils';
 
 export type OperationMethod = 'GET' | 'PUT' | 'POST' | 'DELETE' | 'OPTIONS' | 'HEAD' | 'PATCH' | 'TRACE';
 
@@ -45,7 +47,7 @@ type StringFormat = "date-time" |
     "iri-reference" |
     undefined;
 
-type NumberFormat = "int32" | "int64" | "float" | "double"
+type NumberFormat = "int32" | "int64" | "float" | "double";
 
 export type BodyParam<Param, Required extends boolean, Namespace extends NS = undefined> = Param;
 export type Header<Param, Required extends boolean, Namespace extends NS = undefined, Format extends F = undefined> = Param;
