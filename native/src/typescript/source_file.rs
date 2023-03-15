@@ -132,8 +132,8 @@ impl AstNode {
 pub enum Declaration {
     Alias { from: String, to: String },
     Type { node: AstNode },
-    Export { name: String, file: String },
-    Import { name: String, file: String },
+    Export { name: String, module_ref: String },
+    Import { name: String, module_ref: String },
 }
 
 #[derive(PartialEq, Eq, Hash)]

@@ -1,78 +1,41 @@
 import { sync as fg } from 'fast-glob';
 import { readFileSync } from 'fs';
-import ts, { ImportDeclaration, SourceFile } from 'typescript';
-
-export interface TypeShiftContext {
-    asts: { [path: string]: ts.Node },
-    moduleNames: { [alias: string]: string }
-    rootFiles: string[],
-}
-
-type RefPaths = [string | undefined, string | undefined];
+import ts, { CompilerOptions } from 'typescript';
 
 let cache: ts.ModuleResolutionCache;
 
-export const getContext = (cwd: string, globs: string[], compilerOptions: ts.CompilerOptions): TypeShiftContext => {
+export const getAst = (cwd: string, options: CompilerOptions) => (module_ref: string, sourceFileName: string): string | undefined => {
     if (!cache) {
-        cache = ts.createModuleResolutionCache(
-            cwd,
-            path => path,
-            compilerOptions
-        );
+        cache = ts.createModuleResolutionCache(cwd, path => path, options);
     }
 
-    const moduleNames: { [alias: string]: string } = {}
-    const astMap: { [path: string]: ts.Node } = {};
-    const files = fg(globs, {
-        absolute: true,
-        cwd
-    });
-    const fileNames: Array<RefPaths> = files.map(fullPath => [undefined, fullPath]);
+    let ast: ts.Node | undefined;
+    // module_ref is an absolute path
+    if (module_ref === sourceFileName) {
+        ast = _getAst(module_ref);
+    } else {
+        // we're looking for a module reference found in another source file
+        const resolution = ts.resolveModuleName(module_ref, sourceFileName, options, {
+            fileExists: ts.sys.fileExists,
+            readFile: ts.sys.readFile,
+        }, cache);
 
-    while (fileNames.length) {
-        const [rel, full] = fileNames.pop() as [string | null, string];
-
-        if (rel) moduleNames[rel] = full;
-
-        if (!astMap[full]) {
-            astMap[full] = getAst(full);
-        }
-
-        for (const paths of getRefModules(astMap[full] as ts.Node, compilerOptions)) {
-            if (paths[0] && paths[1]) {
-                fileNames.push(paths as RefPaths);
-            }
-        }
+        ast = _getAst(resolution.resolvedModule?.resolvedFileName as string);
     }
 
-    console.debug("generated ast(s) for ", Object.keys(astMap));
-
-    return { rootFiles: files, asts: astMap, moduleNames };
+    return ast ? JSON.stringify(ast) : ast;
 };
 
-const getAst = (p: string): ts.Node => {
+export const getRootFiles = (cwd: string, globs: string[]): string[] => fg(globs, {
+    absolute: true,
+    cwd
+});
+
+const _getAst = (p: string): ts.Node => {
     const file = readFileSync(p, {
         encoding: 'utf-8',
         flag: 'r'
     });
 
     return ts.createSourceFile(p, file, ts.ScriptTarget.ES2015, false);
-};
-
-function* getRefModules(ast: ts.Node, compilerOptions: ts.CompilerOptions) {
-    const sourceFile = ast as SourceFile;
-    const sourceFileName = sourceFile.fileName;
-    for (const statement of sourceFile.statements) {
-        if (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) {
-            let modSpec = (<ImportDeclaration>statement).moduleSpecifier as ts.StringLiteral;
-            const resolution = ts.resolveModuleName(modSpec.text, sourceFileName, compilerOptions, {
-                fileExists: ts.sys.fileExists,
-                readFile: ts.sys.readFile,
-            }, cache);
-
-            yield [modSpec.text, resolution.resolvedModule?.resolvedFileName];
-        }
-    }
-
-    return [];
 };

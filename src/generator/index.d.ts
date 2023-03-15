@@ -23,8 +23,7 @@ export interface SchemasResult {
 }
 
 interface GenerateSchemaArgs extends Omit<TypeShiftOptions, "cwd", "project"> {
-    asts: string;
-    modules: string;
+    getAst: (reference: string, moduleFileName: string) => string | undefined;
     openApi?: Omit<OpenApiOptions, "base"> & {
         base: string;
     };

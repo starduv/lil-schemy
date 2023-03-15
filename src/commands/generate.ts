@@ -1,22 +1,17 @@
 import { Command } from 'commander';
 import path from 'path';
 import { generateSchemas, TypeShiftOptions } from '../generator';
-import { getContext } from '../utils';
+import { getAst, getRootFiles } from '../utils';
 
 const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
     if (config?.openApi) {
         const { openApi, project } = config;
 
-        const context = getContext(cwd, openApi.paths, {
-            project
-        });
-
         const result = generateSchemas({
-            asts: JSON.stringify(context.asts),
-            modules: JSON.stringify(context.moduleNames),
+            getAst: getAst(cwd, { project }),
             openApi: {
                 base: JSON.stringify(openApi.base),
-                paths: context.rootFiles,
+                paths: getRootFiles(cwd, openApi.paths),
                 output: openApi.output || undefined
             }
         });

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
+use neon::prelude::FunctionContext;
 
 use crate::typescript::*;
 
@@ -174,15 +175,15 @@ fn update_schema(schema: &mut ApiSchema, node: &AstNode) -> () {
     }
 }
 
-fn cache_declarations(node: &AstNode, file_name: &str, module_map: &HashMap<String, String>) -> () {
+fn cache_declarations(node: &AstNode, file_name: &str) -> () {
     match node.kind {
         CLASS_DECLARATION => cache_object_type(node, file_name),
-        IMPORT_DECLARATION => cache_import_declaration(node, file_name, module_map),
-        EXPORT_DECLARATION => cache_export_declaration(node, file_name, module_map),
+        IMPORT_DECLARATION => cache_import_declaration(node, file_name),
+        EXPORT_DECLARATION => cache_export_declaration(node, file_name),
         INTERFACE_DECLARATION => cache_object_type(node, file_name),
         TYPE_ALIAS_DECLARATION => cache_object_type(node, file_name),
         VARIABLE_STATEMENT => cache_variables(node, file_name),
-        _ => node.for_each_child(|n| cache_declarations(n, file_name, module_map)),
+        _ => node.for_each_child(|n| cache_declarations(n, file_name)),
         // _ => {}
     }
 }
@@ -203,12 +204,11 @@ fn cache_object_type(node: &AstNode, file_name: &str) -> () {
     }
 }
 
-fn cache_import_declaration(node: &AstNode, file_name: &str, module_map: &HashMap<String, String>) -> () {
+fn cache_import_declaration(node: &AstNode, file_name: &str) -> () {
     unsafe {
         let declarations = DECLARATIONS.entry(file_name.to_owned()).or_insert(HashMap::new());
         let module_specifier = node.module_specifier.as_ref().unwrap();
         let module_reference = module_specifier.text.as_ref().unwrap();
-        let absolute = module_map.get(module_reference).expect("Could not find module");
 
         let import_clause = node.import_clause.as_ref().unwrap();
         if let Some(ref name) = import_clause.name {
@@ -217,7 +217,7 @@ fn cache_import_declaration(node: &AstNode, file_name: &str, module_map: &HashMa
                 text.to_string(),
                 Declaration::Import {
                     name: String::from("default"),
-                    file: absolute.to_string(),
+                    module_ref: module_reference.to_string(),
                 },
             );
         }
@@ -235,7 +235,7 @@ fn cache_import_declaration(node: &AstNode, file_name: &str, module_map: &HashMa
                     name_text.to_string(),
                     Declaration::Import {
                         name: alias.to_string(),
-                        file: absolute.to_string(),
+                        module_ref: module_reference.to_string(),
                     },
                 );
             })
@@ -243,12 +243,11 @@ fn cache_import_declaration(node: &AstNode, file_name: &str, module_map: &HashMa
     }
 }
 
-fn cache_export_declaration(node: &AstNode, file_name: &str, module_map: &HashMap<String, String>) -> () {
+fn cache_export_declaration(node: &AstNode, file_name: &str) -> () {
     unsafe {
         let declarations = DECLARATIONS.entry(file_name.to_owned()).or_insert(HashMap::new());
         let module_specifier = node.module_specifier.as_ref().unwrap();
         let module_reference = module_specifier.text.as_ref().unwrap();
-        let absolute = module_map.get(module_reference).expect("Could not find module");
 
         let export_clause = node.export_clause.as_ref().unwrap();
 
@@ -265,7 +264,7 @@ fn cache_export_declaration(node: &AstNode, file_name: &str, module_map: &HashMa
                     name_text.to_string(),
                     Declaration::Export {
                         name: alias.to_string(),
-                        file: absolute.to_string(),
+                        module_ref: module_reference.to_string(),
                     },
                 );
             })
@@ -356,21 +355,25 @@ fn find_type_name(name: &str, file_name: &String) -> String {
     }
 }
 
-fn get_declaration<'n>(
+fn get_declaration<'n, F>(
     reference: &str,
-    file_name: &str,
-    ast_map: &'n HashMap<String, AstNode>,
-    module_map: &HashMap<String, String>,
-) -> Option<&'n AstNode> {
+    module_ref: &str,
+    src_file_name: &String,
+    cx: &mut FunctionContext,
+    get_ast: &mut F,
+) -> Option<&'n AstNode>
+where
+    F: FnMut(&str, &str, &mut FunctionContext) -> AstNode,
+{
     unsafe {
-        if !DECLARATIONS.contains_key(file_name) {
-            let source_file = ast_map.get(file_name).unwrap();
-            cache_declarations(source_file, file_name, module_map);
+        if !DECLARATIONS.contains_key(module_ref) {
+            let source_file = get_ast(module_ref, src_file_name, cx);
+            cache_declarations(&source_file, module_ref);
         }
 
         let mut key = reference;
         let mut previous: &str = "";
-        let declarations = DECLARATIONS.get(file_name).unwrap();
+        let declarations = DECLARATIONS.get(module_ref).unwrap();
         while key != previous && declarations.contains_key(key) {
             match declarations.get(key) {
                 Some(Declaration::Alias { from: _, to }) => {
@@ -382,8 +385,12 @@ fn get_declaration<'n>(
         }
 
         match declarations.get(key) {
-            Some(Declaration::Export { name, file }) => get_declaration(name, file, ast_map, module_map),
-            Some(Declaration::Import { name, file }) => get_declaration(name, file, ast_map, module_map),
+            Some(Declaration::Export { name, module_ref }) => {
+                get_declaration(name, module_ref, src_file_name, cx, get_ast)
+            }
+            Some(Declaration::Import { name, module_ref }) => {
+                get_declaration(name, module_ref, src_file_name, cx, get_ast)
+            }
             Some(Declaration::Type { node }) => Some(node),
             _ => None,
         }
@@ -462,18 +469,16 @@ fn get_response_options(node: &AstNode, file_name: &String) -> ResponseOptions {
     response_args
 }
 
-pub struct OpenApiGenerator<'m> {
-    ast_map: &'m HashMap<String, AstNode>,
+pub struct OpenApiGenerator<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> {
+    get_ast: F,
     open_api: OpenApi,
-    module_map: &'m HashMap<String, String>,
     references: HashSet<TypeReference>,
 }
-impl<'m> OpenApiGenerator<'m> {
-    pub fn new(module_map: &'m HashMap<String, String>, ast_map: &'m HashMap<String, AstNode>) -> Self {
+impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> {
+    pub fn new(get_ast: F) -> Self {
         OpenApiGenerator {
-            ast_map,
+            get_ast,
             open_api: OpenApi::new(),
-            module_map,
             references: HashSet::new(),
         }
     }
@@ -585,20 +590,17 @@ impl<'m> OpenApiGenerator<'m> {
         }
     }
 
-    pub(crate) fn api_paths_from(&mut self, path: String) -> () {
-        let source_file = self
-            .ast_map
-            .get(&path)
-            .expect(&format!("Could not find ast for path '{}'", path));
+    pub(crate) fn api_paths_from(&mut self, path: String, cx: &mut FunctionContext) -> () {
+        let source_file = (self.get_ast)(&path, &path, cx);
 
-        cache_declarations(source_file, &path, self.module_map);
+        cache_declarations(&source_file, &path);
 
         source_file.for_each_child(|node| self.find_api_paths(node, &path));
 
         let mut references = self.references.iter().collect::<Vec<&TypeReference>>();
         while references.is_empty() == false {
             let reference = references.pop().unwrap();
-            if let Some(node) = get_declaration(&reference.name, &path, self.ast_map, self.module_map) {
+            if let Some(node) = get_declaration(&reference.name, &path, &path, cx, &mut self.get_ast) {
                 add_schema(&mut self.open_api, node, &reference);
             }
         }
