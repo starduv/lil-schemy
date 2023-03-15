@@ -3,7 +3,6 @@ mod open_api;
 
 use std::{fs::File, io::Write, path::PathBuf};
 
-use ahash::HashMap;
 use neon::{prelude::*, result::Throw};
 use serde_json::json;
 
