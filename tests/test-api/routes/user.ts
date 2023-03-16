@@ -1,5 +1,5 @@
-import { BodyParam, Path, QueryParam, Response, RouteParam } from '../../../src';
-import AdminUser, { CreateUserRequest, GetUserRequest, User, UserPatch } from '../dtos';
+import { BodyParam, Path, Response, RouteParam } from '../../../src';
+import AdminUser, { CreateUserRequest, GetUserRequest, User, UserPatch, UserPatchRequest } from '../dtos';
 import { Router } from './router';
 
 Router.get("", {}, Path(async (request: GetUserRequest, reply: any): Promise<void> => {
@@ -19,7 +19,7 @@ Router.get("", {}, Path(async (request: GetUserRequest, reply: any): Promise<voi
     tags: ['space'],
 }));
 
-Router.patch("", {}, Path(async (request: { id: RouteParam<string, true>; date: QueryParam<string, false, undefined, "date">; }, reply: any): Promise<void> => {
+Router.patch("", {}, Path(async (request: UserPatchRequest, reply: any): Promise<void> => {
     let admin = new AdminUser();
 
     let response = Response(admin, {

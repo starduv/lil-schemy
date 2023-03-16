@@ -12,6 +12,8 @@
             "program": "node",
             "args": [
                 "node_modules/mocha/bin/mocha.js",
+                "--grep",
+                "generates schemas"
             ],
             "cwd": "${workspaceFolder}"
         }

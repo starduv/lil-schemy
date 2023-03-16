@@ -1,5 +1,5 @@
 use ahash::{HashSet, HashSetExt};
-use neon::prelude::FunctionContext;
+use neon::{macro_internal::runtime::reference, prelude::FunctionContext};
 
 use crate::typescript::*;
 
@@ -196,7 +196,7 @@ pub fn get_declaration<'n, F>(
     src_file_name: &String,
     cx: &mut FunctionContext,
     get_ast: &mut F,
-) -> Option<&'n AstNode>
+) -> Option<(&'n AstNode, String)>
 where
     F: FnMut(&str, &str, &mut FunctionContext) -> AstNode,
 {
@@ -226,7 +226,7 @@ where
             Some(Declaration::Import { name, module_ref }) => {
                 get_declaration(name, module_ref, src_file_name, cx, get_ast)
             }
-            Some(Declaration::Type { node }) => Some(node),
+            Some(Declaration::Type { node }) => Some((node, module_ref.to_owned())),
             _ => None,
         }
     }
@@ -360,39 +360,50 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
         }
     }
 
-    fn add_operation_params<'cx>(&mut self, route: &str, method: &str, node: &AstNode, file_name: &String) -> () {
+    fn add_operation_params<'cx>(
+        &mut self,
+        route: &str,
+        method: &str,
+        node: &AstNode,
+        file_name: &String,
+        cx: &mut FunctionContext,
+    ) -> () {
         if let Some(ref _type) = node._type {
-            if let Some(ref type_name) = _type.type_name {
-                if let Some(ref text) = type_name.escaped_text {
+            let type_name = match _type.type_name {
+                Some(ref type_name) => type_name.escaped_text.as_deref(),
+                None => match _type.name {
+                    Some(ref name) => name.escaped_text.as_deref(),
+                    None => None,
+                },
+            };
+
+            match type_name {
+                Some("QueryParam") => {
+                    let property_name = node.name.as_ref().unwrap();
+                    let name = property_name.escaped_text.as_ref().unwrap();
                     let operation = self.open_api.path(&route).method(&method);
-
-                    if text.eq("QueryParam") {
-                        let property_name = node.name.as_ref().unwrap();
-                        let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "query", operation, _type, &mut self.references, file_name)
-                    }
-
-                    if text.eq("RouteParam") {
-                        let property_name = node.name.as_ref().unwrap();
-                        let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "path", operation, _type, &mut self.references, file_name)
-                    }
-
-                    if text.eq("Header") {
-                        let property_name = node.name.as_ref().unwrap();
-                        let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "header", operation, _type, &mut self.references, file_name)
-                    }
-
-                    if text.eq("BodyParam") {
-                        add_body_parameter(operation, _type, &mut self.references, file_name)
-                    }
+                    add_operation_parameter(&name, "query", operation, _type, &mut self.references, file_name)
                 }
-            } else {
-                _type.for_each_child(|node| self.add_operation_params(route, method, node, file_name))
+                Some("RouteParam") => {
+                    let property_name = node.name.as_ref().unwrap();
+                    let name = property_name.escaped_text.as_ref().unwrap();
+                    let operation = self.open_api.path(&route).method(&method);
+                    add_operation_parameter(&name, "path", operation, _type, &mut self.references, file_name)
+                }
+                Some("Header") => {
+                    let property_name = node.name.as_ref().unwrap();
+                    let name = property_name.escaped_text.as_ref().unwrap();
+                    let operation = self.open_api.path(&route).method(&method);
+                    add_operation_parameter(&name, "header", operation, _type, &mut self.references, file_name)
+                }
+                Some("BodyParam") => {
+                    let operation = self.open_api.path(&route).method(&method);
+                    add_body_parameter(operation, _type, &mut self.references, file_name)
+                }
+                _ => _type.for_each_child(|node| self.add_operation_params(route, method, node, file_name, cx)),
             }
         } else {
-            node.for_each_child(|node| self.add_operation_params(route, method, node, file_name))
+            node.for_each_child(|node| self.add_operation_params(route, method, node, file_name, cx))
         }
     }
 
@@ -417,7 +428,22 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
             self.open_api.path(&route).method(&method).tags(path_options.tags);
 
             let request_param = get_request_parameter(route_handler);
-            self.add_operation_params(&route, &method, request_param, file_name);
+            if let Some(name) = match request_param._type {
+                Some(ref type_ref) => match type_ref.name {
+                    Some(ref name) => name.escaped_text.as_ref(),
+                    None => match type_ref.type_name {
+                        Some(ref type_name) => type_name.escaped_text.as_ref(),
+                        None => None,
+                    },
+                },
+                None => None,
+            } {
+                let msg = format!("Could not find a declaration for {}", name);
+                let result = get_declaration(name, file_name, file_name, cx, &mut self.get_ast).expect(&msg);
+                self.add_operation_params(&route, &method, result.0, &result.1, cx);
+            } else {
+                self.add_operation_params(&route, &method, request_param, file_name, cx);
+            }
 
             let route_handler_body = route_handler.body.as_ref().unwrap();
             self.add_operation_response(&route, &method, &*route_handler_body, file_name);
@@ -436,7 +462,7 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
         let mut references = self.references.iter().collect::<Vec<&TypeReference>>();
         while references.is_empty() == false {
             let reference = references.pop().unwrap();
-            if let Some(node) = get_declaration(&reference.name, &path, &path, cx, &mut self.get_ast) {
+            if let Some((node, _)) = get_declaration(&reference.name, &path, &path, cx, &mut self.get_ast) {
                 add_schema(&mut self.open_api, node, &reference);
             }
         }
