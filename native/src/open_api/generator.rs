@@ -1,9 +1,8 @@
-use ahash::{HashSet, HashSetExt};
-use neon::{macro_internal::runtime::reference, prelude::FunctionContext};
+use neon::prelude::FunctionContext;
 
 use crate::typescript::*;
 
-use super::open_api::{ApiPathOperation, ApiSchema, OpenApi, PathArgs, ResponseOptions};
+use super::open_api::{ApiSchema, OpenApi, PathArgs, ResponseOptions};
 
 fn update_schema(schema: &mut ApiSchema, node: &AstNode) -> () {
     match node.kind {
@@ -335,6 +334,7 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
         file_name: &String,
         cx: &mut FunctionContext,
     ) -> () {
+        cache_declaration(node, file_name);
         if let Some(ref expression) = node.expression {
             if let Some(ref text) = expression.escaped_text {
                 if text.eq("Response") {
@@ -390,6 +390,7 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
     where
         F: FnMut(&str, &str, &mut FunctionContext) -> AstNode,
     {
+        cache_declaration(node, file_name);
         if let Some(ref _type) = node._type {
             let type_name = match _type.type_name {
                 Some(ref type_name) => type_name.escaped_text.as_deref(),
@@ -446,6 +447,7 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
     }
 
     fn find_api_paths(&mut self, node: &AstNode, file_name: &String, cx: &mut FunctionContext) -> () {
+        cache_declaration(node, file_name);
         if self.is_api_path(node) {
             let arguments = node.arguments.as_ref().unwrap();
             let route_handler = arguments.get(0).unwrap();
@@ -454,8 +456,6 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
             let route = path_options.path.unwrap();
             let method = path_options.method.unwrap();
             self.open_api.path(&route).method(&method).tags(path_options.tags);
-
-            println!("Found path for route {}", route);
 
             let request_param = get_request_parameter(route_handler);
             if let Some(name) = match request_param._type {
@@ -484,9 +484,6 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
 
     pub(crate) fn api_paths_from(&mut self, path: String, cx: &mut FunctionContext) -> () {
         let source_file = (self.get_ast)(&path, &path, cx);
-
-        cache_declarations(&source_file, &path);
-
         source_file.for_each_child(|node| self.find_api_paths(node, &path, cx));
     }
 }

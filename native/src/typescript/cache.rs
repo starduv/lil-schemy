@@ -6,6 +6,19 @@ use crate::typescript::*;
 
 pub static mut DECLARATIONS: BTreeMap<String, HashMap<String, Declaration>> = BTreeMap::new();
 
+pub fn cache_declaration(node: &AstNode, file_name: &str) -> () {
+    match node.kind {
+        CLASS_DECLARATION => cache_object_type(node, file_name),
+        IMPORT_DECLARATION => cache_import_declaration(node, file_name),
+        EXPORT_DECLARATION => cache_export_declaration(node, file_name),
+        INTERFACE_DECLARATION => cache_object_type(node, file_name),
+        TYPE_ALIAS_DECLARATION => cache_object_type(node, file_name),
+        VARIABLE_STATEMENT => cache_variables(node, file_name),
+        // _ => node.for_each_child(|n| cache_declarations(n, file_name)),
+        _ => {}
+    }
+}
+
 pub fn cache_declarations(node: &AstNode, file_name: &str) -> () {
     match node.kind {
         CLASS_DECLARATION => cache_object_type(node, file_name),
