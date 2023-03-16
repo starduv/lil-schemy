@@ -147,6 +147,7 @@ lib/
 
 .vscode/*
 !.vscode/launch.json
+!.vscode/tasks.json
 
 # test generated files
 tests/**/typeshift.js

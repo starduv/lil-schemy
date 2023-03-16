@@ -8,10 +8,10 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug Tests",
-            "preLaunchTask": "npm: pretest",
+            // "preLaunchTask": "npm: pretest",
             "program": "node",
             "args": [
-                "node_modules/mocha/bin/mocha.js"
+                "node_modules/mocha/bin/mocha.js",
             ],
             "cwd": "${workspaceFolder}"
         }

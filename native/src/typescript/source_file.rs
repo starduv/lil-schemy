@@ -2,8 +2,8 @@ use serde::Deserialize;
 
 use super::{
     ARROW_FUNCTION, BLOCK, CALL_EXPRESSION, CLASS_DECLARATION, EXPRESSION_STATEMENT, IMPORT_CLAUSE,
-    INTERFACE_DECLARATION, NAMED_IMPORTS, SOURCE_FILE, TYPE_ALIAS_DECLARATION, TYPE_LITERAL, VARIABLE_DECLARATION,
-    VARIABLE_DECLARATION_LIST, VARIABLE_STATEMENT,
+    INTERFACE_DECLARATION, NAMED_IMPORTS, PARAMETER, SOURCE_FILE, TYPE_ALIAS_DECLARATION, TYPE_LITERAL, TYPE_REFERENCE,
+    VARIABLE_DECLARATION, VARIABLE_DECLARATION_LIST, VARIABLE_STATEMENT,
 };
 
 #[derive(Clone, Deserialize, Debug)]
@@ -88,6 +88,11 @@ impl AstNode {
                     }
                 }
             }
+            PARAMETER => {
+                if let Some(ref _type) = self._type {
+                    func(_type)
+                }
+            }
             SOURCE_FILE => {
                 for ref node in self.statements.as_ref().unwrap() {
                     func(node)
@@ -106,6 +111,9 @@ impl AstNode {
                         func(member)
                     }
                 }
+            }
+            TYPE_REFERENCE => {
+                // let node = get_declaration(reference, module_ref, src_file_name, cx, get_ast)
             }
             VARIABLE_DECLARATION => {
                 if let Some(ref initializer) = self.initializer {
