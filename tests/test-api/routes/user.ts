@@ -93,7 +93,7 @@ const ledger = {
 };
 
 Router.get("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
-    let success = ledger.getAccount();
+    let success: Account = ledger.getAccount();
 
     let response = Response(success, {
         statusCode: 200,

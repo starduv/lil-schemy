@@ -5,136 +5,6 @@ use crate::typescript::*;
 
 use super::open_api::{ApiPathOperation, ApiSchema, OpenApi, PathArgs, ResponseOptions};
 
-fn add_body_parameter(
-    operation: &mut ApiPathOperation,
-    node: &AstNode,
-    type_refs: &mut HashSet<TypeReference>,
-    file_name: &String,
-) -> () {
-    let param = operation.body();
-    let arguments = node.type_arguments.as_ref().unwrap();
-    if let Some(type_arg) = arguments.get(0) {
-        match type_arg.kind {
-            NUMBER_KEYWORD => {
-                param.content().schema().primitive("number");
-            }
-            STRING_KEYWORD => {
-                param.content().schema().primitive("string");
-            }
-            BOOLEAN_KEYWORD => {
-                param.content().schema().primitive("boolean");
-            }
-            _ => {
-                let type_ref = get_identifier(type_arg, file_name);
-                param.content().schema().reference(type_ref.clone(), false);
-                if let Some(type_ref) = type_ref {
-                    type_refs.insert(TypeReference {
-                        name: type_ref,
-                        namespace: match arguments.get(2) {
-                            Some(namespace) => match namespace.literal {
-                                Some(ref literal) => literal.text.clone(),
-                                None => None,
-                            },
-                            None => None,
-                        },
-                    });
-                }
-            }
-        };
-    }
-
-    if let Some(required) = arguments.get(1) {
-        let literal = required.literal.as_ref().unwrap();
-        param.required(literal.kind == TRUE_KEYWORD);
-    }
-
-    if let Some(namespace) = arguments.get(2) {
-        if let Some(ref literal) = namespace.literal {
-            let text = literal.text.clone();
-            param.content().schema().namespace(text);
-        }
-    }
-
-    if let Some(format) = arguments.get(3) {
-        if let Some(ref literal) = format.literal {
-            let text = literal.text.clone();
-            param.content().schema().format(text);
-        }
-    }
-}
-
-fn add_operation_parameter(
-    name: &str,
-    location: &str,
-    operation: &mut ApiPathOperation,
-    node: &AstNode,
-    type_refs: &mut HashSet<TypeReference>,
-    file_name: &String,
-) -> () {
-    let param = operation.param(name, location);
-    let arguments = node.type_arguments.as_ref().unwrap();
-    if let Some(type_arg) = arguments.get(0) {
-        match type_arg.kind {
-            NUMBER_KEYWORD => {
-                param.content().schema().primitive("number");
-            }
-            STRING_KEYWORD => {
-                param.content().schema().primitive("string");
-            }
-            BOOLEAN_KEYWORD => {
-                param.content().schema().primitive("boolean");
-            }
-            _ => {
-                let type_ref = get_identifier(type_arg, file_name);
-                param.content().schema().reference(type_ref.clone(), false);
-                if let Some(type_ref) = type_ref {
-                    type_refs.insert(TypeReference {
-                        name: type_ref,
-                        namespace: match arguments.get(2) {
-                            Some(namespace) => match namespace.literal {
-                                Some(ref literal) => literal.text.clone(),
-                                None => None,
-                            },
-                            None => None,
-                        },
-                    });
-                }
-            }
-        };
-    }
-
-    if let Some(required) = arguments.get(1) {
-        let literal = required.literal.as_ref().unwrap();
-        param.required(literal.kind == TRUE_KEYWORD);
-    }
-
-    if let Some(namespace) = arguments.get(2) {
-        if let Some(ref literal) = namespace.literal {
-            let text = literal.text.clone();
-            param.content().schema().namespace(text);
-        }
-    }
-
-    if let Some(format) = arguments.get(3) {
-        if let Some(ref literal) = format.literal {
-            let text = literal.text.clone();
-            param.content().schema().format(text);
-        }
-    }
-}
-
-fn add_schema(open_api: &mut OpenApi, node: &AstNode, reference: &TypeReference) -> () {
-    let schema = match reference.namespace {
-        Some(ref namespace) => {
-            let schema = open_api.components.schema(&namespace).object();
-            schema.property(&reference.name).object()
-        }
-        None => open_api.components.schema(&reference.name).object(),
-    };
-
-    update_schema(schema, node);
-}
-
 fn update_schema(schema: &mut ApiSchema, node: &AstNode) -> () {
     match node.kind {
         ARRAY_TYPE => {
@@ -307,14 +177,12 @@ fn get_response_options(node: &AstNode, file_name: &String) -> ResponseOptions {
 pub struct OpenApiGenerator<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> {
     get_ast: F,
     open_api: OpenApi,
-    references: HashSet<TypeReference>,
 }
 impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> {
     pub fn new(get_ast: F) -> Self {
         OpenApiGenerator {
             get_ast,
             open_api: OpenApi::new(),
-            references: HashSet::new(),
         }
     }
 
@@ -322,7 +190,151 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
         &self.open_api
     }
 
-    fn add_operation_response(&mut self, route: &str, method: &str, node: &AstNode, file_name: &String) -> () {
+    fn add_body_parameter(
+        &mut self,
+        route: &str,
+        method: &str,
+        node: &AstNode,
+        file_name: &String,
+        cx: &mut FunctionContext,
+    ) -> () {
+        let arguments = node.type_arguments.as_ref().unwrap();
+        let operation = self.open_api.path(route).method(method);
+        let param = operation.body();
+
+        if let Some(required) = arguments.get(1) {
+            let literal = required.literal.as_ref().unwrap();
+            param.required(literal.kind == TRUE_KEYWORD);
+        }
+
+        if let Some(namespace) = arguments.get(2) {
+            if let Some(ref literal) = namespace.literal {
+                let text = literal.text.clone();
+                param.content().schema().namespace(text);
+            }
+        }
+
+        if let Some(format) = arguments.get(3) {
+            if let Some(ref literal) = format.literal {
+                let text = literal.text.clone();
+                param.content().schema().format(text);
+            }
+        }
+
+        if let Some(type_arg) = arguments.get(0) {
+            match type_arg.kind {
+                NUMBER_KEYWORD => {
+                    param.content().schema().primitive("number");
+                }
+                STRING_KEYWORD => {
+                    param.content().schema().primitive("string");
+                }
+                BOOLEAN_KEYWORD => {
+                    param.content().schema().primitive("boolean");
+                }
+                _ => {
+                    let type_ref = get_identifier(type_arg, file_name);
+                    param.content().schema().reference(type_ref.clone(), false);
+                    if let Some(type_ref) = type_ref {
+                        if let Some((node, _)) = get_declaration(&type_ref, file_name, file_name, cx, &mut self.get_ast)
+                        {
+                            self.add_schema(
+                                node,
+                                &TypeReference {
+                                    name: type_ref,
+                                    namespace: match arguments.get(2) {
+                                        Some(namespace) => match namespace.literal {
+                                            Some(ref literal) => literal.text.clone(),
+                                            None => None,
+                                        },
+                                        None => None,
+                                    },
+                                },
+                            );
+                        }
+                    }
+                }
+            };
+        }
+    }
+
+    fn add_operation_parameter(
+        &mut self,
+        name: &str,
+        location: &str,
+        route: &str,
+        method: &str,
+        node: &AstNode,
+        file_name: &String,
+        cx: &mut FunctionContext,
+    ) -> () {
+        let operation = self.open_api.path(&route).method(&method);
+        let param = operation.param(name, location);
+        let arguments = node.type_arguments.as_ref().unwrap();
+        if let Some(required) = arguments.get(1) {
+            let literal = required.literal.as_ref().unwrap();
+            param.required(literal.kind == TRUE_KEYWORD);
+        }
+
+        if let Some(namespace) = arguments.get(2) {
+            if let Some(ref literal) = namespace.literal {
+                let text = literal.text.clone();
+                param.content().schema().namespace(text);
+            }
+        }
+
+        if let Some(format) = arguments.get(3) {
+            if let Some(ref literal) = format.literal {
+                let text = literal.text.clone();
+                param.content().schema().format(text);
+            }
+        }
+
+        if let Some(type_arg) = arguments.get(0) {
+            match type_arg.kind {
+                NUMBER_KEYWORD => {
+                    param.content().schema().primitive("number");
+                }
+                STRING_KEYWORD => {
+                    param.content().schema().primitive("string");
+                }
+                BOOLEAN_KEYWORD => {
+                    param.content().schema().primitive("boolean");
+                }
+                _ => {
+                    let type_ref = get_identifier(type_arg, file_name);
+                    param.content().schema().reference(type_ref.clone(), false);
+                    if let Some(type_ref) = type_ref {
+                        if let Some((node, _)) = get_declaration(&type_ref, file_name, file_name, cx, &mut self.get_ast)
+                        {
+                            self.add_schema(
+                                node,
+                                &TypeReference {
+                                    name: type_ref,
+                                    namespace: match arguments.get(2) {
+                                        Some(namespace) => match namespace.literal {
+                                            Some(ref literal) => literal.text.clone(),
+                                            None => None,
+                                        },
+                                        None => None,
+                                    },
+                                },
+                            );
+                        }
+                    }
+                }
+            };
+        }
+    }
+
+    fn add_operation_response(
+        &mut self,
+        route: &str,
+        method: &str,
+        node: &AstNode,
+        file_name: &String,
+        cx: &mut FunctionContext,
+    ) -> () {
         if let Some(ref expression) = node.expression {
             if let Some(ref text) = expression.escaped_text {
                 if text.eq("Response") {
@@ -346,17 +358,24 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
                             operation.response(&ref_name, response_options);
 
                             if let Some(ref ref_name) = ref_name {
-                                self.references.insert(TypeReference {
-                                    name: ref_name.to_owned(),
-                                    namespace: namespace,
-                                });
+                                if let Some((node, _)) =
+                                    get_declaration(ref_name, file_name, file_name, cx, &mut self.get_ast)
+                                {
+                                    self.add_schema(
+                                        node,
+                                        &TypeReference {
+                                            name: ref_name.to_owned(),
+                                            namespace: namespace,
+                                        },
+                                    );
+                                }
                             }
                         }
                     }
                 }
             }
         } else {
-            node.for_each_child(|node| self.add_operation_response(route, method, node, file_name))
+            node.for_each_child(|node| self.add_operation_response(route, method, node, file_name, cx))
         }
     }
 
@@ -367,7 +386,10 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
         node: &AstNode,
         file_name: &String,
         cx: &mut FunctionContext,
-    ) -> () {
+    ) -> ()
+    where
+        F: FnMut(&str, &str, &mut FunctionContext) -> AstNode,
+    {
         if let Some(ref _type) = node._type {
             let type_name = match _type.type_name {
                 Some(ref type_name) => type_name.escaped_text.as_deref(),
@@ -381,30 +403,36 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
                 Some("QueryParam") => {
                     let property_name = node.name.as_ref().unwrap();
                     let name = property_name.escaped_text.as_ref().unwrap();
-                    let operation = self.open_api.path(&route).method(&method);
-                    add_operation_parameter(&name, "query", operation, _type, &mut self.references, file_name)
+                    self.add_operation_parameter(&name, "query", route, method, _type, file_name, cx)
                 }
                 Some("RouteParam") => {
                     let property_name = node.name.as_ref().unwrap();
                     let name = property_name.escaped_text.as_ref().unwrap();
-                    let operation = self.open_api.path(&route).method(&method);
-                    add_operation_parameter(&name, "path", operation, _type, &mut self.references, file_name)
+                    self.add_operation_parameter(&name, "path", route, method, _type, file_name, cx)
                 }
                 Some("Header") => {
                     let property_name = node.name.as_ref().unwrap();
                     let name = property_name.escaped_text.as_ref().unwrap();
-                    let operation = self.open_api.path(&route).method(&method);
-                    add_operation_parameter(&name, "header", operation, _type, &mut self.references, file_name)
+                    self.add_operation_parameter(&name, "header", route, method, _type, file_name, cx)
                 }
-                Some("BodyParam") => {
-                    let operation = self.open_api.path(&route).method(&method);
-                    add_body_parameter(operation, _type, &mut self.references, file_name)
-                }
+                Some("BodyParam") => self.add_body_parameter(route, method, _type, file_name, cx),
                 _ => _type.for_each_child(|node| self.add_operation_params(route, method, node, file_name, cx)),
             }
         } else {
             node.for_each_child(|node| self.add_operation_params(route, method, node, file_name, cx))
         }
+    }
+
+    fn add_schema(&mut self, node: &AstNode, reference: &TypeReference) -> () {
+        let schema = match reference.namespace {
+            Some(ref namespace) => {
+                let schema = self.open_api.components.schema(&namespace).object();
+                schema.property(&reference.name).object()
+            }
+            None => self.open_api.components.schema(&reference.name).object(),
+        };
+
+        update_schema(schema, node);
     }
 
     fn is_api_path(&self, node: &AstNode) -> bool {
@@ -427,6 +455,8 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
             let method = path_options.method.unwrap();
             self.open_api.path(&route).method(&method).tags(path_options.tags);
 
+            println!("Found path for route {}", route);
+
             let request_param = get_request_parameter(route_handler);
             if let Some(name) = match request_param._type {
                 Some(ref type_ref) => match type_ref.name {
@@ -446,15 +476,7 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
             }
 
             let route_handler_body = route_handler.body.as_ref().unwrap();
-            self.add_operation_response(&route, &method, &*route_handler_body, file_name);
-
-            let mut references = self.references.drain().collect::<Vec<TypeReference>>();
-            while !references.is_empty() {
-                let reference = references.pop().unwrap();
-                if let Some((node, _)) = get_declaration(&reference.name, file_name, file_name, cx, &mut self.get_ast) {
-                    add_schema(&mut self.open_api, node, &reference);
-                }
-            }
+            self.add_operation_response(&route, &method, &*route_handler_body, file_name, cx);
         } else {
             node.for_each_child(|node| self.find_api_paths(node, file_name, cx))
         }

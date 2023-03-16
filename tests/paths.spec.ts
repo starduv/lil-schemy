@@ -107,7 +107,7 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        $ref: "#components/schemas/Account"
+                                        $ref: "#/components/schemas/Account"
                                     }
                                 }
                             }

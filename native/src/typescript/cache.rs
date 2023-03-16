@@ -108,65 +108,88 @@ fn cache_variables(node: &AstNode, file_name: &str) -> () {
         let declarations = DECLARATIONS.get_mut(file_name).unwrap();
         if let Some(ref list) = node.declaration_list {
             list.for_each_child(|declaration| {
-                let initializer = declaration.initializer.as_ref().unwrap();
                 let name = declaration.name.as_ref().unwrap();
                 let text = name.escaped_text.as_ref().unwrap();
-                match initializer.kind {
-                    AS_EXPRESSION => {
-                        let _type = initializer._type.as_ref().unwrap();
-                        let type_name = _type.type_name.as_ref().unwrap();
-                        let type_name_text = type_name.escaped_text.as_ref().unwrap();
-                        declarations.insert(
-                            text.to_string(),
-                            Declaration::Alias {
-                                from: text.to_string(),
-                                to: type_name_text.to_string(),
-                            },
-                        );
-                    }
-                    TYPE_ASSERTION_EXPRESSION => {
-                        let _type = initializer._type.as_ref().unwrap();
-                        let type_name = _type.type_name.as_ref().unwrap();
-                        let type_name_text = type_name.escaped_text.as_ref().unwrap();
-                        declarations.insert(
-                            text.to_string(),
-                            Declaration::Alias {
-                                from: text.to_string(),
-                                to: type_name_text.to_string(),
-                            },
-                        );
-                    }
-                    CALL_EXPRESSION => {
-                        let expression = initializer.expression.as_ref().unwrap();
-                        let expression_text = match expression.name {
-                            Some(ref name) => name.escaped_text.as_ref().unwrap(),
-                            None => expression.escaped_text.as_ref().unwrap(),
-                        };
-
-                        declarations.insert(
-                            text.to_string(),
-                            Declaration::Alias {
-                                from: text.to_string(),
-                                to: expression_text.to_string(),
-                            },
-                        );
-                    }
-                    NEW_EXPRESSION => {
-                        let expression = initializer.expression.as_ref().unwrap();
-                        let expression_text = expression.escaped_text.as_ref().unwrap();
-                        declarations.insert(
-                            text.to_string(),
-                            Declaration::Alias {
-                                from: text.to_string(),
-                                to: expression_text.to_string(),
-                            },
-                        );
-                    }
-                    _ => {
-                        declarations.insert(text.to_string(), Declaration::Type { node: node.clone() });
-                    }
+                if declaration._type.is_some() {
+                    let type_ref = declaration._type.as_deref().unwrap();
+                    let type_name = type_ref.type_name.as_ref().unwrap();
+                    let type_text = type_name.escaped_text.as_ref().unwrap();
+                    declarations.insert(
+                        text.to_string(),
+                        Declaration::Alias {
+                            from: text.to_string(),
+                            to: type_text.to_string(),
+                        },
+                    );
+                } else if declaration.initializer.is_some() {
+                    cache_initializer(text, node, declaration, declarations)
                 }
             })
+        }
+    }
+}
+
+fn cache_initializer(
+    name: &str,
+    node: &AstNode,
+    declaration: &AstNode,
+    declarations: &mut HashMap<String, Declaration>,
+) -> () {
+    let initializer = declaration.initializer.as_ref().unwrap();
+
+    match initializer.kind {
+        AS_EXPRESSION => {
+            let _type = initializer._type.as_ref().unwrap();
+            let type_name = _type.type_name.as_ref().unwrap();
+            let type_name_text = type_name.escaped_text.as_ref().unwrap();
+            declarations.insert(
+                name.to_string(),
+                Declaration::Alias {
+                    from: name.to_string(),
+                    to: type_name_text.to_string(),
+                },
+            );
+        }
+        TYPE_ASSERTION_EXPRESSION => {
+            let _type = initializer._type.as_ref().unwrap();
+            let type_name = _type.type_name.as_ref().unwrap();
+            let type_name_text = type_name.escaped_text.as_ref().unwrap();
+            declarations.insert(
+                name.to_string(),
+                Declaration::Alias {
+                    from: name.to_string(),
+                    to: type_name_text.to_string(),
+                },
+            );
+        }
+        CALL_EXPRESSION => {
+            let expression = initializer.expression.as_ref().unwrap();
+            let expression_text = match expression.name {
+                Some(ref name) => name.escaped_text.as_ref().unwrap(),
+                None => expression.escaped_text.as_ref().unwrap(),
+            };
+
+            declarations.insert(
+                name.to_string(),
+                Declaration::Alias {
+                    from: name.to_string(),
+                    to: expression_text.to_string(),
+                },
+            );
+        }
+        NEW_EXPRESSION => {
+            let expression = initializer.expression.as_ref().unwrap();
+            let expression_text = expression.escaped_text.as_ref().unwrap();
+            declarations.insert(
+                name.to_string(),
+                Declaration::Alias {
+                    from: name.to_string(),
+                    to: expression_text.to_string(),
+                },
+            );
+        }
+        _ => {
+            declarations.insert(name.to_string(), Declaration::Type { node: node.clone() });
         }
     }
 }
