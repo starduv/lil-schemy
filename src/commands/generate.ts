@@ -7,17 +7,23 @@ export const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
     if (config?.openApi) {
         const { openApi, project } = config;
 
+        const files = getRootFiles(cwd, openApi.paths);
+
+        console.debug("Searching for api paths in files %o", files);
+
         const result = generateSchemas({
             getAst: getAst(cwd, { project }),
             openApi: {
                 base: JSON.stringify(openApi.base),
-                paths: getRootFiles(cwd, openApi.paths),
+                paths: files,
                 output: openApi.output || undefined
             }
         });
 
         if (result.openApi?.schema) {
-            console.log(result.openApi.schema);
+            console.info(result.openApi.schema);
+        } else if (result.openApi?.filepath) {
+            console.info("OpenApi schema written to %s", result.openApi.filepath);
         }
     }
 };

@@ -138,7 +138,11 @@ fn cache_variables(node: &AstNode, file_name: &str) -> () {
                     }
                     CALL_EXPRESSION => {
                         let expression = initializer.expression.as_ref().unwrap();
-                        let expression_text = expression.escaped_text.as_ref().unwrap();
+                        let expression_text = match expression.name {
+                            Some(ref name) => name.escaped_text.as_ref().unwrap(),
+                            None => expression.escaped_text.as_ref().unwrap(),
+                        };
+
                         declarations.insert(
                             text.to_string(),
                             Declaration::Alias {

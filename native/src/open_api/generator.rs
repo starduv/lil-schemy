@@ -447,6 +447,14 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
 
             let route_handler_body = route_handler.body.as_ref().unwrap();
             self.add_operation_response(&route, &method, &*route_handler_body, file_name);
+
+            let mut references = self.references.drain().collect::<Vec<TypeReference>>();
+            while !references.is_empty() {
+                let reference = references.pop().unwrap();
+                if let Some((node, _)) = get_declaration(&reference.name, file_name, file_name, cx, &mut self.get_ast) {
+                    add_schema(&mut self.open_api, node, &reference);
+                }
+            }
         } else {
             node.for_each_child(|node| self.find_api_paths(node, file_name, cx))
         }
@@ -458,13 +466,5 @@ impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> 
         cache_declarations(&source_file, &path);
 
         source_file.for_each_child(|node| self.find_api_paths(node, &path, cx));
-
-        let mut references = self.references.iter().collect::<Vec<&TypeReference>>();
-        while references.is_empty() == false {
-            let reference = references.pop().unwrap();
-            if let Some((node, _)) = get_declaration(&reference.name, &path, &path, cx, &mut self.get_ast) {
-                add_schema(&mut self.open_api, node, &reference);
-            }
-        }
     }
 }

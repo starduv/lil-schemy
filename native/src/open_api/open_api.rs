@@ -1,4 +1,4 @@
-use ahash::{HashMap, HashMapExt};
+use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 
 #[derive(Serialize, Debug)]
@@ -243,7 +243,7 @@ pub struct ApiSchema {
     namespace: Option<String>,
     is_example: bool,
     properties: Option<HashMap<String, ApiSchema>>,
-    required: Vec<String>,
+    required: HashSet<String>,
 }
 
 impl Serialize for ApiSchema {
@@ -298,7 +298,7 @@ impl ApiSchema {
             is_example: false,
             items: None,
             properties: None,
-            required: Vec::new(),
+            required: HashSet::new(),
         }
     }
 
@@ -330,7 +330,7 @@ impl ApiSchema {
     }
 
     pub fn property(&mut self, name_text: &str) -> &mut ApiSchema {
-        self.required.push(name_text.to_string());
+        self.required.insert(name_text.to_string());
 
         self.properties
             .get_or_insert(HashMap::new())

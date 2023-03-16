@@ -56,6 +56,15 @@ describe('open api generator', () => {
                     "AdminUser"
                 ]
             },
+            Account: {
+                type: 'object',
+                properties: {
+                    number: {
+                        type: 'string'
+                    }
+                },
+                required: ['number']
+            },
             AdminUser: {
                 type: 'object',
                 properties: {
@@ -76,6 +85,37 @@ describe('open api generator', () => {
 
     it('generates api paths', () => {
         expect(schema.paths).to.deep.equal({
+            "/account": {
+                get: {
+                    parameters: [
+                        {
+                            content: {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            in: "path",
+                            name: "id",
+                            required: true
+                        }
+                    ],
+                    responses: {
+                        200: {
+                            description: "Get user account",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#components/schemas/Account"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    tags: ["Account"]
+                }
+            },
             "/user": {
                 get: {
                     responses: {
@@ -132,7 +172,7 @@ describe('open api generator', () => {
                         }
                     ],
                     tags: [
-                        "space"
+                        "Users"
                     ]
                 },
                 post: {

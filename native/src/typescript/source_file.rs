@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 use super::{
-    ARROW_FUNCTION, BLOCK, CALL_EXPRESSION, CLASS_DECLARATION, EXPRESSION_STATEMENT, IMPORT_CLAUSE,
+    ARROW_FUNCTION, BLOCK, CALL_EXPRESSION, CLASS_DECLARATION, EXPORT_ASSIGNMENT, EXPRESSION_STATEMENT, IMPORT_CLAUSE,
     INTERFACE_DECLARATION, NAMED_IMPORTS, PARAMETER, SOURCE_FILE, TYPE_ALIAS_DECLARATION, TYPE_LITERAL, TYPE_REFERENCE,
     VARIABLE_DECLARATION, VARIABLE_DECLARATION_LIST, VARIABLE_STATEMENT,
 };
@@ -66,6 +66,11 @@ impl AstNode {
                     for member in members {
                         func(member)
                     }
+                }
+            }
+            EXPORT_ASSIGNMENT => {
+                if let Some(ref expression) = self.expression {
+                    func(expression)
                 }
             }
             INTERFACE_DECLARATION => {
