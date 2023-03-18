@@ -12,7 +12,7 @@ export const getAst = (cwd: string, options: CompilerOptions) => (module_ref: st
     let ast: ts.Node | undefined;
     // module_ref is an absolute path
     if (module_ref === sourceFileName) {
-        ast = _getAst(module_ref);
+        ast = _getAst(module_ref, false);
     } else {
         // we're looking for a module reference found in another source file
         const resolution = ts.resolveModuleName(module_ref, sourceFileName, options, {
@@ -20,10 +20,18 @@ export const getAst = (cwd: string, options: CompilerOptions) => (module_ref: st
             readFile: ts.sys.readFile,
         }, cache);
 
-        ast = _getAst(resolution.resolvedModule?.resolvedFileName as string);
+        ast = _getAst(resolution.resolvedModule?.resolvedFileName as string, resolution.resolvedModule?.isExternalLibraryImport as boolean);
     }
 
-    return ast ? JSON.stringify(ast) : ast;
+    if ((ast as ts.SourceFile).fileName.endsWith('fastify.d.ts')) {
+        console.log('--------------- MODULE %s ---------------------', module_ref);
+        console.log(JSON.stringify(ast));
+        console.log('-------------------------------------------------');
+    }
+
+    const astStr = JSON.stringify(ast || {});
+
+    return astStr;
 };
 
 export const getRootFiles = (cwd: string, globs: string[]): string[] => fg(globs, {
@@ -31,11 +39,17 @@ export const getRootFiles = (cwd: string, globs: string[]): string[] => fg(globs
     cwd
 });
 
-const _getAst = (p: string): ts.Node => {
+const _getAst = (p: string, external: boolean): ts.Node => {
     const file = readFileSync(p, {
         encoding: 'utf-8',
         flag: 'r'
     });
 
-    return ts.createSourceFile(p, file, ts.ScriptTarget.ES2015, false);
+    const ast = ts.createSourceFile(p, file, ts.ScriptTarget.ESNext, false, external ? ts.ScriptKind.External : ts.ScriptKind.TS);
+
+    if (p.endsWith('fastify.d.ts')) {
+        console.log(ast.fileName);
+    }
+
+    return ast;
 };

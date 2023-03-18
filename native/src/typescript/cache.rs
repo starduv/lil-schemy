@@ -121,21 +121,24 @@ fn cache_variables(node: &AstNode, file_name: &str) -> () {
         let declarations = DECLARATIONS.get_mut(file_name).unwrap();
         if let Some(ref list) = node.declaration_list {
             list.for_each_child(|declaration| {
-                let name = declaration.name.as_ref().unwrap();
-                let text = name.escaped_text.as_ref().unwrap();
-                if declaration._type.is_some() {
-                    let type_ref = declaration._type.as_deref().unwrap();
-                    let type_name = type_ref.type_name.as_ref().unwrap();
-                    let type_text = type_name.escaped_text.as_ref().unwrap();
-                    declarations.insert(
-                        text.to_string(),
-                        Declaration::Alias {
-                            from: text.to_string(),
-                            to: type_text.to_string(),
-                        },
-                    );
-                } else if declaration.initializer.is_some() {
-                    cache_initializer(text, node, declaration, declarations)
+                if let Some(ref name) = declaration.name {
+                    if let Some(ref text) = name.escaped_text {
+                        if declaration._type.is_some() {
+                            let type_ref = declaration._type.as_deref().unwrap();
+                            if let Some(ref type_name) = type_ref.type_name {
+                                let type_text = type_name.escaped_text.as_ref().unwrap();
+                                declarations.insert(
+                                    text.to_string(),
+                                    Declaration::Alias {
+                                        from: text.to_string(),
+                                        to: type_text.to_string(),
+                                    },
+                                );
+                            }
+                        } else if declaration.initializer.is_some() {
+                            cache_initializer(text, node, declaration, declarations)
+                        }
+                    }
                 }
             })
         }
