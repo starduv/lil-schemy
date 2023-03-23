@@ -16,6 +16,7 @@ jobs:
         strategy:
             fail-fast: true
             matrix:
+              build:
                 - BIN: libtypeshift.so
                   NAME: typeshift-x64-linux.node
                   OS: ubuntu-20.04
