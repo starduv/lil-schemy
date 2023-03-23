@@ -81,3 +81,7 @@ jobs:
                 yarn
                 yarn build
 
+            - name: Test
+              run: |
+                yarn test
+
