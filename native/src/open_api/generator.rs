@@ -1,142 +1,8 @@
-use std::collections::BTreeMap;
-
-use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
+use neon::prelude::FunctionContext;
 
 use crate::typescript::*;
 
-use super::open_api::{ApiPathOperation, ApiSchema, OpenApi, PathArgs, ResponseOptions};
-
-static mut DECLARATIONS: BTreeMap<String, HashMap<String, Declaration>> = BTreeMap::new();
-
-fn add_body_parameter(
-    operation: &mut ApiPathOperation,
-    node: &AstNode,
-    type_refs: &mut HashSet<TypeReference>,
-    file_name: &String,
-) -> () {
-    let param = operation.body();
-    let arguments = node.type_arguments.as_ref().unwrap();
-    if let Some(type_arg) = arguments.get(0) {
-        match type_arg.kind {
-            NUMBER_KEYWORD => {
-                param.content().schema().primitive("number");
-            }
-            STRING_KEYWORD => {
-                param.content().schema().primitive("string");
-            }
-            BOOLEAN_KEYWORD => {
-                param.content().schema().primitive("boolean");
-            }
-            _ => {
-                let type_ref = get_identifier(type_arg, file_name);
-                param.content().schema().reference(type_ref.clone(), false);
-                if let Some(type_ref) = type_ref {
-                    type_refs.insert(TypeReference {
-                        name: type_ref,
-                        namespace: match arguments.get(2) {
-                            Some(namespace) => match namespace.literal {
-                                Some(ref literal) => literal.text.clone(),
-                                None => None,
-                            },
-                            None => None,
-                        },
-                    });
-                }
-            }
-        };
-    }
-
-    if let Some(required) = arguments.get(1) {
-        let literal = required.literal.as_ref().unwrap();
-        param.required(literal.kind == TRUE_KEYWORD);
-    }
-
-    if let Some(namespace) = arguments.get(2) {
-        if let Some(ref literal) = namespace.literal {
-            let text = literal.text.clone();
-            param.content().schema().namespace(text);
-        }
-    }
-
-    if let Some(format) = arguments.get(3) {
-        if let Some(ref literal) = format.literal {
-            let text = literal.text.clone();
-            param.content().schema().format(text);
-        }
-    }
-}
-
-fn add_operation_parameter(
-    name: &str,
-    location: &str,
-    operation: &mut ApiPathOperation,
-    node: &AstNode,
-    type_refs: &mut HashSet<TypeReference>,
-    file_name: &String,
-) -> () {
-    let param = operation.param(name, location);
-    let arguments = node.type_arguments.as_ref().unwrap();
-    if let Some(type_arg) = arguments.get(0) {
-        match type_arg.kind {
-            NUMBER_KEYWORD => {
-                param.content().schema().primitive("number");
-            }
-            STRING_KEYWORD => {
-                param.content().schema().primitive("string");
-            }
-            BOOLEAN_KEYWORD => {
-                param.content().schema().primitive("boolean");
-            }
-            _ => {
-                let type_ref = get_identifier(type_arg, file_name);
-                param.content().schema().reference(type_ref.clone(), false);
-                if let Some(type_ref) = type_ref {
-                    type_refs.insert(TypeReference {
-                        name: type_ref,
-                        namespace: match arguments.get(2) {
-                            Some(namespace) => match namespace.literal {
-                                Some(ref literal) => literal.text.clone(),
-                                None => None,
-                            },
-                            None => None,
-                        },
-                    });
-                }
-            }
-        };
-    }
-
-    if let Some(required) = arguments.get(1) {
-        let literal = required.literal.as_ref().unwrap();
-        param.required(literal.kind == TRUE_KEYWORD);
-    }
-
-    if let Some(namespace) = arguments.get(2) {
-        if let Some(ref literal) = namespace.literal {
-            let text = literal.text.clone();
-            param.content().schema().namespace(text);
-        }
-    }
-
-    if let Some(format) = arguments.get(3) {
-        if let Some(ref literal) = format.literal {
-            let text = literal.text.clone();
-            param.content().schema().format(text);
-        }
-    }
-}
-
-fn add_schema(open_api: &mut OpenApi, node: &AstNode, reference: &TypeReference) -> () {
-    let schema = match reference.namespace {
-        Some(ref namespace) => {
-            let schema = open_api.components.schema(&namespace).object();
-            schema.property(&reference.name).object()
-        }
-        None => open_api.components.schema(&reference.name).object(),
-    };
-
-    update_schema(schema, node);
-}
+use super::open_api::{ApiSchema, OpenApi, PathArgs, ResponseOptions};
 
 fn update_schema(schema: &mut ApiSchema, node: &AstNode) -> () {
     match node.kind {
@@ -161,170 +27,16 @@ fn update_schema(schema: &mut ApiSchema, node: &AstNode) -> () {
         STRING_KEYWORD => {
             schema.primitive("string");
         }
+        BOOLEAN_KEYWORD => {
+            schema.primitive("boolean");
+        }
+        NUMBER_KEYWORD => {
+            schema.primitive("number");
+        }
+        BIG_INT_KEYWORD => {
+            schema.primitive("number");
+        }
         _ => {}
-    }
-}
-
-fn cache_declarations(node: &AstNode, file_name: &str, module_map: &HashMap<String, String>) -> () {
-    match node.kind {
-        CLASS_DECLARATION => cache_object_type(node, file_name),
-        IMPORT_DECLARATION => cache_import_declaration(node, file_name, module_map),
-        EXPORT_DECLARATION => cache_export_declaration(node, file_name, module_map),
-        INTERFACE_DECLARATION => cache_object_type(node, file_name),
-        TYPE_ALIAS_DECLARATION => cache_object_type(node, file_name),
-        VARIABLE_STATEMENT => cache_variables(node, file_name),
-        _ => node.for_each_child(|n| cache_declarations(n, file_name, module_map)),
-        // _ => {}
-    }
-}
-
-fn cache_object_type(node: &AstNode, file_name: &str) -> () {
-    unsafe {
-        let name = node.name.as_ref().unwrap();
-        let text = match node.modifiers {
-            Some(ref modifiers) => match modifiers.iter().find(|n| n.kind == DEFAULT_KEYWORD) {
-                Some(_) => "default",
-                None => name.escaped_text.as_ref().unwrap(),
-            },
-            None => name.escaped_text.as_ref().unwrap(),
-        };
-
-        let declarations = DECLARATIONS.entry(file_name.to_string()).or_insert(HashMap::new());
-        declarations.insert(text.to_string(), Declaration::Type { node: node.clone() });
-    }
-}
-
-fn cache_import_declaration(node: &AstNode, file_name: &str, module_map: &HashMap<String, String>) -> () {
-    unsafe {
-        let declarations = DECLARATIONS.entry(file_name.to_owned()).or_insert(HashMap::new());
-        let module_specifier = node.module_specifier.as_ref().unwrap();
-        let module_reference = module_specifier.text.as_ref().unwrap();
-        let absolute = module_map.get(module_reference).expect("Could not find module");
-
-        let import_clause = node.import_clause.as_ref().unwrap();
-        if let Some(ref name) = import_clause.name {
-            let text = name.escaped_text.as_ref().unwrap();
-            declarations.insert(
-                text.to_string(),
-                Declaration::Import {
-                    name: String::from("default"),
-                    file: absolute.to_string(),
-                },
-            );
-        }
-
-        import_clause.for_each_child(|bindings| {
-            bindings.for_each_child(|element| {
-                let name = element.name.as_ref().unwrap();
-                let name_text = name.escaped_text.as_ref().unwrap();
-                let alias = match element.property_name {
-                    Some(ref node) => node.escaped_text.as_ref().unwrap(),
-                    None => name_text,
-                };
-
-                declarations.insert(
-                    name_text.to_string(),
-                    Declaration::Import {
-                        name: alias.to_string(),
-                        file: absolute.to_string(),
-                    },
-                );
-            })
-        })
-    }
-}
-
-fn cache_export_declaration(node: &AstNode, file_name: &str, module_map: &HashMap<String, String>) -> () {
-    unsafe {
-        let declarations = DECLARATIONS.entry(file_name.to_owned()).or_insert(HashMap::new());
-        let module_specifier = node.module_specifier.as_ref().unwrap();
-        let module_reference = module_specifier.text.as_ref().unwrap();
-        let absolute = module_map.get(module_reference).expect("Could not find module");
-
-        let export_clause = node.export_clause.as_ref().unwrap();
-
-        export_clause.for_each_child(|exports| {
-            exports.for_each_child(|element| {
-                let name = element.name.as_ref().unwrap();
-                let name_text = name.escaped_text.as_ref().unwrap();
-                let alias = match element.property_name {
-                    Some(ref node) => node.escaped_text.as_ref().unwrap(),
-                    None => name_text,
-                };
-
-                declarations.insert(
-                    name_text.to_string(),
-                    Declaration::Export {
-                        name: alias.to_string(),
-                        file: absolute.to_string(),
-                    },
-                );
-            })
-        })
-    }
-}
-
-fn cache_variables(node: &AstNode, file_name: &str) -> () {
-    unsafe {
-        let declarations = DECLARATIONS.get_mut(file_name).unwrap();
-        if let Some(ref list) = node.declaration_list {
-            list.for_each_child(|declaration| {
-                let initializer = declaration.initializer.as_ref().unwrap();
-                let name = declaration.name.as_ref().unwrap();
-                let text = name.escaped_text.as_ref().unwrap();
-                match initializer.kind {
-                    AS_EXPRESSION => {
-                        let _type = initializer._type.as_ref().unwrap();
-                        let type_name = _type.type_name.as_ref().unwrap();
-                        let type_name_text = type_name.escaped_text.as_ref().unwrap();
-                        declarations.insert(
-                            text.to_string(),
-                            Declaration::Alias {
-                                from: text.to_string(),
-                                to: type_name_text.to_string(),
-                            },
-                        );
-                    }
-                    TYPE_ASSERTION_EXPRESSION => {
-                        let _type = initializer._type.as_ref().unwrap();
-                        let type_name = _type.type_name.as_ref().unwrap();
-                        let type_name_text = type_name.escaped_text.as_ref().unwrap();
-                        declarations.insert(
-                            text.to_string(),
-                            Declaration::Alias {
-                                from: text.to_string(),
-                                to: type_name_text.to_string(),
-                            },
-                        );
-                    }
-                    CALL_EXPRESSION => {
-                        let expression = initializer.expression.as_ref().unwrap();
-                        let expression_text = expression.escaped_text.as_ref().unwrap();
-                        declarations.insert(
-                            text.to_string(),
-                            Declaration::Alias {
-                                from: text.to_string(),
-                                to: expression_text.to_string(),
-                            },
-                        );
-                    }
-                    NEW_EXPRESSION => {
-                        let expression = initializer.expression.as_ref().unwrap();
-                        let expression_text = expression.escaped_text.as_ref().unwrap();
-                        declarations.insert(
-                            text.to_string(),
-                            Declaration::Alias {
-                                from: text.to_string(),
-                                to: expression_text.to_string(),
-                            },
-                        );
-                    }
-                    _ => {
-                        declarations.insert(text.to_string(), Declaration::Type { node: node.clone() });
-                    }
-                }
-            })
-        }
     }
 }
 
@@ -347,21 +59,25 @@ fn find_type_name(name: &str, file_name: &String) -> String {
     }
 }
 
-fn get_declaration<'n>(
+pub fn get_declaration<'n, F>(
     reference: &str,
-    file_name: &str,
-    ast_map: &'n HashMap<String, AstNode>,
-    module_map: &HashMap<String, String>,
-) -> Option<&'n AstNode> {
+    module_ref: &str,
+    src_file_name: &String,
+    cx: &mut FunctionContext,
+    get_ast: &mut F,
+) -> Option<(&'n AstNode, String)>
+where
+    F: FnMut(&str, &str, &mut FunctionContext) -> AstNode,
+{
     unsafe {
-        if !DECLARATIONS.contains_key(file_name) {
-            let source_file = ast_map.get(file_name).unwrap();
-            cache_declarations(source_file, file_name, module_map);
+        if !DECLARATIONS.contains_key(module_ref) {
+            let source_file = get_ast(module_ref, src_file_name, cx);
+            cache_declarations(&source_file, module_ref);
         }
 
         let mut key = reference;
         let mut previous: &str = "";
-        let declarations = DECLARATIONS.get(file_name).unwrap();
+        let declarations = DECLARATIONS.get(module_ref).unwrap();
         while key != previous && declarations.contains_key(key) {
             match declarations.get(key) {
                 Some(Declaration::Alias { from: _, to }) => {
@@ -373,9 +89,13 @@ fn get_declaration<'n>(
         }
 
         match declarations.get(key) {
-            Some(Declaration::Export { name, file }) => get_declaration(name, file, ast_map, module_map),
-            Some(Declaration::Import { name, file }) => get_declaration(name, file, ast_map, module_map),
-            Some(Declaration::Type { node }) => Some(node),
+            Some(Declaration::Export { name, module_ref }) => {
+                get_declaration(name, module_ref, src_file_name, cx, get_ast)
+            }
+            Some(Declaration::Import { name, module_ref }) => {
+                get_declaration(name, module_ref, src_file_name, cx, get_ast)
+            }
+            Some(Declaration::Type { node }) => Some((node, module_ref.to_owned())),
             _ => None,
         }
     }
@@ -453,19 +173,15 @@ fn get_response_options(node: &AstNode, file_name: &String) -> ResponseOptions {
     response_args
 }
 
-pub struct OpenApiGenerator<'m> {
-    ast_map: &'m HashMap<String, AstNode>,
+pub struct OpenApiGenerator<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> {
+    get_ast: F,
     open_api: OpenApi,
-    module_map: &'m HashMap<String, String>,
-    references: HashSet<TypeReference>,
 }
-impl<'m> OpenApiGenerator<'m> {
-    pub fn new(module_map: &'m HashMap<String, String>, ast_map: &'m HashMap<String, AstNode>) -> Self {
+impl<F: FnMut(&str, &str, &mut FunctionContext) -> AstNode> OpenApiGenerator<F> {
+    pub fn new(get_ast: F) -> Self {
         OpenApiGenerator {
-            ast_map,
+            get_ast,
             open_api: OpenApi::new(),
-            module_map,
-            references: HashSet::new(),
         }
     }
 
@@ -473,7 +189,152 @@ impl<'m> OpenApiGenerator<'m> {
         &self.open_api
     }
 
-    fn add_operation_response(&mut self, route: &str, method: &str, node: &AstNode, file_name: &String) -> () {
+    fn add_body_parameter(
+        &mut self,
+        route: &str,
+        method: &str,
+        node: &AstNode,
+        file_name: &String,
+        cx: &mut FunctionContext,
+    ) -> () {
+        let arguments = node.type_arguments.as_ref().unwrap();
+        let operation = self.open_api.path(route).method(method);
+        let param = operation.body();
+
+        if let Some(required) = arguments.get(1) {
+            let literal = required.literal.as_ref().unwrap();
+            param.required(literal.kind == TRUE_KEYWORD);
+        }
+
+        if let Some(namespace) = arguments.get(2) {
+            if let Some(ref literal) = namespace.literal {
+                let text = literal.text.clone();
+                param.content().schema().namespace(text);
+            }
+        }
+
+        if let Some(format) = arguments.get(3) {
+            if let Some(ref literal) = format.literal {
+                let text = literal.text.clone();
+                param.content().schema().format(text);
+            }
+        }
+
+        if let Some(type_arg) = arguments.get(0) {
+            match type_arg.kind {
+                NUMBER_KEYWORD => {
+                    param.content().schema().primitive("number");
+                }
+                STRING_KEYWORD => {
+                    param.content().schema().primitive("string");
+                }
+                BOOLEAN_KEYWORD => {
+                    param.content().schema().primitive("boolean");
+                }
+                _ => {
+                    let type_ref = get_identifier(type_arg, file_name);
+                    param.content().schema().reference(type_ref.clone(), false);
+                    if let Some(type_ref) = type_ref {
+                        if let Some((node, _)) = get_declaration(&type_ref, file_name, file_name, cx, &mut self.get_ast)
+                        {
+                            self.add_schema(
+                                node,
+                                &TypeReference {
+                                    name: type_ref,
+                                    namespace: match arguments.get(2) {
+                                        Some(namespace) => match namespace.literal {
+                                            Some(ref literal) => literal.text.clone(),
+                                            None => None,
+                                        },
+                                        None => None,
+                                    },
+                                },
+                            );
+                        }
+                    }
+                }
+            };
+        }
+    }
+
+    fn add_operation_parameter(
+        &mut self,
+        name: &str,
+        location: &str,
+        route: &str,
+        method: &str,
+        node: &AstNode,
+        file_name: &String,
+        cx: &mut FunctionContext,
+    ) -> () {
+        let operation = self.open_api.path(&route).method(&method);
+        let param = operation.param(name, location);
+        let arguments = node.type_arguments.as_ref().unwrap();
+        if let Some(required) = arguments.get(1) {
+            let literal = required.literal.as_ref().unwrap();
+            param.required(literal.kind == TRUE_KEYWORD);
+        }
+
+        if let Some(namespace) = arguments.get(2) {
+            if let Some(ref literal) = namespace.literal {
+                let text = literal.text.clone();
+                param.content().schema().namespace(text);
+            }
+        }
+
+        if let Some(format) = arguments.get(3) {
+            if let Some(ref literal) = format.literal {
+                let text = literal.text.clone();
+                param.content().schema().format(text);
+            }
+        }
+
+        if let Some(type_arg) = arguments.get(0) {
+            match type_arg.kind {
+                NUMBER_KEYWORD => {
+                    param.content().schema().primitive("number");
+                }
+                STRING_KEYWORD => {
+                    param.content().schema().primitive("string");
+                }
+                BOOLEAN_KEYWORD => {
+                    param.content().schema().primitive("boolean");
+                }
+                _ => {
+                    let type_ref = get_identifier(type_arg, file_name);
+                    param.content().schema().reference(type_ref.clone(), false);
+                    if let Some(type_ref) = type_ref {
+                        if let Some((node, _)) = get_declaration(&type_ref, file_name, file_name, cx, &mut self.get_ast)
+                        {
+                            self.add_schema(
+                                node,
+                                &TypeReference {
+                                    name: type_ref,
+                                    namespace: match arguments.get(2) {
+                                        Some(namespace) => match namespace.literal {
+                                            Some(ref literal) => literal.text.clone(),
+                                            None => None,
+                                        },
+                                        None => None,
+                                    },
+                                },
+                            );
+                        }
+                    }
+                }
+            };
+        }
+    }
+
+    fn add_operation_response(
+        &mut self,
+        route: &str,
+        method: &str,
+        node: &AstNode,
+        file_name: &String,
+        cx: &mut FunctionContext,
+    ) -> () {
+        cache_declaration(node, file_name);
         if let Some(ref expression) = node.expression {
             if let Some(ref text) = expression.escaped_text {
                 if text.eq("Response") {
@@ -497,54 +358,82 @@ impl<'m> OpenApiGenerator<'m> {
                             operation.response(&ref_name, response_options);
 
                             if let Some(ref ref_name) = ref_name {
-                                self.references.insert(TypeReference {
-                                    name: ref_name.to_owned(),
-                                    namespace: namespace,
-                                });
+                                if let Some((node, _)) =
+                                    get_declaration(ref_name, file_name, file_name, cx, &mut self.get_ast)
+                                {
+                                    self.add_schema(
+                                        node,
+                                        &TypeReference {
+                                            name: ref_name.to_owned(),
+                                            namespace: namespace,
+                                        },
+                                    );
+                                }
                             }
                         }
                     }
                 }
             }
         } else {
-            node.for_each_child(|node| self.add_operation_response(route, method, node, file_name))
+            node.for_each_child(|node| self.add_operation_response(route, method, node, file_name, cx))
         }
     }
 
-    fn add_operation_params<'cx>(&mut self, route: &str, method: &str, node: &AstNode, file_name: &String) -> () {
+    fn add_operation_params<'cx>(
+        &mut self,
+        route: &str,
+        method: &str,
+        node: &AstNode,
+        file_name: &String,
+        cx: &mut FunctionContext,
+    ) -> ()
+    where
+        F: FnMut(&str, &str, &mut FunctionContext) -> AstNode,
+    {
+        cache_declaration(node, file_name);
         if let Some(ref _type) = node._type {
-            if let Some(ref type_name) = _type.type_name {
-                if let Some(ref text) = type_name.escaped_text {
-                    let operation = self.open_api.path(&route).method(&method);
+            let type_name = match _type.type_name {
+                Some(ref type_name) => type_name.escaped_text.as_deref(),
+                None => match _type.name {
+                    Some(ref name) => name.escaped_text.as_deref(),
+                    None => None,
+                },
+            };
 
-                    if text.eq("QueryParam") {
-                        let property_name = node.name.as_ref().unwrap();
-                        let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "query", operation, _type, &mut self.references, file_name)
-                    }
-
-                    if text.eq("RouteParam") {
-                        let property_name = node.name.as_ref().unwrap();
-                        let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "path", operation, _type, &mut self.references, file_name)
-                    }
-
-                    if text.eq("Header") {
-                        let property_name = node.name.as_ref().unwrap();
-                        let name = property_name.escaped_text.as_ref().unwrap();
-                        add_operation_parameter(&name, "header", operation, _type, &mut self.references, file_name)
-                    }
-
-                    if text.eq("BodyParam") {
-                        add_body_parameter(operation, _type, &mut self.references, file_name)
-                    }
+            match type_name {
+                Some("QueryParam") => {
+                    let property_name = node.name.as_ref().unwrap();
+                    let name = property_name.escaped_text.as_ref().unwrap();
+                    self.add_operation_parameter(&name, "query", route, method, _type, file_name, cx)
                 }
-            } else {
-                _type.for_each_child(|node| self.add_operation_params(route, method, node, file_name))
+                Some("RouteParam") => {
+                    let property_name = node.name.as_ref().unwrap();
+                    let name = property_name.escaped_text.as_ref().unwrap();
+                    self.add_operation_parameter(&name, "path", route, method, _type, file_name, cx)
+                }
+                Some("Header") => {
+                    let property_name = node.name.as_ref().unwrap();
+                    let name = property_name.escaped_text.as_ref().unwrap();
+                    self.add_operation_parameter(&name, "header", route, method, _type, file_name, cx)
+                }
+                Some("BodyParam") => self.add_body_parameter(route, method, _type, file_name, cx),
+                _ => _type.for_each_child(|node| self.add_operation_params(route, method, node, file_name, cx)),
             }
         } else {
-            node.for_each_child(|node| self.add_operation_params(route, method, node, file_name))
+            node.for_each_child(|node| self.add_operation_params(route, method, node, file_name, cx))
         }
+    }
+
+    fn add_schema(&mut self, node: &AstNode, reference: &TypeReference) -> () {
+        let schema = match reference.namespace {
+            Some(ref namespace) => {
+                let schema = self.open_api.components.schema(&namespace).object();
+                schema.property(&reference.name).object()
+            }
+            None => self.open_api.components.schema(&reference.name).object(),
+        };
+
+        update_schema(schema, node);
     }
 
     fn is_api_path(&self, node: &AstNode) -> bool {
@@ -557,41 +446,44 @@ impl<'m> OpenApiGenerator<'m> {
         }
     }
 
-    fn find_api_paths(&mut self, node: &AstNode, file_name: &String) -> () {
+    fn find_api_paths(&mut self, node: &AstNode, file_name: &String, cx: &mut FunctionContext) -> () {
+        cache_declaration(node, file_name);
         if self.is_api_path(node) {
             let arguments = node.arguments.as_ref().unwrap();
             let route_handler = arguments.get(0).unwrap();
-            let route_handler_body = route_handler.body.as_ref().unwrap();
-            let request_param = get_request_parameter(route_handler);
-            let path_options = get_path_args(arguments.get(1).unwrap());
 
+            let path_options = get_path_args(arguments.get(1).unwrap());
             let route = path_options.path.unwrap();
             let method = path_options.method.unwrap();
             self.open_api.path(&route).method(&method).tags(path_options.tags);
 
-            self.add_operation_params(&route, &method, request_param, file_name);
-            self.add_operation_response(&route, &method, &*route_handler_body, file_name);
+            let request_param = get_request_parameter(route_handler);
+            if let Some(name) = match request_param._type {
+                Some(ref type_ref) => match type_ref.name {
+                    Some(ref name) => name.escaped_text.as_ref(),
+                    None => match type_ref.type_name {
+                        Some(ref type_name) => type_name.escaped_text.as_ref(),
+                        None => None,
+                    },
+                },
+                None => None,
+            } {
+                let msg = format!("Could not find a declaration for {}", name);
+                let result = get_declaration(name, file_name, file_name, cx, &mut self.get_ast).expect(&msg);
+                self.add_operation_params(&route, &method, result.0, &result.1, cx);
+            } else {
+                self.add_operation_params(&route, &method, request_param, file_name, cx);
+            }
+
+            let route_handler_body = route_handler.body.as_ref().unwrap();
+            self.add_operation_response(&route, &method, &*route_handler_body, file_name, cx);
         } else {
-            node.for_each_child(|node| self.find_api_paths(node, file_name))
+            node.for_each_child(|node| self.find_api_paths(node, file_name, cx))
         }
     }
 
-    pub(crate) fn api_paths_from(&mut self, path: String) -> () {
-        let source_file = self
-            .ast_map
-            .get(&path)
-            .expect(&format!("Could not find ast for path '{}'", path));
-
-        cache_declarations(source_file, &path, self.module_map);
-
-        source_file.for_each_child(|node| self.find_api_paths(node, &path));
-
-        let mut references = self.references.iter().collect::<Vec<&TypeReference>>();
-        while references.is_empty() == false {
-            let reference = references.pop().unwrap();
-            if let Some(node) = get_declaration(&reference.name, &path, self.ast_map, self.module_map) {
-                add_schema(&mut self.open_api, node, &reference);
-            }
-        }
+    pub(crate) fn api_paths_from(&mut self, path: String, cx: &mut FunctionContext) -> () {
+        let source_file = (self.get_ast)(&path, &path, cx);
+        source_file.for_each_child(|node| self.find_api_paths(node, &path, cx));
     }
 }

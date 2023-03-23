@@ -1,8 +1,8 @@
-import { BodyParam, Header, Path, QueryParam, Response, RouteParam } from '../../../src';
-import AdminUser, { CreateUserRequest, User, UserPatch } from '../dtos';
-import { Router } from './router'
+import { BodyParam, Path, Response, RouteParam } from '../../../src';
+import AdminUser, { Account, CreateUserRequest, GetUserRequest, User, UserPatch, UserPatchRequest } from '../dtos';
+import { Router } from './router';
 
-Router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: QueryParam<number, false>; headers: { user: Header<User, true, "v1">; }; }, reply: any): Promise<void> => {
+export default Router.get("", {}, Path(async (request: GetUserRequest, reply: any): Promise<void> => {
     let success = {} as User;
 
     let response = Response(success, {
@@ -16,10 +16,10 @@ Router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: 
 }, {
     method: 'GET',
     path: '/user',
-    tags: ['space'],
+    tags: ['Users'],
 }));
 
-Router.patch("", {}, Path(async (request: { id: RouteParam<string, true>; date: QueryParam<string, false, undefined, "date">; }, reply: any): Promise<void> => {
+Router.patch("", {}, Path(async (request: UserPatchRequest, reply: any): Promise<void> => {
     let admin = new AdminUser();
 
     let response = Response(admin, {
@@ -86,4 +86,23 @@ Router.put("", {}, Path(async (request: { tomato: BodyParam<UserPatch, false, "v
     method: 'PUT',
     path: '/user',
     tags: ["User"]
+}));
+
+const ledger = {
+    getAccount: () => ({} as Account)
+};
+
+Router.get("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
+    let success: Account = ledger.getAccount();
+
+    let response = Response(success, {
+        statusCode: 200,
+        description: "Get user account",
+    });
+
+    reply.send(response);
+}, {
+    method: 'GET',
+    path: '/account',
+    tags: ['Account'],
 }));

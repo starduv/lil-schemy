@@ -1,3 +1,5 @@
+export { generateOpenApi } from './commands/generate';
+export { getAst, getRootFiles } from './utils';
 
 export type OperationMethod = 'GET' | 'PUT' | 'POST' | 'DELETE' | 'OPTIONS' | 'HEAD' | 'PATCH' | 'TRACE';
 
@@ -7,19 +9,11 @@ export interface PathItemOptions {
     tags?: string[];
 }
 
-export function Path<Func>(fn: Func, options: PathItemOptions | null = null) {
-    return fn;
-}
-
 export interface ResponseOptions {
     description?: string;
     example?: string;
     namespace?: string;
     statusCode: number;
-}
-
-export function Response<ResponseType>(response: ResponseType, options: ResponseOptions) {
-    return response;
 }
 
 type NS = string | undefined;
@@ -45,7 +39,20 @@ type StringFormat = "date-time" |
     "iri-reference" |
     undefined;
 
-type NumberFormat = "int32" | "int64" | "float" | "double"
+type NumberFormat = "int32" | "int64" | "float" | "double";
+
+export function Path<Func>(fn: Func, options: PathItemOptions | null = null) {
+    return fn;
+}
+
+export function Response<ResponseType>(response: ResponseType, options: ResponseOptions) {
+    return response;
+}
+
+interface BodyParamArgs { required: boolean, namespace: NS }
+export function BodyParam<BodyType>(type: BodyType, args: BodyParamArgs = { required: false, namespace: undefined }) {
+    return type;
+}
 
 export type BodyParam<Param, Required extends boolean, Namespace extends NS = undefined> = Param;
 export type Header<Param, Required extends boolean, Namespace extends NS = undefined, Format extends F = undefined> = Param;

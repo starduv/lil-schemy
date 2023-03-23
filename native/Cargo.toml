@@ -4,12 +4,16 @@ version = "0.0.1"
 edition = "2021"
 authors = ["Joel C Rainear-Wills <starshiprdubb@gmail.com>"]
 exclude = ["index.node"]
+rust-version = "1.66.0"
 
 [lib]
 crate-type=["cdylib"]
 
 [dependencies]
 lazy_static = "1.4.0"
+deno_ast = { version = "0.25.0", features = ["typescript", "swc_ecma_visit", "visit", "dep_graph"] }
+deno_graph = "0.45.0"
+url = "2.3.1"
 
 [dependencies.ahash]
 version = "0.8.2"
@@ -26,8 +30,3 @@ features = ["derive"]
 version = "0.10.1"
 default-features = false
 features = ["napi-1"]
-
-
-
-
-

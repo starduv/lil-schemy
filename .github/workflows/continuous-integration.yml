@@ -1,0 +1,87 @@
+name: Continuous Integration
+
+on:
+    workflow_dispatch:
+    push:
+        branches:
+            - main
+
+jobs:
+    build-and-test:
+        name: Build and Test
+        runs-on: ${{ matrix.build.OS }}
+        defaults:
+            run:
+                shell: bash
+        strategy:
+            fail-fast: true
+            matrix:
+                - BIN: libtypeshift.so
+                  NAME: typeshift-x64-linux.node
+                  OS: ubuntu-20.04
+                  TOOLCHAIN: stable
+                  TARGET: x86_64-unknown-linux-gnu
+
+                - BIN: libtypeshift.so
+                  NAME: typeshift-arm64-linux.node
+                  OS: ubuntu-20.04
+                  TOOLCHAIN: stable
+                  TARGET: aarch64-unknown-linux-gnu
+
+                - BIN: typeshift.dll
+                  NAME: typeshift-x64-win32.node
+                  OS: windows-2022
+                  TOOLCHAIN: stable
+                  TARGET: x86_64-pc-windows-msvc
+
+                - BIN: typeshift.dll
+                  NAME: typeshift-arm64-win32.node
+                  OS: windows-2022
+                  TOOLCHAIN: stable
+                  TARGET: aarch64-pc-windows-msvc
+
+                - BIN: libtypeshift.dylib
+                  NAME: typeshift-x64-darwin.node
+                  OS: macos-11
+                  TOOLCHAIN: stable
+                  TARGET: x86_64-apple-darwin
+
+                - BIN: libtypeshift.dylib
+                  NAME: typeshift-arm64-darwin.node
+                  OS: macos-11
+                  TOOLCHAIN: stable
+                  TARGET: aarch64-apple-darwin
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v3
+
+            - name: Setup Node
+              uses: actions/setup-node@v3
+              with:
+                node-version: "18"
+
+            - id: cache-rustup
+              name: Cache Rust toolchain
+              uses: actions/cache@v3
+              with:
+                path: ~/.rustup
+                key: toolchain-${{ matrix.build.TARGET }}
+
+            - if: ${{ steps.cache-rustup.outputs.cache-hit != 'true' }}
+              name: Install Rust toolchain
+              uses: actions-rs/toolchain@v1
+              with:
+                profile: minimal
+                toolchain: ${{ matrix.build.TOOLCHAIN }}
+                target: ${{ matrix.build.TARGET }}
+                override: true
+            
+            - name: Install dependencies
+              run: |
+                yarn
+                yarn build
+
+            - name: Test
+              run: |
+                yarn test
+

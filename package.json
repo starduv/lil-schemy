@@ -25,23 +25,32 @@
     "postbuild": "npm run build:addon && npm run copy:addon && npm run copy:config",
     "build:addon": "node scripts/build-addon",
     "build:app": "tsc -b",
-    "copy:addon": "copyfiles --error **/*.node lib/generator",
-    "copy:config": "copyfiles --error /default-config.txt lib/commands",
+    "copy:addon": "copyfiles --error --up 2 src/generator/*.node lib/generator",
+    "copy:config": "copyfiles --error --up 2 src/commands/default-config.txt lib/commands",
     "test": "mocha",
     "pretest": "npm run build:addon -- --debug",
     "start": "node -r ts-node/register ./src/typeshift.ts"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/engagedtheory/typeshift.git"
+    "url": "git+https://github.com/starduv/typeshift.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "code",
+    "first",
+    "schema",
+    "generator",
+    "OpenApi",
+    "Swagger",
+    "TypeScript",
+    "Node"
+  ],
+  "author": "Joel Rainear-Wills <starshiprdubb@gmail.com>",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/engagedtheory/typeshift/issues"
+    "url": "https://github.com/starduv/typeshift/issues"
   },
-  "homepage": "https://github.com/engagedtheory/typeshift#readme",
+  "homepage": "https://github.com/starduv/typeshift#readme",
   "dependencies": {
     "commander": "^10.0.0",
     "fast-glob": "^3.2.12",

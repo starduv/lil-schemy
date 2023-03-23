@@ -1,30 +1,25 @@
 import { expect, use } from 'chai';
-import { writeFileSync } from 'fs';
-import { OpenAPIV3 } from 'openapi-types'
-import { generateSchemas } from '../src/generator'
-import { getContext } from '../src/utils'
 import deepEqual from 'deep-equal-in-any-order';
+import { OpenAPIV3 } from 'openapi-types';
+import { generateSchemas } from '../src/generator';
+import { getAst, getRootFiles } from '../src/utils';
 
 use(deepEqual);
 
 describe('open api generator', () => {
     let schema: OpenAPIV3.Document;
-    let context = getContext(__dirname, ["test-api/routes/*.ts"], {
-        project: './tsconfig.json'
-    })
 
     before(() => {
         const result = generateSchemas({
-            asts: JSON.stringify(context.asts),
-            modules: JSON.stringify(context.moduleNames),
+            getAst: getAst(__dirname, { project: './tsconfig.json' }),
             openApi: {
                 base: JSON.stringify({}),
-                paths: context.rootFiles,
+                paths: getRootFiles(__dirname, ["test-api/routes/*.ts"]),
             }
-        })
+        });
 
         schema = JSON.parse(result.openApi.schema || "");
-    })
+    });
 
     it('generates schemas', () => {
         expect(schema.components?.schemas).to.deep.equalInAnyOrder({
@@ -61,6 +56,15 @@ describe('open api generator', () => {
                     "AdminUser"
                 ]
             },
+            Account: {
+                type: 'object',
+                properties: {
+                    number: {
+                        type: 'string'
+                    }
+                },
+                required: ['number']
+            },
             AdminUser: {
                 type: 'object',
                 properties: {
@@ -76,11 +80,42 @@ describe('open api generator', () => {
                 },
                 required: ['permissions', 'name']
             }
-        })
-    })
+        });
+    });
 
     it('generates api paths', () => {
         expect(schema.paths).to.deep.equal({
+            "/account": {
+                get: {
+                    parameters: [
+                        {
+                            content: {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            in: "path",
+                            name: "id",
+                            required: true
+                        }
+                    ],
+                    responses: {
+                        200: {
+                            description: "Get user account",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/Account"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    tags: ["Account"]
+                }
+            },
             "/user": {
                 get: {
                     responses: {
@@ -137,7 +172,7 @@ describe('open api generator', () => {
                         }
                     ],
                     tags: [
-                        "space"
+                        "Users"
                     ]
                 },
                 post: {
@@ -292,5 +327,5 @@ describe('open api generator', () => {
                 }
             }
         });
-    })
-})
+    });
+});
