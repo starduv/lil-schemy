@@ -23,13 +23,12 @@ export const getAst = (cwd: string, options: CompilerOptions) => (module_ref: st
         ast = _getAst(resolution.resolvedModule?.resolvedFileName as string, resolution.resolvedModule?.isExternalLibraryImport as boolean);
     }
 
-    if ((ast as ts.SourceFile).fileName.endsWith('fastify.d.ts')) {
-        console.log('--------------- MODULE %s ---------------------', module_ref);
-        console.log(JSON.stringify(ast));
-        console.log('-------------------------------------------------');
-    }
 
     const astStr = JSON.stringify(ast || {});
+
+    if ((ast as ts.SourceFile).fileName.endsWith('fastify.d.ts')) {
+        console.log('No error, but no module either - ', astStr.length === 0)
+    }
 
     return astStr;
 };
