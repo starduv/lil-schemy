@@ -1,5 +1,5 @@
 export { generateOpenApi } from './commands/generate';
-export { getAst, getRootFiles } from './utils';
+export { getRootFiles } from './utils';
 
 export type OperationMethod = 'GET' | 'PUT' | 'POST' | 'DELETE' | 'OPTIONS' | 'HEAD' | 'PATCH' | 'TRACE';
 

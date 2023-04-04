@@ -1,8 +1,8 @@
-import { BodyParam, Path, Response, RouteParam } from '../../../src';
-import AdminUser, { Account, CreateUserRequest, GetUserRequest, User, UserPatch, UserPatchRequest } from '../dtos';
+import { BodyParam, Header, Path, QueryParam, Response, RouteParam } from '../../../src';
+import AdminUser, { Account, CreateUserRequest, User, UserPatch, UserPatchRequest } from '../dtos';
 import { Router } from './router';
 
-export default Router.get("", {}, Path(async (request: GetUserRequest, reply: any): Promise<void> => {
+export default Router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: QueryParam<number, false>; headers: { user: Header<User, true, "v1">; }; }, reply: any): Promise<void> => {
     let success = {} as User;
 
     let response = Response(success, {
@@ -19,7 +19,7 @@ export default Router.get("", {}, Path(async (request: GetUserRequest, reply: an
     tags: ['Users'],
 }));
 
-Router.patch("", {}, Path(async (request: UserPatchRequest, reply: any): Promise<void> => {
+Router.patch("", {}, Path(async (request: { id: RouteParam<string, true>; date: QueryParam<string, false, undefined, "date">; }, reply: any): Promise<void> => {
     let admin = new AdminUser();
 
     let response = Response(admin, {

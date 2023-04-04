@@ -2,7 +2,7 @@ import { expect, use } from 'chai';
 import deepEqual from 'deep-equal-in-any-order';
 import { OpenAPIV3 } from 'openapi-types';
 import { generateSchemas } from '../src/generator';
-import { getAst, getRootFiles } from '../src/utils';
+import { getRootFiles } from '../src/utils';
 
 use(deepEqual);
 
@@ -11,7 +11,6 @@ describe('open api generator', () => {
 
     before(() => {
         const result = generateSchemas({
-            getAst: getAst(__dirname, { project: './tsconfig.json' }),
             openApi: {
                 base: JSON.stringify({}),
                 paths: getRootFiles(__dirname, ["test-api/routes/*.ts"]),

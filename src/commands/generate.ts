@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import path from 'path';
 import { generateSchemas, TypeShiftOptions } from '../generator';
-import { getAst, getRootFiles } from '../utils';
+import { getRootFiles } from '../utils';
 
 export const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
     if (config?.openApi) {
@@ -12,7 +12,7 @@ export const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
         console.debug("Searching for api paths in files %o", files);
 
         const result = generateSchemas({
-            getAst: getAst(cwd, { project }),
+            // getAst: getAst(cwd, { project }),
             openApi: {
                 base: JSON.stringify(openApi.base),
                 paths: files,

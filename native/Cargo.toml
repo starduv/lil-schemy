@@ -11,22 +11,12 @@ crate-type=["cdylib"]
 
 [dependencies]
 lazy_static = "1.4.0"
-deno_ast = { version = "0.25.0", features = ["typescript", "swc_ecma_visit", "visit", "dep_graph"] }
-deno_graph = "0.45.0"
+deno_ast = { version = "0.24.0", features = ["typescript", "swc_ecma_visit", "visit", "dep_graph"] }
 url = "2.3.1"
+es_resolve = "0.4.2"
+ahash = "0.8.2"
+serde_json = { version = "1.0.89", features = ["preserve_order"] }
+serde = { version = "1.0.148", features = ["derive"] }
+neon = { version = "0.10.1", default-features = false, features = ["napi-1"] }
+dprint-swc-ext = { version = "0.7.0", features = ["view"] }
 
-[dependencies.ahash]
-version = "0.8.2"
-
-[dependencies.serde_json]
-version = "1.0.89"
-features = ["preserve_order"]
-
-[dependencies.serde]
-version = "1.0.148"
-features = ["derive"]
-
-[dependencies.neon]
-version = "0.10.1"
-default-features = false
-features = ["napi-1"]

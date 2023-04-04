@@ -17,6 +17,11 @@ impl<'v> OpenApi {
     pub(crate) fn path(&mut self, key: &str) -> &mut ApiPath {
         self.paths.entry(key.to_string()).or_insert(ApiPath::new())
     }
+
+    pub(crate) fn merge(&mut self, open_api: OpenApi) -> () {
+        self.components.schemas.extend(open_api.components.schemas);
+        self.paths.extend(open_api.paths);
+    }
 }
 
 #[derive(Serialize, Debug)]
@@ -103,7 +108,7 @@ impl<'v> ApiPath {
 #[derive(Serialize, Debug)]
 pub struct ApiPathOperation {
     #[serde(rename = "requestBody", skip_serializing_if = "Option::is_none")]
-    body_parameter: Option<BodyParam>,
+    body_parameter: Option<ApiParam>,
     #[serde(skip_serializing_if = "Option::is_none")]
     examples: Option<HashMap<String, ApiSchema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -130,7 +135,11 @@ impl ApiPathOperation {
         self
     }
 
-    pub(crate) fn response(&mut self, name: &Option<String>, response_args: ResponseOptions) -> &mut ApiResponse {
+    pub(crate) fn response(
+        &mut self,
+        response_type: &Option<String>,
+        response_args: ResponseOptions,
+    ) -> &mut ApiResponse {
         let status_code = response_args
             .status_code
             .expect("An ApiResponse must have a status code");
@@ -145,10 +154,10 @@ impl ApiPathOperation {
             .content()
             .example(response_args.example, response_args.namespace.clone());
 
-        if name.is_some() {
+        if response_type.is_some() {
             content
                 .schema()
-                .reference(name.to_owned(), false)
+                .reference(response_type.to_owned(), false)
                 .namespace(response_args.namespace);
         }
 
@@ -156,7 +165,7 @@ impl ApiPathOperation {
     }
 
     pub(crate) fn param(&mut self, name: &str, location: &str) -> &mut ApiParam {
-        let param = ApiParam::new(name, location.to_string());
+        let param = ApiParam::new(Some(name), Some(location));
         self.parameters.get_or_insert_with(Default::default).push(param);
         self.parameters
             .get_or_insert_with(Default::default)
@@ -164,8 +173,8 @@ impl ApiPathOperation {
             .expect("Could not get parameter from ApiOperation")
     }
 
-    pub(crate) fn body(&mut self) -> &mut BodyParam {
-        self.body_parameter.get_or_insert(BodyParam::new())
+    pub(crate) fn body(&mut self) -> &mut ApiParam {
+        self.body_parameter.get_or_insert(ApiParam::new(None, None))
     }
 }
 
@@ -350,9 +359,10 @@ impl ApiSchema {
 
 #[derive(Serialize, Debug)]
 pub struct ApiParam {
-    name: String,
-    #[serde(rename = "in")]
-    location: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(rename = "in", skip_serializing_if = "Option::is_none")]
+    location: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<HashMap<String, ApiConent>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -360,11 +370,11 @@ pub struct ApiParam {
 }
 
 impl ApiParam {
-    fn new(name: &str, location: String) -> ApiParam {
+    fn new(name: Option<&str>, location: Option<&str>) -> ApiParam {
         ApiParam {
             content: None,
-            location,
-            name: name.to_string(),
+            location: location.map(|l| l.to_string()),
+            name: name.map(|n| n.to_string()),
             required: None,
         }
     }
@@ -382,45 +392,17 @@ impl ApiParam {
         self
     }
 }
-#[derive(Serialize, Debug)]
-pub struct BodyParam {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    content: Option<HashMap<String, ApiConent>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    required: Option<bool>,
-}
 
-impl BodyParam {
-    fn new() -> BodyParam {
-        BodyParam {
-            content: None,
-            required: None,
-        }
-    }
-
-    pub(crate) fn content(&mut self) -> &mut ApiConent {
-        let key = "application/json";
-        self.content
-            .get_or_insert(HashMap::new())
-            .entry(key.to_owned())
-            .or_insert(ApiConent::new())
-    }
-
-    pub(crate) fn required(&mut self, required: bool) -> &mut BodyParam {
-        self.required = Some(required);
-        self
-    }
-}
-
-pub struct PathArgs {
+#[derive(Debug)]
+pub struct PathOptions {
     pub method: Option<String>,
     pub path: Option<String>,
     pub tags: Option<Vec<String>>,
 }
 
-impl PathArgs {
+impl PathOptions {
     pub(crate) fn new() -> Self {
-        PathArgs {
+        PathOptions {
             method: None,
             path: None,
             tags: None,
@@ -428,6 +410,7 @@ impl PathArgs {
     }
 }
 
+#[derive(Debug)]
 pub struct ResponseOptions {
     pub description: Option<String>,
     pub example: Option<String>,

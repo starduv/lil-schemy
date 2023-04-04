@@ -2,7 +2,7 @@ use neon::prelude::FunctionContext;
 
 use crate::typescript::*;
 
-use super::open_api::{ApiSchema, OpenApi, PathArgs, ResponseOptions};
+use super::open_api::{ApiSchema, OpenApi, PathOptions, ResponseOptions};
 
 fn update_schema(schema: &mut ApiSchema, node: &AstNode) -> () {
     match node.kind {
@@ -124,8 +124,8 @@ fn get_identifier(node: &AstNode, file_name: &String) -> Option<String> {
     None
 }
 
-fn get_path_args(node: &AstNode) -> PathArgs {
-    let mut path_args = PathArgs::new();
+fn get_path_args(node: &AstNode) -> PathOptions {
+    let mut path_args = PathOptions::new();
     let properties = node.properties.as_ref().unwrap();
     for prop in properties {
         let name = prop.name.as_ref().unwrap().escaped_text.as_ref().unwrap();
