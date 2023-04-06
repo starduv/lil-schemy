@@ -1,3 +1,5 @@
+use std::{fs::File, io::Write};
+
 use deno_ast::{ParseParams, ParsedSource, SourceTextInfo};
 use dprint_swc_ext::view::{with_ast_view_for_module, ModuleInfo, NodeTrait};
 use url::Url;
@@ -7,6 +9,11 @@ use super::{add_paths::find_paths, open_api::OpenApi};
 pub(crate) fn from_source_file(path: String) -> OpenApi {
     let mut open_api = OpenApi::new();
     let result = get_syntax_tree(path);
+
+    // let value = serde_json::json!(result.module());
+    // let mut file = File::create("/home/captainrdubb/serialized.json").unwrap();
+    // file.write_all(value.to_string().as_bytes()).expect("could not write");
+
     with_ast_view_for_module(
         ModuleInfo {
             module: result.module(),

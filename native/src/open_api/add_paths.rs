@@ -116,69 +116,6 @@ fn add_request_details(operation: &mut ApiPathOperation, route_handler: Node) ->
     }
 }
 
-fn add_request_response(operation: &mut ApiPathOperation, body: Node) -> () {
-    for child in body.children() {
-        match child {
-            Node::VarDecl(declaration) => {
-                for variable in &declaration.decls {
-                    add_response_from_variable(operation, Node::from(variable.deref()))
-                }
-            }
-            other => add_request_response(operation, other),
-        }
-    }
-}
-
-fn add_response_from_variable(operation: &mut ApiPathOperation, node: Node) -> () {
-    for child in node.children() {
-        match child {
-            Node::Ident(identifier) if identifier.sym().eq("Response") => match identifier.parent() {
-                Node::CallExpr(call_expression) => {
-                    let response_type = match call_expression.args.get(0) {
-                        Some(arg) => match arg.expr {
-                            Expr::New(new_expression) => match new_expression.callee {
-                                Expr::Ident(identifier) => Some(identifier.sym().to_string()),
-                                _ => None,
-                            },
-                            Expr::Ident(response_type) => Some(response_type.sym().to_string()),
-                            Expr::TsAs(ts_as) => match ts_as.type_ann {
-                                TsType::TsTypeRef(type_ref) => match type_ref.type_name {
-                                    TsEntityName::Ident(identifier) => Some(identifier.sym().to_string()),
-                                    _ => None,
-                                },
-                                _ => None,
-                            },
-                            Expr::TsTypeAssertion(type_assertion) => match type_assertion.type_ann {
-                                TsType::TsTypeRef(type_ref) => match type_ref.type_name {
-                                    TsEntityName::Ident(identifier) => Some(identifier.sym().to_string()),
-                                    _ => None,
-                                },
-                                _ => None,
-                            },
-                            _ => None,
-                        },
-                        None => None,
-                    };
-
-                    let options = match call_expression.args.get(1) {
-                        Some(arg) => match arg.expr {
-                            Expr::Object(options) => Some(get_response_options(options)),
-                            _ => None,
-                        },
-                        None => None,
-                    };
-
-                    if let Some(response_options) = options {
-                        operation.response(&response_type, response_options);
-                    }
-                }
-                _ => {}
-            },
-            _ => add_response_from_variable(operation, child),
-        }
-    }
-}
-
 fn add_request_params(operation: &mut ApiPathOperation, node: Node) {
     for child in node.children() {
         match child {
@@ -332,6 +269,69 @@ fn get_parameter_name(node: Node) -> String {
             Some(parent) => get_parameter_name(parent),
             None => panic!("Could not find parameter name"),
         },
+    }
+}
+
+fn add_request_response(operation: &mut ApiPathOperation, body: Node) -> () {
+    for child in body.children() {
+        match child {
+            Node::VarDecl(declaration) => {
+                for variable in &declaration.decls {
+                    add_response_from_variable(operation, Node::from(variable.deref()))
+                }
+            }
+            other => add_request_response(operation, other),
+        }
+    }
+}
+
+fn add_response_from_variable(operation: &mut ApiPathOperation, node: Node) -> () {
+    for child in node.children() {
+        match child {
+            Node::Ident(identifier) if identifier.sym().eq("Response") => match identifier.parent() {
+                Node::CallExpr(call_expression) => {
+                    let response_type = match call_expression.args.get(0) {
+                        Some(arg) => match arg.expr {
+                            Expr::New(new_expression) => match new_expression.callee {
+                                Expr::Ident(identifier) => Some(identifier.sym().to_string()),
+                                _ => None,
+                            },
+                            Expr::Ident(response_type) => Some(response_type.sym().to_string()),
+                            Expr::TsAs(ts_as) => match ts_as.type_ann {
+                                TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                                    TsEntityName::Ident(identifier) => Some(identifier.sym().to_string()),
+                                    _ => None,
+                                },
+                                _ => None,
+                            },
+                            Expr::TsTypeAssertion(type_assertion) => match type_assertion.type_ann {
+                                TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                                    TsEntityName::Ident(identifier) => Some(identifier.sym().to_string()),
+                                    _ => None,
+                                },
+                                _ => None,
+                            },
+                            _ => None,
+                        },
+                        None => None,
+                    };
+
+                    let options = match call_expression.args.get(1) {
+                        Some(arg) => match arg.expr {
+                            Expr::Object(options) => Some(get_response_options(options)),
+                            _ => None,
+                        },
+                        None => None,
+                    };
+
+                    if let Some(response_options) = options {
+                        operation.response(&response_type, response_options);
+                    }
+                }
+                _ => {}
+            },
+            _ => add_response_from_variable(operation, child),
+        }
     }
 }
 

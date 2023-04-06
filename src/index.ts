@@ -54,6 +54,7 @@ export function BodyParam<BodyType>(type: BodyType, args: BodyParamArgs = { requ
     return type;
 }
 
+// TODO add Path type
 export type BodyParam<Param, Required extends boolean, Namespace extends NS = undefined> = Param;
 export type Header<Param, Required extends boolean, Namespace extends NS = undefined, Format extends F = undefined> = Param;
 export type QueryParam<Param, Required extends boolean, Namespace extends NS = undefined, Format extends F = undefined> = Param;

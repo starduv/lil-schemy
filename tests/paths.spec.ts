@@ -13,7 +13,7 @@ describe('open api generator', () => {
         const result = generateSchemas({
             openApi: {
                 base: JSON.stringify({}),
-                paths: getRootFiles(__dirname, ["test-api/routes/*.ts"]),
+                paths: getRootFiles(__dirname, ["test-api/routes/*.ts", "!test-api/routes/router.ts"]),
             }
         });
 
