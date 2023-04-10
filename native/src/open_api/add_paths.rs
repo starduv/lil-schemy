@@ -1,24 +1,35 @@
 use dprint_swc_ext::view::*;
 use lazy_static::__Deref;
 
-use super::open_api::{ApiPathOperation, OpenApi, PathOptions, ResponseOptions};
+use crate::typescript::DeclarationTable;
 
-pub fn find_paths(open_api: &mut OpenApi, module: &Node) {
-    for child in module.children() {
+use super::{
+    open_api::{ApiPathOperation, OpenApi, PathOptions, ResponseOptions},
+    symbol_table_helpers::store_symbol_maybe,
+};
+
+pub fn find_paths<'n>(open_api: &mut OpenApi, node: &Node<'n>, symbol_table: &mut DeclarationTable<'n>) {
+    store_symbol_maybe(node, symbol_table);
+
+    for child in node.children() {
         match child.kind() {
             NodeKind::CallExpr => match child.to::<CallExpr>() {
                 Some(call_expr) => match call_expr.callee {
-                    Callee::Expr(Expr::Ident(ident)) if ident.sym().eq("Path") => add_path(open_api, &call_expr),
-                    _ => find_paths(open_api, &child),
+                    Callee::Expr(Expr::Ident(ident)) if ident.sym().eq("Path") => {
+                        symbol_table.push_scope();
+                        add_path(open_api, &call_expr, symbol_table);
+                        symbol_table.pop_scope();
+                    }
+                    _ => find_paths(open_api, &child, symbol_table),
                 },
-                None => find_paths(open_api, &child),
+                None => find_paths(open_api, &child, symbol_table),
             },
-            _ => find_paths(open_api, &child),
+            _ => find_paths(open_api, &child, symbol_table),
         }
     }
 }
 
-fn add_path(open_api: &mut OpenApi, node: &CallExpr) -> () {
+fn add_path(open_api: &mut OpenApi, node: &CallExpr, symbol_table: &mut DeclarationTable) -> () {
     let args = &node.args;
     let route_handler = args.first().copied();
     let route_options = args.last().copied();
@@ -30,7 +41,7 @@ fn add_path(open_api: &mut OpenApi, node: &CallExpr) -> () {
         .tags(options.tags);
 
     let route_handler = route_handler.unwrap();
-    add_request_details(&mut operation, Node::from(route_handler));
+    add_request_details(&mut operation, Node::from(route_handler), symbol_table);
 }
 
 fn get_path_options(options: Option<&ExprOrSpread>) -> PathOptions {
@@ -101,12 +112,16 @@ fn load_options(path_options: &mut PathOptions, node: &Node) {
     }
 }
 
-fn add_request_details(operation: &mut ApiPathOperation, route_handler: Node) -> () {
+fn add_request_details(
+    operation: &mut ApiPathOperation,
+    route_handler: Node,
+    symbol_table: &mut DeclarationTable,
+) -> () {
     for child in route_handler.children() {
         match child {
             Node::ArrowExpr(arrow_expression) => {
                 for param in &arrow_expression.params {
-                    add_request_params(operation, Node::from(param));
+                    add_request_params(operation, Node::from(param), symbol_table);
                 }
 
                 add_request_response(operation, Node::from(arrow_expression.body));
@@ -116,12 +131,12 @@ fn add_request_details(operation: &mut ApiPathOperation, route_handler: Node) ->
     }
 }
 
-fn add_request_params(operation: &mut ApiPathOperation, node: Node) {
+fn add_request_params(operation: &mut ApiPathOperation, node: Node, symbol_table: &mut DeclarationTable) {
     for child in node.children() {
         match child {
             Node::TsTypeRef(type_ref) => match type_ref.type_name {
                 TsEntityName::Ident(identifier) if identifier.sym().eq("BodyParam") => {
-                    add_body_param_details(operation, type_ref);
+                    add_body_param_details(operation, type_ref, symbol_table);
                 }
                 TsEntityName::Ident(identifier) if identifier.sym().eq("Header") => {
                     add_param_details(operation, "header", type_ref);
@@ -132,14 +147,18 @@ fn add_request_params(operation: &mut ApiPathOperation, node: Node) {
                 TsEntityName::Ident(identifier) if identifier.sym().eq("RouteParam") => {
                     add_param_details(operation, "path", type_ref);
                 }
-                _ => add_request_params(operation, type_ref.as_node()),
+                _ => add_request_params(operation, type_ref.as_node(), symbol_table),
             },
-            _ => add_request_params(operation, child),
+            _ => add_request_params(operation, child, symbol_table),
         }
     }
 }
 
-fn add_body_param_details(operation: &mut ApiPathOperation, type_ref: &TsTypeRef) -> () {
+fn add_body_param_details(
+    operation: &mut ApiPathOperation,
+    type_ref: &TsTypeRef,
+    symbol_table: &mut DeclarationTable,
+) -> () {
     let operation_param = operation.body();
     if let Some(type_params) = type_ref.type_params {
         match type_params.params.get(0) {
@@ -157,10 +176,8 @@ fn add_body_param_details(operation: &mut ApiPathOperation, type_ref: &TsTypeRef
             },
             Some(TsType::TsTypeRef(type_ref)) => match type_ref.type_name {
                 TsEntityName::Ident(identifier) => {
-                    operation_param
-                        .content()
-                        .schema()
-                        .reference(identifier.sym().to_string().into(), false);
+                    let reference = symbol_table.get_root_declaration(identifier.sym().to_string());
+                    operation_param.content().schema().reference(Some(reference), false);
                 }
                 _ => {}
             },

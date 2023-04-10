@@ -2,11 +2,14 @@ mod add_paths;
 mod generator;
 mod generator_v2;
 mod open_api;
+mod symbol_table_helpers;
 
-use std::{fs::File, io::Write, path::PathBuf};
+use std::{collections::BTreeMap, fs::File, io::Write, path::PathBuf};
 
 use neon::{prelude::*, result::Throw};
 use serde_json::json;
+
+use crate::typescript::DeclarationTable;
 
 use self::{generator_v2::from_source_file, open_api::OpenApi};
 
@@ -41,24 +44,12 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
 
 fn generate_schema(open_api_handle: Handle<JsObject>, cx: &mut FunctionContext) -> Result<String, Throw> {
     let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "paths")?;
-    // let mut generator = OpenApiGenerator::new(|module_ref, source_file_name, cx: &mut FunctionContext| {
-    //     let mut call = get_ast.call_with(cx);
-    //     let raw = call
-    //         .args((cx.string(module_ref), cx.string(source_file_name)))
-    //         .apply::<JsString, _>(cx)
-    //         .expect(&format!(
-    //             "Could not find ast for module {} referenced in file {}",
-    //             module_ref, source_file_name
-    //         ));
-
-    //     serde_json::from_str::<AstNode>(&raw.value(cx))
-    //         .expect(&format!("Could not parse raw test for file {}", module_ref))
-    // });
+    let mut symbol_tables = BTreeMap::<String, DeclarationTable>::new();
 
     let mut result = OpenApi::new();
     for path in paths.to_vec(cx)? {
         let path = path.downcast_or_throw::<JsString, _>(cx)?.value(cx);
-        let open_api = from_source_file(path);
+        let open_api = from_source_file(path, &mut symbol_tables);
         result.merge(open_api);
     }
 
