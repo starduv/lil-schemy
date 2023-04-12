@@ -6,6 +6,7 @@ struct Scope<'a> {
     symbols: BTreeMap<String, Declaration<'a>>,
 }
 
+#[derive(Default)]
 pub struct DeclarationTable<'a> {
     scopes: Vec<Scope<'a>>,
 }
