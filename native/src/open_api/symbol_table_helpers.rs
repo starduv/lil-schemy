@@ -2,13 +2,6 @@ use dprint_swc_ext::view::{Node, NodeTrait, Pat};
 
 use crate::typescript::{Declaration, DeclarationTable};
 
-// pub enum Declaration {
-//     Alias { from: String, to: String },
-//     Type { node: AstNode },
-//     Export { name: String, module_ref: String },
-//     Import { name: String, module_ref: String },
-// }
-
 pub fn store_symbol_maybe<'n>(node: &Node<'n>, symbol_table: &mut DeclarationTable<'n>) -> () {
     match node {
         Node::ClassDecl(class_declaration) => {
@@ -41,23 +34,6 @@ pub fn store_symbol_maybe<'n>(node: &Node<'n>, symbol_table: &mut DeclarationTab
                     _ => {}
                 }
             }
-            // let file_name = import_declaration.inner.src.value;
-            // for specifier in import_declaration.inner.specifiers {
-            //     match specifier {
-            //         deno_ast::swc::ast::ImportSpecifier::Named(named_specifier) => {
-            //             let name = named_specifier.local.sym.to_string();
-            //             symbol_table.insert(
-            //                 name,
-            //                 Symbol {
-            //                     file_name: Some(file_name.to_string()),
-            //                     node: named_specifier,
-            //                 },
-            //             )
-            //         }
-            //         deno_ast::swc::ast::ImportSpecifier::Default(default_specifier) => todo!(),
-            //         _ => {}
-            //     }
-            // }
         }
         Node::TsEnumDecl(ts_enum_declaration) => {
             println!("{:?}", ts_enum_declaration.inner);
@@ -70,32 +46,69 @@ pub fn store_symbol_maybe<'n>(node: &Node<'n>, symbol_table: &mut DeclarationTab
         }
         Node::VarDecl(variable_declaration) => {
             for declaration in &variable_declaration.decls {
-                println!("{:?}", declaration.inner);
-                let name = match declaration.name {
-                    Pat::Ident(identifier) => identifier.id.sym().to_string(),
-                    _ => "other".into(),
-                };
-
-                match declaration.init {
-                    Some(dprint_swc_ext::view::Expr::Assign(assignment)) => {
-                        println!("{:?}", assignment.inner);
-                    }
-                    Some(dprint_swc_ext::view::Expr::New(new_expression)) => {
-                        println!("{:?}", new_expression.inner);
-                    }
-                    Some(dprint_swc_ext::view::Expr::Ident(identifier)) => {
-                        println!("{:?}", identifier.inner);
-                    }
-                    Some(dprint_swc_ext::view::Expr::Class(class_declaration)) => {
-                        println!("{:?}", class_declaration.inner);
-                    }
-                    Some(dprint_swc_ext::view::Expr::TsAs(as_expression)) => {
-                        println!("{:?}", as_expression.inner);
+                match declaration.name {
+                    Pat::Ident(identifier) => {
+                        let name = identifier.id.sym().to_string();
+                        match identifier.type_ann {
+                            Some(type_annotation) => match type_annotation.type_ann {
+                                dprint_swc_ext::view::TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                                    dprint_swc_ext::view::TsEntityName::Ident(identifier) => {
+                                        let type_name = identifier.sym().to_string();
+                                        symbol_table.insert(
+                                            name.to_string(),
+                                            Declaration::Alias {
+                                                from: name,
+                                                to: type_name,
+                                            },
+                                        )
+                                    }
+                                    _ => {}
+                                },
+                                _ => {}
+                            },
+                            None => match declaration.init {
+                                Some(initializer) => {
+                                    store_variable(&name, initializer.as_node(), symbol_table);
+                                }
+                                None => {}
+                            },
+                        }
                     }
                     _ => {}
-                }
+                };
             }
         }
         _ => {}
+    }
+}
+
+fn store_variable(name: &str, node: Node, symbol_table: &mut DeclarationTable) -> () {
+    for child in node.children() {
+        match child {
+            Node::Ident(identifier) => {
+                let type_name = identifier.sym().to_string();
+                symbol_table.insert(
+                    name.to_string(),
+                    Declaration::Alias {
+                        from: name.to_string(),
+                        to: type_name,
+                    },
+                )
+            }
+            Node::TsTypeRef(type_ref) => match type_ref.type_name {
+                dprint_swc_ext::view::TsEntityName::Ident(identifier) => {
+                    let type_name = identifier.sym().to_string();
+                    symbol_table.insert(
+                        name.to_string(),
+                        Declaration::Alias {
+                            from: name.to_string(),
+                            to: type_name,
+                        },
+                    )
+                }
+                _ => {}
+            },
+            _ => store_variable(name, child, symbol_table),
+        }
     }
 }

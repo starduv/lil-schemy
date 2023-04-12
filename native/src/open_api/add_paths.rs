@@ -29,7 +29,7 @@ pub fn find_paths<'n>(open_api: &mut OpenApi, node: &Node<'n>, symbol_table: &mu
     }
 }
 
-fn add_path(open_api: &mut OpenApi, node: &CallExpr, symbol_table: &mut DeclarationTable) -> () {
+fn add_path<'n>(open_api: &mut OpenApi, node: &CallExpr<'n>, symbol_table: &mut DeclarationTable<'n>) -> () {
     let args = &node.args;
     let route_handler = args.first().copied();
     let route_options = args.last().copied();
@@ -112,10 +112,10 @@ fn load_options(path_options: &mut PathOptions, node: &Node) {
     }
 }
 
-fn add_request_details(
+fn add_request_details<'n>(
     operation: &mut ApiPathOperation,
-    route_handler: Node,
-    symbol_table: &mut DeclarationTable,
+    route_handler: Node<'n>,
+    symbol_table: &mut DeclarationTable<'n>,
 ) -> () {
     for child in route_handler.children() {
         match child {
@@ -124,7 +124,9 @@ fn add_request_details(
                     add_request_params(operation, Node::from(param), symbol_table);
                 }
 
-                add_request_response(operation, Node::from(arrow_expression.body));
+                symbol_table.push_scope();
+                find_response(operation, Node::from(arrow_expression.body), symbol_table);
+                symbol_table.pop_scope();
             }
             _ => {}
         }
@@ -289,65 +291,61 @@ fn get_parameter_name(node: Node) -> String {
     }
 }
 
-fn add_request_response(operation: &mut ApiPathOperation, body: Node) -> () {
+fn find_response<'a>(operation: &mut ApiPathOperation, body: Node<'a>, symbol_table: &mut DeclarationTable<'a>) -> () {
     for child in body.children() {
+        store_symbol_maybe(&child, symbol_table);
+
         match child {
-            Node::VarDecl(declaration) => {
-                for variable in &declaration.decls {
-                    add_response_from_variable(operation, Node::from(variable.deref()))
-                }
+            Node::Ident(identifier) if identifier.sym().eq("Response") => {
+                add_response(operation, identifier.parent(), symbol_table)
             }
-            other => add_request_response(operation, other),
+            other => find_response(operation, other, symbol_table),
         }
     }
 }
 
-fn add_response_from_variable(operation: &mut ApiPathOperation, node: Node) -> () {
-    for child in node.children() {
-        match child {
-            Node::Ident(identifier) if identifier.sym().eq("Response") => match identifier.parent() {
-                Node::CallExpr(call_expression) => {
-                    let response_type = match call_expression.args.get(0) {
-                        Some(arg) => match arg.expr {
-                            Expr::New(new_expression) => match new_expression.callee {
-                                Expr::Ident(identifier) => Some(identifier.sym().to_string()),
-                                _ => None,
-                            },
-                            Expr::Ident(response_type) => Some(response_type.sym().to_string()),
-                            Expr::TsAs(ts_as) => match ts_as.type_ann {
-                                TsType::TsTypeRef(type_ref) => match type_ref.type_name {
-                                    TsEntityName::Ident(identifier) => Some(identifier.sym().to_string()),
-                                    _ => None,
-                                },
-                                _ => None,
-                            },
-                            Expr::TsTypeAssertion(type_assertion) => match type_assertion.type_ann {
-                                TsType::TsTypeRef(type_ref) => match type_ref.type_name {
-                                    TsEntityName::Ident(identifier) => Some(identifier.sym().to_string()),
-                                    _ => None,
-                                },
-                                _ => None,
-                            },
-                            _ => None,
-                        },
-                        None => None,
-                    };
-
-                    let options = match call_expression.args.get(1) {
-                        Some(arg) => match arg.expr {
-                            Expr::Object(options) => Some(get_response_options(options)),
-                            _ => None,
-                        },
-                        None => None,
-                    };
-
-                    if let Some(response_options) = options {
-                        operation.response(&response_type, response_options);
-                    }
-                }
-                _ => {}
+fn add_response(operation: &mut ApiPathOperation, node: Node, symbol_table: &mut DeclarationTable) -> () {
+    if let Some(call_expression) = node.to::<CallExpr>() {
+        let response_type = match call_expression.args.get(0) {
+            Some(arg) => match arg.expr {
+                Expr::New(new_expression) => match new_expression.callee {
+                    Expr::Ident(identifier) => Some(symbol_table.get_root_declaration(identifier.sym().to_string())),
+                    _ => None,
+                },
+                Expr::Ident(response_type) => Some(symbol_table.get_root_declaration(response_type.sym().to_string())),
+                Expr::TsAs(ts_as) => match ts_as.type_ann {
+                    TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                        TsEntityName::Ident(identifier) => {
+                            Some(symbol_table.get_root_declaration(identifier.sym().to_string()))
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                },
+                Expr::TsTypeAssertion(type_assertion) => match type_assertion.type_ann {
+                    TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                        TsEntityName::Ident(identifier) => {
+                            Some(symbol_table.get_root_declaration(identifier.sym().to_string()))
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                },
+                _ => None,
             },
-            _ => add_response_from_variable(operation, child),
+            None => None,
+        };
+
+        let options = match call_expression.args.get(1) {
+            Some(arg) => match arg.expr {
+                Expr::Object(options) => Some(get_response_options(options)),
+                _ => None,
+            },
+            None => None,
+        };
+
+        if let Some(response_options) = options {
+            operation.response(&response_type, response_options);
         }
     }
 }
