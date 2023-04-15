@@ -90,16 +90,16 @@ impl<'v> ApiPath {
         }
     }
 
-    pub(crate) fn add_method(&mut self, method: &str, operation: ApiPathOperation) -> &mut ApiPathOperation {
+    pub(crate) fn method(&mut self, method: &str) -> &mut ApiPathOperation {
         match method.to_lowercase().as_str() {
-            "get" => self.get.insert(operation),
-            "put" => self.put.insert(operation),
-            "post" => self.post.insert(operation),
-            "delete" => self.delete.insert(operation),
-            "options" => self.options.insert(operation),
-            "head" => self.head.insert(operation),
-            "patch" => self.patch.insert(operation),
-            "trace" => self.trace.insert(operation),
+            "get" => self.get.get_or_insert(ApiPathOperation::new()),
+            "put" => self.put.get_or_insert(ApiPathOperation::new()),
+            "post" => self.post.get_or_insert(ApiPathOperation::new()),
+            "delete" => self.delete.get_or_insert(ApiPathOperation::new()),
+            "options" => self.options.get_or_insert(ApiPathOperation::new()),
+            "head" => self.head.get_or_insert(ApiPathOperation::new()),
+            "patch" => self.patch.get_or_insert(ApiPathOperation::new()),
+            "trace" => self.trace.get_or_insert(ApiPathOperation::new()),
             other => panic!("Unsupported http method '{}'", other),
         }
     }

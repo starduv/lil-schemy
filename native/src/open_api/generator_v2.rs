@@ -183,12 +183,13 @@ impl<'n> GeneratorV2<'n> {
         let route_options = args.last().copied();
         let options = get_path_options(route_options);
 
-        let api_path = open_api.path(&options.path.unwrap());
-        let mut operation = ApiPathOperation::new();
+        let operation = open_api
+            .path(&options.path.unwrap())
+            .method(&options.method.unwrap())
+            .tags(options.tags);
 
         let route_handler = route_handler.unwrap();
-        self.add_request_details(operation.tags(options.tags), Node::from(route_handler), file_path);
-        api_path.add_method(&options.method.unwrap(), operation);
+        self.add_request_details(operation, Node::from(route_handler), file_path);
     }
 
     fn add_request_details(
