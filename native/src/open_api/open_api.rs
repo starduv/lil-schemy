@@ -90,22 +90,22 @@ impl<'v> ApiPath {
         }
     }
 
-    pub(crate) fn method(&mut self, method: &str) -> &mut ApiPathOperation {
+    pub(crate) fn add_method(&mut self, method: &str, operation: ApiPathOperation) -> &mut ApiPathOperation {
         match method.to_lowercase().as_str() {
-            "get" => self.get.get_or_insert(ApiPathOperation::new()),
-            "put" => self.put.get_or_insert(ApiPathOperation::new()),
-            "post" => self.post.get_or_insert(ApiPathOperation::new()),
-            "delete" => self.delete.get_or_insert(ApiPathOperation::new()),
-            "options" => self.options.get_or_insert(ApiPathOperation::new()),
-            "head" => self.head.get_or_insert(ApiPathOperation::new()),
-            "patch" => self.patch.get_or_insert(ApiPathOperation::new()),
-            "trace" => self.trace.get_or_insert(ApiPathOperation::new()),
+            "get" => self.get.insert(operation),
+            "put" => self.put.insert(operation),
+            "post" => self.post.insert(operation),
+            "delete" => self.delete.insert(operation),
+            "options" => self.options.insert(operation),
+            "head" => self.head.insert(operation),
+            "patch" => self.patch.insert(operation),
+            "trace" => self.trace.insert(operation),
             other => panic!("Unsupported http method '{}'", other),
         }
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct ApiPathOperation {
     #[serde(rename = "requestBody", skip_serializing_if = "Option::is_none")]
     body_parameter: Option<ApiParam>,
@@ -181,7 +181,7 @@ impl ApiPathOperation {
 #[derive(Serialize, Debug)]
 pub struct ApiPathParameter {}
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ApiResponse {
     description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -214,7 +214,7 @@ impl ApiResponse {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ApiConent {
     #[serde(skip_serializing_if = "Option::is_none")]
     schema: Option<ApiSchema>,
@@ -243,7 +243,7 @@ impl ApiConent {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ApiSchema {
     items: Option<Box<ApiSchema>>,
     format: Option<String>,
@@ -357,7 +357,7 @@ impl ApiSchema {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ApiParam {
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,

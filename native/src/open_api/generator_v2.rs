@@ -1,10 +1,9 @@
 // use std::{fs::File, io::Write};
-use std::collections::BTreeMap;
 
 use dprint_swc_ext::view::*;
 use lazy_static::__Deref;
 
-use crate::typescript::DeclarationTable;
+use crate::typescript::{Declaration, DeclarationTables};
 
 use super::{
     open_api::{ApiPathOperation, OpenApi, PathOptions, ResponseOptions},
@@ -16,7 +15,7 @@ use dprint_swc_ext::view::{with_ast_view_for_module, ModuleInfo, NodeTrait};
 use url::Url;
 
 pub struct GeneratorV2<'n> {
-    symbol_tables: BTreeMap<String, DeclarationTable<'n>>,
+    symbol_tables: DeclarationTables<'n>,
 }
 impl<'n> GeneratorV2<'n> {
     pub fn new() -> GeneratorV2<'n> {
@@ -28,10 +27,6 @@ impl<'n> GeneratorV2<'n> {
     pub(crate) fn from_source_file(&mut self, file_path: &str) -> OpenApi {
         let mut open_api = OpenApi::new();
         let result = get_syntax_tree(file_path);
-        let symbol_table = self
-            .symbol_tables
-            .entry(file_path.to_owned())
-            .or_insert(Default::default());
 
         with_ast_view_for_module(
             ModuleInfo {
@@ -40,10 +35,331 @@ impl<'n> GeneratorV2<'n> {
                 text_info: Some(result.text_info()),
                 tokens: None,
             },
-            |module| find_paths(&mut open_api, &module.as_node(), symbol_table),
+            |module| self.find_paths(&mut open_api, &module.as_node(), file_path),
         );
 
         open_api
+    }
+
+    fn find_paths(&mut self, open_api: &mut OpenApi, node: &Node<'n>, file_path: &str) {
+        store_symbol_maybe(node, file_path, &mut self.symbol_tables);
+
+        for child in node.children() {
+            match child.kind() {
+                NodeKind::CallExpr => match child.to::<CallExpr>() {
+                    Some(call_expr) => match call_expr.callee {
+                        Callee::Expr(Expr::Ident(ident)) if ident.sym().eq("Path") => {
+                            self.symbol_tables.push_scope(file_path);
+                            self.add_path(open_api, &call_expr, file_path);
+                            self.symbol_tables.pop_scope(file_path);
+                        }
+                        _ => self.find_paths(open_api, &child, file_path),
+                    },
+                    None => self.find_paths(open_api, &child, file_path),
+                },
+                _ => self.find_paths(open_api, &child, file_path),
+            }
+        }
+    }
+
+    fn store_symbol_maybe(&mut self, node: &Node<'n>, file_path: &str) -> () {
+        match node {
+            Node::ClassDecl(class_declaration) => {
+                println!("{:?}", class_declaration.inner);
+            }
+            Node::ExportDecl(export_declaration) => {
+                println!("{:?}", export_declaration.inner);
+            }
+            Node::ExportDefaultDecl(export_default_declaration) => {
+                println!("{:?}", export_default_declaration.inner);
+            }
+            Node::FnDecl(function_declaration) => {
+                println!("{:?}", function_declaration.inner);
+            }
+            Node::ImportDecl(import_declaration) => {
+                for child in import_declaration.children() {
+                    match child {
+                        Node::ImportNamedSpecifier(specifier) => {
+                            // TODO this will need module resolution
+                            let src = import_declaration.src.value().to_string();
+                            let name = specifier.local.sym().to_string();
+                            self.symbol_tables.insert(
+                                file_path,
+                                name.to_string(),
+                                Declaration::Import {
+                                    name,
+                                    source_file_name: src,
+                                },
+                            )
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Node::TsEnumDecl(ts_enum_declaration) => {
+                println!("{:?}", ts_enum_declaration.inner);
+            }
+            Node::TsInterfaceDecl(ts_interface_declaration) => {
+                println!("{:?}", ts_interface_declaration.inner);
+            }
+            Node::TsTypeAliasDecl(ts_type_alias_declaration) => {
+                println!("{:?}", ts_type_alias_declaration.inner);
+            }
+            Node::VarDecl(variable_declaration) => {
+                for declaration in &variable_declaration.decls {
+                    match declaration.name {
+                        Pat::Ident(identifier) => {
+                            let name = identifier.id.sym().to_string();
+                            match identifier.type_ann {
+                                Some(type_annotation) => match type_annotation.type_ann {
+                                    dprint_swc_ext::view::TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                                        dprint_swc_ext::view::TsEntityName::Ident(identifier) => {
+                                            let type_name = identifier.sym().to_string();
+                                            self.symbol_tables.insert(
+                                                file_path,
+                                                name.to_string(),
+                                                Declaration::Alias {
+                                                    from: name,
+                                                    to: type_name,
+                                                },
+                                            )
+                                        }
+                                        _ => {}
+                                    },
+                                    _ => {}
+                                },
+                                None => match declaration.init {
+                                    Some(initializer) => {
+                                        self.store_variable(&name, initializer.as_node(), file_path);
+                                    }
+                                    None => {}
+                                },
+                            }
+                        }
+                        _ => {}
+                    };
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn store_variable(&mut self, name: &str, node: Node, file_path: &str) -> () {
+        for child in node.children() {
+            match child {
+                Node::Ident(identifier) => {
+                    let type_name = identifier.sym().to_string();
+                    self.symbol_tables.insert(
+                        file_path,
+                        name.to_string(),
+                        Declaration::Alias {
+                            from: name.to_string(),
+                            to: type_name,
+                        },
+                    )
+                }
+                Node::TsTypeRef(type_ref) => match type_ref.type_name {
+                    dprint_swc_ext::view::TsEntityName::Ident(identifier) => {
+                        let type_name = identifier.sym().to_string();
+                        self.symbol_tables.insert(
+                            file_path,
+                            name.to_string(),
+                            Declaration::Alias {
+                                from: name.to_string(),
+                                to: type_name,
+                            },
+                        )
+                    }
+                    _ => {}
+                },
+                _ => self.store_variable(name, child, file_path),
+            }
+        }
+    }
+
+    fn add_path(&mut self, open_api: &mut OpenApi, node: &CallExpr<'n>, file_path: &str) -> () {
+        let args = &node.args;
+        let route_handler = args.first().copied();
+        let route_options = args.last().copied();
+        let options = get_path_options(route_options);
+
+        let api_path = open_api.path(&options.path.unwrap());
+        let mut operation = ApiPathOperation::new();
+
+        let route_handler = route_handler.unwrap();
+        self.add_request_details(operation.tags(options.tags), Node::from(route_handler), file_path);
+        api_path.add_method(&options.method.unwrap(), operation);
+    }
+
+    fn add_request_details(
+        &mut self,
+        operation: &mut ApiPathOperation,
+        route_handler: Node<'n>,
+        file_path: &str,
+    ) -> () {
+        for child in route_handler.children() {
+            match child {
+                Node::ArrowExpr(arrow_expression) => {
+                    for param in &arrow_expression.params {
+                        self.add_request_params(operation, Node::from(param), file_path);
+                    }
+
+                    self.symbol_tables.push_scope(file_path);
+                    self.find_response(operation, Node::from(arrow_expression.body), file_path);
+                    self.symbol_tables.pop_scope(file_path);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn add_request_params(&mut self, operation: &mut ApiPathOperation, node: Node, file_path: &str) {
+        for child in node.children() {
+            match child {
+                Node::TsTypeRef(type_ref) => match type_ref.type_name {
+                    TsEntityName::Ident(identifier) if identifier.sym().eq("BodyParam") => {
+                        self.add_body_param_details(operation, type_ref, file_path);
+                    }
+                    TsEntityName::Ident(identifier) if identifier.sym().eq("Header") => {
+                        add_param_details(operation, "header", type_ref);
+                    }
+                    TsEntityName::Ident(identifier) if identifier.sym().eq("QueryParam") => {
+                        add_param_details(operation, "query", type_ref);
+                    }
+                    TsEntityName::Ident(identifier) if identifier.sym().eq("RouteParam") => {
+                        add_param_details(operation, "path", type_ref);
+                    }
+                    _ => self.add_request_params(operation, type_ref.as_node(), file_path),
+                },
+                _ => self.add_request_params(operation, child, file_path),
+            }
+        }
+    }
+
+    fn add_body_param_details(
+        &mut self,
+        operation: &mut ApiPathOperation,
+        type_ref: &TsTypeRef,
+        file_path: &str,
+    ) -> () {
+        let operation_param = operation.body();
+        if let Some(type_params) = type_ref.type_params {
+            match type_params.params.get(0) {
+                Some(TsType::TsKeywordType(param_type)) => match param_type.inner.kind {
+                    TsKeywordTypeKind::TsNumberKeyword => {
+                        operation_param.content().schema().primitive("number");
+                    }
+                    TsKeywordTypeKind::TsBooleanKeyword => {
+                        operation_param.content().schema().primitive("boolean");
+                    }
+                    TsKeywordTypeKind::TsStringKeyword => {
+                        operation_param.content().schema().primitive("string");
+                    }
+                    _ => {}
+                },
+                Some(TsType::TsTypeRef(type_ref)) => match type_ref.type_name {
+                    TsEntityName::Ident(identifier) => {
+                        let reference = self
+                            .symbol_tables
+                            .get_root_declaration(file_path, identifier.sym().to_string());
+
+                        operation_param.content().schema().reference(Some(reference), false);
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+
+            match type_params.params.get(1) {
+                Some(TsType::TsLitType(required)) => match required.lit {
+                    TsLit::Bool(boolean) => {
+                        operation_param.required(boolean.value());
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+
+            match type_params.params.get(2) {
+                Some(TsType::TsLitType(namespace)) => match &namespace.lit {
+                    TsLit::Str(literal_string) => {
+                        operation_param
+                            .content()
+                            .schema()
+                            .namespace(Some(literal_string.value().to_string()));
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+        }
+    }
+
+    fn find_response(&mut self, operation: &mut ApiPathOperation, body: Node<'n>, file_path: &str) -> () {
+        for child in body.children() {
+            store_symbol_maybe(&child, file_path, &mut self.symbol_tables);
+
+            match child {
+                Node::Ident(identifier) if identifier.sym().eq("Response") => {
+                    self.add_response(operation, identifier.parent(), file_path)
+                }
+                other => self.find_response(operation, other, file_path),
+            }
+        }
+    }
+
+    fn add_response(&mut self, operation: &mut ApiPathOperation, node: Node, file_path: &str) -> () {
+        if let Some(call_expression) = node.to::<CallExpr>() {
+            let response_type = match call_expression.args.get(0) {
+                Some(arg) => match arg.expr {
+                    Expr::New(new_expression) => match new_expression.callee {
+                        Expr::Ident(identifier) => Some(
+                            self.symbol_tables
+                                .get_root_declaration(file_path, identifier.sym().to_string()),
+                        ),
+                        _ => None,
+                    },
+                    Expr::Ident(response_type) => Some(
+                        self.symbol_tables
+                            .get_root_declaration(file_path, response_type.sym().to_string()),
+                    ),
+                    Expr::TsAs(ts_as) => match ts_as.type_ann {
+                        TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                            TsEntityName::Ident(identifier) => Some(
+                                self.symbol_tables
+                                    .get_root_declaration(file_path, identifier.sym().to_string()),
+                            ),
+                            _ => None,
+                        },
+                        _ => None,
+                    },
+                    Expr::TsTypeAssertion(type_assertion) => match type_assertion.type_ann {
+                        TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                            TsEntityName::Ident(identifier) => Some(
+                                self.symbol_tables
+                                    .get_root_declaration(file_path, identifier.sym().to_string()),
+                            ),
+                            _ => None,
+                        },
+                        _ => None,
+                    },
+                    _ => None,
+                },
+                None => None,
+            };
+
+            let options = match call_expression.args.get(1) {
+                Some(arg) => match arg.expr {
+                    Expr::Object(options) => Some(get_response_options(options)),
+                    _ => None,
+                },
+                None => None,
+            };
+
+            if let Some(response_options) = options {
+                operation.response(&response_type, response_options);
+            }
+        }
     }
 }
 
@@ -61,42 +377,6 @@ fn get_syntax_tree(path: &str) -> ParsedSource {
     .unwrap();
 
     parsed_source
-}
-
-pub fn find_paths<'n>(open_api: &mut OpenApi, node: &Node<'n>, symbol_table: &mut DeclarationTable<'n>) {
-    store_symbol_maybe(node, symbol_table);
-
-    for child in node.children() {
-        match child.kind() {
-            NodeKind::CallExpr => match child.to::<CallExpr>() {
-                Some(call_expr) => match call_expr.callee {
-                    Callee::Expr(Expr::Ident(ident)) if ident.sym().eq("Path") => {
-                        symbol_table.push_scope();
-                        add_path(open_api, &call_expr, symbol_table);
-                        symbol_table.pop_scope();
-                    }
-                    _ => find_paths(open_api, &child, symbol_table),
-                },
-                None => find_paths(open_api, &child, symbol_table),
-            },
-            _ => find_paths(open_api, &child, symbol_table),
-        }
-    }
-}
-
-fn add_path<'n>(open_api: &mut OpenApi, node: &CallExpr<'n>, symbol_table: &mut DeclarationTable<'n>) -> () {
-    let args = &node.args;
-    let route_handler = args.first().copied();
-    let route_options = args.last().copied();
-    let options = get_path_options(route_options);
-
-    let mut operation = open_api
-        .path(&options.path.unwrap())
-        .method(&options.method.unwrap())
-        .tags(options.tags);
-
-    let route_handler = route_handler.unwrap();
-    add_request_details(&mut operation, Node::from(route_handler), symbol_table);
 }
 
 fn get_path_options(options: Option<&ExprOrSpread>) -> PathOptions {
@@ -163,105 +443,6 @@ fn load_options(path_options: &mut PathOptions, node: &Node) {
                 }
             }
             _ => load_options(path_options, &child),
-        }
-    }
-}
-
-fn add_request_details<'n>(
-    operation: &mut ApiPathOperation,
-    route_handler: Node<'n>,
-    symbol_table: &mut DeclarationTable<'n>,
-) -> () {
-    for child in route_handler.children() {
-        match child {
-            Node::ArrowExpr(arrow_expression) => {
-                for param in &arrow_expression.params {
-                    add_request_params(operation, Node::from(param), symbol_table);
-                }
-
-                symbol_table.push_scope();
-                find_response(operation, Node::from(arrow_expression.body), symbol_table);
-                symbol_table.pop_scope();
-            }
-            _ => {}
-        }
-    }
-}
-
-fn add_request_params(operation: &mut ApiPathOperation, node: Node, symbol_table: &mut DeclarationTable) {
-    for child in node.children() {
-        match child {
-            Node::TsTypeRef(type_ref) => match type_ref.type_name {
-                TsEntityName::Ident(identifier) if identifier.sym().eq("BodyParam") => {
-                    add_body_param_details(operation, type_ref, symbol_table);
-                }
-                TsEntityName::Ident(identifier) if identifier.sym().eq("Header") => {
-                    add_param_details(operation, "header", type_ref);
-                }
-                TsEntityName::Ident(identifier) if identifier.sym().eq("QueryParam") => {
-                    add_param_details(operation, "query", type_ref);
-                }
-                TsEntityName::Ident(identifier) if identifier.sym().eq("RouteParam") => {
-                    add_param_details(operation, "path", type_ref);
-                }
-                _ => add_request_params(operation, type_ref.as_node(), symbol_table),
-            },
-            _ => add_request_params(operation, child, symbol_table),
-        }
-    }
-}
-
-fn add_body_param_details(
-    operation: &mut ApiPathOperation,
-    type_ref: &TsTypeRef,
-    symbol_table: &mut DeclarationTable,
-) -> () {
-    let operation_param = operation.body();
-    if let Some(type_params) = type_ref.type_params {
-        match type_params.params.get(0) {
-            Some(TsType::TsKeywordType(param_type)) => match param_type.inner.kind {
-                TsKeywordTypeKind::TsNumberKeyword => {
-                    operation_param.content().schema().primitive("number");
-                }
-                TsKeywordTypeKind::TsBooleanKeyword => {
-                    operation_param.content().schema().primitive("boolean");
-                }
-                TsKeywordTypeKind::TsStringKeyword => {
-                    operation_param.content().schema().primitive("string");
-                }
-                _ => {}
-            },
-            Some(TsType::TsTypeRef(type_ref)) => match type_ref.type_name {
-                TsEntityName::Ident(identifier) => {
-                    let reference = symbol_table.get_root_declaration(identifier.sym().to_string());
-                    operation_param.content().schema().reference(Some(reference), false);
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-
-        match type_params.params.get(1) {
-            Some(TsType::TsLitType(required)) => match required.lit {
-                TsLit::Bool(boolean) => {
-                    operation_param.required(boolean.value());
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-
-        match type_params.params.get(2) {
-            Some(TsType::TsLitType(namespace)) => match &namespace.lit {
-                TsLit::Str(literal_string) => {
-                    operation_param
-                        .content()
-                        .schema()
-                        .namespace(Some(literal_string.value().to_string()));
-                }
-                _ => {}
-            },
-            _ => {}
         }
     }
 }
@@ -343,65 +524,6 @@ fn get_parameter_name(node: Node) -> String {
             Some(parent) => get_parameter_name(parent),
             None => panic!("Could not find parameter name"),
         },
-    }
-}
-
-fn find_response<'a>(operation: &mut ApiPathOperation, body: Node<'a>, symbol_table: &mut DeclarationTable<'a>) -> () {
-    for child in body.children() {
-        store_symbol_maybe(&child, symbol_table);
-
-        match child {
-            Node::Ident(identifier) if identifier.sym().eq("Response") => {
-                add_response(operation, identifier.parent(), symbol_table)
-            }
-            other => find_response(operation, other, symbol_table),
-        }
-    }
-}
-
-fn add_response(operation: &mut ApiPathOperation, node: Node, symbol_table: &mut DeclarationTable) -> () {
-    if let Some(call_expression) = node.to::<CallExpr>() {
-        let response_type = match call_expression.args.get(0) {
-            Some(arg) => match arg.expr {
-                Expr::New(new_expression) => match new_expression.callee {
-                    Expr::Ident(identifier) => Some(symbol_table.get_root_declaration(identifier.sym().to_string())),
-                    _ => None,
-                },
-                Expr::Ident(response_type) => Some(symbol_table.get_root_declaration(response_type.sym().to_string())),
-                Expr::TsAs(ts_as) => match ts_as.type_ann {
-                    TsType::TsTypeRef(type_ref) => match type_ref.type_name {
-                        TsEntityName::Ident(identifier) => {
-                            Some(symbol_table.get_root_declaration(identifier.sym().to_string()))
-                        }
-                        _ => None,
-                    },
-                    _ => None,
-                },
-                Expr::TsTypeAssertion(type_assertion) => match type_assertion.type_ann {
-                    TsType::TsTypeRef(type_ref) => match type_ref.type_name {
-                        TsEntityName::Ident(identifier) => {
-                            Some(symbol_table.get_root_declaration(identifier.sym().to_string()))
-                        }
-                        _ => None,
-                    },
-                    _ => None,
-                },
-                _ => None,
-            },
-            None => None,
-        };
-
-        let options = match call_expression.args.get(1) {
-            Some(arg) => match arg.expr {
-                Expr::Object(options) => Some(get_response_options(options)),
-                _ => None,
-            },
-            None => None,
-        };
-
-        if let Some(response_options) = options {
-            operation.response(&response_type, response_options);
-        }
     }
 }
 

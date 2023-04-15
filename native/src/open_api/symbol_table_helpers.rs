@@ -1,8 +1,8 @@
 use dprint_swc_ext::view::{Node, NodeTrait, Pat};
 
-use crate::typescript::{Declaration, DeclarationTable};
+use crate::typescript::{Declaration, DeclarationTables};
 
-pub fn store_symbol_maybe<'n>(node: &Node<'n>, symbol_table: &mut DeclarationTable<'n>) -> () {
+pub fn store_symbol_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tables: &mut DeclarationTables<'n>) -> () {
     match node {
         Node::ClassDecl(class_declaration) => {
             println!("{:?}", class_declaration.inner);
@@ -23,7 +23,8 @@ pub fn store_symbol_maybe<'n>(node: &Node<'n>, symbol_table: &mut DeclarationTab
                         // TODO this will need module resolution
                         let src = import_declaration.src.value().to_string();
                         let name = specifier.local.sym().to_string();
-                        symbol_table.insert(
+                        symbol_tables.insert(
+                            file_path,
                             name.to_string(),
                             Declaration::Import {
                                 name,
@@ -54,7 +55,8 @@ pub fn store_symbol_maybe<'n>(node: &Node<'n>, symbol_table: &mut DeclarationTab
                                 dprint_swc_ext::view::TsType::TsTypeRef(type_ref) => match type_ref.type_name {
                                     dprint_swc_ext::view::TsEntityName::Ident(identifier) => {
                                         let type_name = identifier.sym().to_string();
-                                        symbol_table.insert(
+                                        symbol_tables.insert(
+                                            file_path,
                                             name.to_string(),
                                             Declaration::Alias {
                                                 from: name,
@@ -68,7 +70,7 @@ pub fn store_symbol_maybe<'n>(node: &Node<'n>, symbol_table: &mut DeclarationTab
                             },
                             None => match declaration.init {
                                 Some(initializer) => {
-                                    store_variable(&name, initializer.as_node(), symbol_table);
+                                    store_variable(&name, initializer.as_node(), file_path, symbol_tables);
                                 }
                                 None => {}
                             },
@@ -82,12 +84,13 @@ pub fn store_symbol_maybe<'n>(node: &Node<'n>, symbol_table: &mut DeclarationTab
     }
 }
 
-fn store_variable(name: &str, node: Node, symbol_table: &mut DeclarationTable) -> () {
+fn store_variable(name: &str, node: Node, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
     for child in node.children() {
         match child {
             Node::Ident(identifier) => {
                 let type_name = identifier.sym().to_string();
-                symbol_table.insert(
+                symbol_tables.insert(
+                    file_path,
                     name.to_string(),
                     Declaration::Alias {
                         from: name.to_string(),
@@ -98,7 +101,8 @@ fn store_variable(name: &str, node: Node, symbol_table: &mut DeclarationTable) -
             Node::TsTypeRef(type_ref) => match type_ref.type_name {
                 dprint_swc_ext::view::TsEntityName::Ident(identifier) => {
                     let type_name = identifier.sym().to_string();
-                    symbol_table.insert(
+                    symbol_tables.insert(
+                        file_path,
                         name.to_string(),
                         Declaration::Alias {
                             from: name.to_string(),
@@ -108,7 +112,7 @@ fn store_variable(name: &str, node: Node, symbol_table: &mut DeclarationTable) -
                 }
                 _ => {}
             },
-            _ => store_variable(name, child, symbol_table),
+            _ => store_variable(name, child, file_path, symbol_tables),
         }
     }
 }
