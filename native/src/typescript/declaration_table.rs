@@ -1,11 +1,14 @@
+use std::fmt;
+
 use ahash::{HashMap, HashMapExt};
 use dprint_swc_ext::view::Node;
 
+#[derive(Debug)]
 struct Scope<'a> {
     symbols: HashMap<String, Declaration<'a>>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct DeclarationTables<'n> {
     tables: HashMap<String, DeclarationTable<'n>>,
 }
@@ -41,7 +44,7 @@ impl<'n> DeclarationTables<'n> {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct DeclarationTable<'a> {
     scopes: Vec<Scope<'a>>,
 }
@@ -106,3 +109,31 @@ pub enum Declaration<'a> {
     Export { name: String, source_file_name: String },
     Import { name: String, source_file_name: String },
 }
+
+impl<'n> fmt::Debug for Declaration<'n> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Alias { from, to } => f.debug_struct("Alias").field("from", from).field("to", to).finish(),
+            Self::Export { name, source_file_name } => f
+                .debug_struct("Export")
+                .field("name", name)
+                .field("source_file_name", source_file_name)
+                .finish(),
+            Self::Import { name, source_file_name } => f
+                .debug_struct("Import")
+                .field("name", name)
+                .field("source_file_name", source_file_name)
+                .finish(),
+            _ => fmt::Result::Ok(()),
+        }
+    }
+}
+
+// impl<'n> Serialize for Declaration<'n> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         serializer.serialize_none()
+//     }
+// }

@@ -1,5 +1,4 @@
 mod generator;
-mod generator_v2;
 mod open_api;
 mod symbol_table_helpers;
 
@@ -8,7 +7,7 @@ use std::{fs::File, io::Write, path::PathBuf};
 use neon::{prelude::*, result::Throw};
 use serde_json::json;
 
-use self::{generator_v2::GeneratorV2, open_api::OpenApi};
+use self::open_api::OpenApi;
 
 fn merge_schemas(
     open_api: &OpenApi,
@@ -40,14 +39,12 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
 }
 
 fn generate_schema(open_api_handle: Handle<JsObject>, cx: &mut FunctionContext) -> Result<String, Throw> {
-    let mut generator = GeneratorV2::new();
     let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "paths")?;
 
     let mut result = OpenApi::new();
     for path in paths.to_vec(cx)? {
         let path = path.downcast_or_throw::<JsString, _>(cx)?.value(cx);
-        let open_api = generator.from_source_file(&path);
-        result.merge(open_api);
+        result.from_source_file(&path);
     }
 
     merge_schemas(&mut result, open_api_handle, cx)
