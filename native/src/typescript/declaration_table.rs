@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use ahash::{HashMap, HashMapExt};
 use dprint_swc_ext::view::Node;
 
