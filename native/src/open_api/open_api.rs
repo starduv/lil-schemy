@@ -7,11 +7,13 @@ use url::Url;
 
 use crate::typescript::{Declaration, DeclarationTables};
 
-use super::symbol_table_helpers::store_symbol_maybe;
+use super::declaration_helpers::store_declaration_maybe;
 
 #[derive(Serialize, Debug)]
 pub struct OpenApi<'n> {
     pub components: ApiComponents,
+    #[serde(skip)]
+    deferred_schemas: Vec<(String, String)>,
     paths: HashMap<String, ApiPath>,
     #[serde(skip)]
     symbol_tables: DeclarationTables<'n>,
@@ -20,6 +22,7 @@ impl<'n> OpenApi<'n> {
     pub(crate) fn new() -> Self {
         OpenApi {
             components: ApiComponents::new(),
+            deferred_schemas: Vec::new(),
             paths: HashMap::new(),
             symbol_tables: Default::default(),
         }
@@ -46,19 +49,24 @@ impl<'n> OpenApi<'n> {
             },
             |module| self.find_paths(&module.as_node(), file_path),
         );
+
+        let deferred_schemas: Vec<(String, String)> = self.deferred_schemas.drain(..).collect();
+        for deferred in deferred_schemas {
+            self.add_reference_schema(&deferred.0, &deferred.1)
+        }
     }
 
     fn find_paths(&mut self, node: &Node<'n>, file_path: &str) {
-        store_symbol_maybe(node, file_path, &mut self.symbol_tables);
+        store_declaration_maybe(node, file_path, &mut self.symbol_tables);
 
         for child in node.children() {
             match child.kind() {
                 NodeKind::CallExpr => match child.to::<CallExpr>() {
                     Some(call_expr) => match call_expr.callee {
                         Callee::Expr(Expr::Ident(ident)) if ident.sym().eq("Path") => {
-                            self.symbol_tables.push_scope(file_path);
+                            self.symbol_tables.add_child_scope(file_path);
                             self.add_path(&call_expr, file_path);
-                            self.symbol_tables.pop_scope(file_path);
+                            self.symbol_tables.parent_scope(file_path);
                         }
                         _ => self.find_paths(&child, file_path),
                     },
@@ -211,9 +219,9 @@ impl<'n> OpenApi<'n> {
                         self.add_request_params(operation, Node::from(param), file_path);
                     }
 
-                    self.symbol_tables.push_scope(file_path);
+                    self.symbol_tables.add_child_scope(file_path);
                     self.find_response(operation, Node::from(arrow_expression.body), file_path);
-                    self.symbol_tables.pop_scope(file_path);
+                    self.symbol_tables.parent_scope(file_path);
                 }
                 _ => {}
             }
@@ -228,17 +236,89 @@ impl<'n> OpenApi<'n> {
                         self.add_body_param_details(operation, type_ref, file_path);
                     }
                     TsEntityName::Ident(identifier) if identifier.sym().eq("Header") => {
-                        add_param_details(operation, "header", type_ref);
+                        self.add_param_details(operation, "header", type_ref, file_path);
                     }
                     TsEntityName::Ident(identifier) if identifier.sym().eq("QueryParam") => {
-                        add_param_details(operation, "query", type_ref);
+                        self.add_param_details(operation, "query", type_ref, file_path);
                     }
                     TsEntityName::Ident(identifier) if identifier.sym().eq("RouteParam") => {
-                        add_param_details(operation, "path", type_ref);
+                        self.add_param_details(operation, "path", type_ref, file_path);
                     }
                     _ => self.add_request_params(operation, type_ref.as_node(), file_path),
                 },
                 _ => self.add_request_params(operation, child, file_path),
+            }
+        }
+    }
+
+    fn add_param_details(
+        &mut self,
+        operation: &mut ApiPathOperation,
+        location: &str,
+        type_ref: &TsTypeRef,
+        file_path: &str,
+    ) {
+        let parameter_name = get_parameter_name(Node::from(type_ref));
+        let operation_param = operation.param(&parameter_name, location);
+        if let Some(type_params) = type_ref.type_params {
+            match type_params.params.get(0) {
+                Some(TsType::TsKeywordType(param_type)) => match param_type.inner.kind {
+                    TsKeywordTypeKind::TsNumberKeyword => {
+                        operation_param.content().schema().primitive("number");
+                    }
+                    TsKeywordTypeKind::TsBooleanKeyword => {
+                        operation_param.content().schema().primitive("boolean");
+                    }
+                    TsKeywordTypeKind::TsStringKeyword => {
+                        operation_param.content().schema().primitive("string");
+                    }
+                    _ => {}
+                },
+                Some(TsType::TsTypeRef(type_ref)) => match type_ref.type_name {
+                    TsEntityName::Ident(identifier) => {
+                        let reference = identifier.sym().to_string();
+                        self.add_reference_schema(file_path, &reference);
+                        operation_param.content().schema().reference(reference.into(), false);
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+
+            match type_params.params.get(1) {
+                Some(TsType::TsLitType(required)) => match required.lit {
+                    TsLit::Bool(boolean) => {
+                        operation_param.required(boolean.value());
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+
+            match type_params.params.get(2) {
+                Some(TsType::TsLitType(namespace)) => match &namespace.lit {
+                    TsLit::Str(literal_string) => {
+                        operation_param
+                            .content()
+                            .schema()
+                            .namespace(Some(literal_string.value().to_string()));
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+
+            match type_params.params.get(3) {
+                Some(TsType::TsLitType(format)) => match &format.lit {
+                    TsLit::Str(literal_string) => {
+                        operation_param
+                            .content()
+                            .schema()
+                            .format(Some(literal_string.value().to_string()));
+                    }
+                    _ => {}
+                },
+                _ => {}
             }
         }
     }
@@ -269,8 +349,8 @@ impl<'n> OpenApi<'n> {
                     TsEntityName::Ident(identifier) => {
                         let reference = self
                             .symbol_tables
-                            .get_root_declaration(file_path, identifier.sym().to_string());
-
+                            .get_root_declaration_name(file_path, identifier.sym().to_string());
+                        self.add_reference_schema(file_path, &reference);
                         operation_param.content().schema().reference(Some(reference), false);
                     }
                     _ => {}
@@ -305,7 +385,7 @@ impl<'n> OpenApi<'n> {
 
     fn find_response(&mut self, operation: &mut ApiPathOperation, body: Node<'n>, file_path: &str) -> () {
         for child in body.children() {
-            store_symbol_maybe(&child, file_path, &mut self.symbol_tables);
+            store_declaration_maybe(&child, file_path, &mut self.symbol_tables);
 
             match child {
                 Node::Ident(identifier) if identifier.sym().eq("Response") => {
@@ -325,19 +405,19 @@ impl<'n> OpenApi<'n> {
                         Expr::Ident(identifier) => {
                             let type_reference = identifier.sym().to_string();
                             self.add_reference_schema(file_path, &type_reference);
-                            Some(self.symbol_tables.get_root_declaration(file_path, type_reference))
+                            Some(self.symbol_tables.get_root_declaration_name(file_path, type_reference))
                         }
                         _ => None,
                     },
                     Expr::Ident(response_type) => Some(
                         self.symbol_tables
-                            .get_root_declaration(file_path, response_type.sym().to_string()),
+                            .get_root_declaration_name(file_path, response_type.sym().to_string()),
                     ),
                     Expr::TsAs(ts_as) => match ts_as.type_ann {
                         TsType::TsTypeRef(type_ref) => match type_ref.type_name {
                             TsEntityName::Ident(identifier) => Some(
                                 self.symbol_tables
-                                    .get_root_declaration(file_path, identifier.sym().to_string()),
+                                    .get_root_declaration_name(file_path, identifier.sym().to_string()),
                             ),
                             _ => None,
                         },
@@ -347,7 +427,7 @@ impl<'n> OpenApi<'n> {
                         TsType::TsTypeRef(type_ref) => match type_ref.type_name {
                             TsEntityName::Ident(identifier) => Some(
                                 self.symbol_tables
-                                    .get_root_declaration(file_path, identifier.sym().to_string()),
+                                    .get_root_declaration_name(file_path, identifier.sym().to_string()),
                             ),
                             _ => None,
                         },
@@ -373,7 +453,54 @@ impl<'n> OpenApi<'n> {
     }
 
     fn add_reference_schema(&mut self, file_path: &str, type_reference: &str) -> () {
-        // todo!()
+        if !self.symbol_tables.has_table(&file_path) {
+            self.load_symbols_from_module(&file_path);
+        }
+
+        match self.symbol_tables.get_root_declaration(file_path, type_reference) {
+            Some(Declaration::Export {
+                name: _,
+                source_file_name,
+            }) => {
+                self.deferred_schemas.push((source_file_name, type_reference.into()));
+            }
+            Some(Declaration::Import {
+                name: _,
+                source_file_name,
+            }) => {
+                self.deferred_schemas.push((source_file_name, type_reference.into()));
+            }
+            Some(Declaration::Type { node }) => match node {
+                Node::ClassDecl(declaration) => println!("{:?}", declaration.inner),
+                Node::TsArrayType(declaration) => println!("{:?}", declaration.inner),
+                Node::TsEnumDecl(declaration) => println!("{:?}", declaration.inner),
+                Node::TsInterfaceDecl(declaration) => println!("{:?}", declaration.inner),
+                Node::TsTypeAliasDecl(declaration) => println!("{:?}", declaration.inner),
+                _ => {}
+            },
+            _ => {}
+        };
+    }
+
+    fn load_symbols_from_module(&mut self, source_file_name: &str) -> () {
+        let result = get_syntax_tree(source_file_name);
+
+        with_ast_view_for_module(
+            ModuleInfo {
+                module: result.module(),
+                comments: None,
+                text_info: Some(result.text_info()),
+                tokens: None,
+            },
+            |module| self.load_symbols(&module.as_node(), source_file_name),
+        );
+    }
+
+    fn load_symbols(&mut self, node: &Node<'n>, source_file_name: &str) -> () {
+        for child in node.children() {
+            store_declaration_maybe(node, source_file_name, &mut self.symbol_tables);
+            self.load_symbols(&child, source_file_name);
+        }
     }
 }
 
@@ -442,20 +569,6 @@ impl<'v> ApiPath {
             parameters: None,
         }
     }
-
-    // pub(crate) fn method(&mut self, method: &str) -> &mut ApiPathOperation {
-    //     match method.to_lowercase().as_str() {
-    //         "get" => self.get.get_or_insert(ApiPathOperation::new()),
-    //         "put" => self.put.get_or_insert(ApiPathOperation::new()),
-    //         "post" => self.post.get_or_insert(ApiPathOperation::new()),
-    //         "delete" => self.delete.get_or_insert(ApiPathOperation::new()),
-    //         "options" => self.options.get_or_insert(ApiPathOperation::new()),
-    //         "head" => self.head.get_or_insert(ApiPathOperation::new()),
-    //         "patch" => self.patch.get_or_insert(ApiPathOperation::new()),
-    //         "trace" => self.trace.get_or_insert(ApiPathOperation::new()),
-    //         other => panic!("Unsupported http method '{}'", other),
-    //     }
-    // }
 
     fn add_operation(&mut self, method: &str, operation: ApiPathOperation) -> &mut ApiPathOperation {
         match method.to_lowercase().as_str() {
@@ -876,74 +989,6 @@ fn load_options(path_options: &mut PathOptions, node: &Node) {
                 }
             }
             _ => load_options(path_options, &child),
-        }
-    }
-}
-
-// TODO add schema for ref here
-fn add_param_details(operation: &mut ApiPathOperation, location: &str, type_ref: &TsTypeRef) {
-    let parameter_name = get_parameter_name(Node::from(type_ref));
-    let operation_param = operation.param(&parameter_name, location);
-    if let Some(type_params) = type_ref.type_params {
-        match type_params.params.get(0) {
-            Some(TsType::TsKeywordType(param_type)) => match param_type.inner.kind {
-                TsKeywordTypeKind::TsNumberKeyword => {
-                    operation_param.content().schema().primitive("number");
-                }
-                TsKeywordTypeKind::TsBooleanKeyword => {
-                    operation_param.content().schema().primitive("boolean");
-                }
-                TsKeywordTypeKind::TsStringKeyword => {
-                    operation_param.content().schema().primitive("string");
-                }
-                _ => {}
-            },
-            Some(TsType::TsTypeRef(type_ref)) => match type_ref.type_name {
-                TsEntityName::Ident(identifier) => {
-                    operation_param
-                        .content()
-                        .schema()
-                        .reference(identifier.sym().to_string().into(), false);
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-
-        match type_params.params.get(1) {
-            Some(TsType::TsLitType(required)) => match required.lit {
-                TsLit::Bool(boolean) => {
-                    operation_param.required(boolean.value());
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-
-        match type_params.params.get(2) {
-            Some(TsType::TsLitType(namespace)) => match &namespace.lit {
-                TsLit::Str(literal_string) => {
-                    operation_param
-                        .content()
-                        .schema()
-                        .namespace(Some(literal_string.value().to_string()));
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-
-        match type_params.params.get(3) {
-            Some(TsType::TsLitType(format)) => match &format.lit {
-                TsLit::Str(literal_string) => {
-                    operation_param
-                        .content()
-                        .schema()
-                        .format(Some(literal_string.value().to_string()));
-                }
-                _ => {}
-            },
-            _ => {}
         }
     }
 }

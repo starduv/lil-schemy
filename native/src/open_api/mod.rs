@@ -1,6 +1,6 @@
+mod declaration_helpers;
 mod generator;
 mod open_api;
-mod symbol_table_helpers;
 
 use std::{fs::File, io::Write, path::PathBuf};
 

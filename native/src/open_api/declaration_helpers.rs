@@ -1,8 +1,11 @@
+use std::path::PathBuf;
+
 use dprint_swc_ext::view::{Node, NodeTrait, Pat};
+use es_resolve::{EsResolver, TargetEnv};
 
 use crate::typescript::{Declaration, DeclarationTables};
 
-pub fn store_symbol_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tables: &mut DeclarationTables<'n>) -> () {
+pub fn store_declaration_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tables: &mut DeclarationTables<'n>) -> () {
     match node {
         Node::ClassDecl(class_declaration) => {
             println!("{:?}", class_declaration.inner);
@@ -19,18 +22,39 @@ pub fn store_symbol_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tables: &
         Node::ImportDecl(import_declaration) => {
             for child in import_declaration.children() {
                 match child {
-                    Node::ImportNamedSpecifier(specifier) => {
-                        // TODO this will need module resolution
+                    Node::ImportDefaultSpecifier(specifier) => {
                         let src = import_declaration.src.value().to_string();
-                        let name = specifier.local.sym().to_string();
-                        symbol_tables.insert(
-                            file_path,
-                            name.to_string(),
-                            Declaration::Import {
-                                name,
-                                source_file_name: src,
-                            },
-                        )
+                        match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
+                            Ok(module_path) => {
+                                let name = specifier.local.sym().to_string();
+                                symbol_tables.insert(
+                                    file_path,
+                                    name,
+                                    Declaration::Import {
+                                        name: String::from("default"),
+                                        source_file_name: module_path,
+                                    },
+                                )
+                            }
+                            Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
+                        }
+                    }
+                    Node::ImportNamedSpecifier(specifier) => {
+                        let src = import_declaration.src.value().to_string();
+                        match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
+                            Ok(module_path) => {
+                                let name = specifier.local.sym().to_string();
+                                symbol_tables.insert(
+                                    file_path,
+                                    name.to_string(),
+                                    Declaration::Import {
+                                        name,
+                                        source_file_name: module_path,
+                                    },
+                                )
+                            }
+                            Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
+                        }
                     }
                     _ => {}
                 }

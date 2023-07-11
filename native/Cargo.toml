@@ -19,4 +19,5 @@ serde_json = { version = "1.0.89", features = ["preserve_order"] }
 serde = { version = "1.0.148", features = ["derive"] }
 neon = { version = "0.10.1", default-features = false, features = ["napi-1"] }
 dprint-swc-ext = { version = "0.7.0", features = ["view"] }
+swc_ecma_loader = { version = "0.43.6", features = ["tsc", "lru", "parking_lot"] }
 
