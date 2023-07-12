@@ -24,8 +24,8 @@ const run = async (args) => {
     const folder = debug ? 'debug' : 'release';
     const prefix = process.platform == 'darwin' ? "lib" : process.platform == 'linux' ? "lib" : "";
     const ext = process.platform == 'darwin' ? 'dylib' : process.platform == 'linux' ? 'so' : 'dll';
-    const src = `native/target/${folder}/${prefix}typeshift.${ext}`;
-    const dest = `src/generator/typeshift-${process.arch}-${process.platform}.node`;
+    const src = `native/target/${folder}/${prefix}lil_schemy.${ext}`;
+    const dest = `src/generator/lil-schemy-${process.arch}-${process.platform}.node`;
 
     await copyFile(src, dest);
 }

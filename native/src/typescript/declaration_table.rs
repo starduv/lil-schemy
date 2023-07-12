@@ -45,7 +45,7 @@ impl<'n> DeclarationTables<'n> {
             .get_root_declaration_name(reference)
     }
 
-    pub(crate) fn get_root_declaration(&mut self, file_path: &str, type_reference: &str) -> Option<Declaration> {
+    pub(crate) fn get_root_declaration(&mut self, file_path: &str, type_reference: &str) -> Option<Declaration<'n>> {
         self.tables
             .entry(file_path.to_owned())
             .or_insert_with(Default::default)
@@ -108,7 +108,7 @@ impl<'a> DeclarationTable<'a> {
         self
     }
 
-    fn get_root_declaration(&self, reference: &str) -> Option<Declaration> {
+    fn get_root_declaration(&self, reference: &str) -> Option<Declaration<'a>> {
         let mut declaration: Option<Declaration> = None;
         let mut queue = VecDeque::from([Rc::clone(&self.current_scope)]);
         while declaration.is_none() && !queue.is_empty() {
