@@ -7,18 +7,18 @@ use crate::typescript::{Declaration, DeclarationTables};
 
 pub fn store_declaration_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tables: &mut DeclarationTables<'n>) -> () {
     match node {
-        Node::ClassDecl(class_declaration) => {
-            println!("{:?}", class_declaration.inner);
-        }
-        Node::ExportDecl(export_declaration) => {
-            println!("{:?}", export_declaration.inner);
-        }
-        Node::ExportDefaultDecl(export_default_declaration) => {
-            println!("{:?}", export_default_declaration.inner);
-        }
-        Node::FnDecl(function_declaration) => {
-            println!("{:?}", function_declaration.inner);
-        }
+        // Node::ClassDecl(class_declaration) => {
+        //     println!("{:?}", class_declaration.inner);
+        // }
+        // Node::ExportDecl(export_declaration) => {
+        //     println!("{:?}", export_declaration.inner);
+        // }
+        // Node::ExportDefaultDecl(export_default_declaration) => {
+        //     println!("{:?}", export_default_declaration.inner);
+        // }
+        // Node::FnDecl(function_declaration) => {
+        //     println!("{:?}", function_declaration.inner);
+        // }
         Node::ImportDecl(import_declaration) => {
             for child in import_declaration.children() {
                 match child {
@@ -65,7 +65,19 @@ pub fn store_declaration_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tabl
         }
         Node::TsInterfaceDecl(ts_interface_declaration) => {
             println!("{:?}", ts_interface_declaration.inner);
+            println!("--------------------------------------------------------------------");
+            let name = ts_interface_declaration.id.sym();
+            symbol_tables.insert(
+                file_path,
+                name.to_string(),
+                Declaration::Type {
+                    node: ts_interface_declaration.as_node(),
+                },
+            )
         }
+        // Node::TsTypeLit(ts_literal_declaration) => {
+        //     println!("{:?}", ts_literal_declaration.inner);
+        // }
         Node::TsTypeAliasDecl(ts_type_alias_declaration) => {
             println!("{:?}", ts_type_alias_declaration.inner);
         }

@@ -5,7 +5,7 @@ use lazy_static::__Deref;
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use url::Url;
 
-use crate::typescript::{Declaration, DeclarationTables};
+use crate::typescript::{Declaration, DeclarationTables, KEY_OF_KEYWORD};
 
 use super::declaration_helpers::store_declaration_maybe;
 
@@ -13,7 +13,7 @@ use super::declaration_helpers::store_declaration_maybe;
 pub struct OpenApi<'n> {
     pub components: ApiComponents,
     #[serde(skip)]
-    deferred_schemas: Vec<(String, String)>,
+    deferred_schemas: Vec<(String, String, String)>,
     paths: HashMap<String, ApiPath>,
     #[serde(skip)]
     symbol_tables: DeclarationTables<'n>,
@@ -50,9 +50,9 @@ impl<'n> OpenApi<'n> {
             |module| self.find_paths(&module.as_node(), file_path),
         );
 
-        let deferred_schemas: Vec<(String, String)> = self.deferred_schemas.drain(..).collect();
+        let deferred_schemas: Vec<(String, String, String)> = self.deferred_schemas.drain(..).collect();
         for deferred in deferred_schemas {
-            self.add_reference_schema(&deferred.0, &deferred.1)
+            self.add_reference_schema(&deferred.0, &deferred.1, &deferred.2)
         }
     }
 
@@ -277,7 +277,7 @@ impl<'n> OpenApi<'n> {
                 Some(TsType::TsTypeRef(type_ref)) => match type_ref.type_name {
                     TsEntityName::Ident(identifier) => {
                         let reference = identifier.sym().to_string();
-                        self.add_reference_schema(file_path, &reference);
+                        self.add_reference_schema(&reference, &reference, file_path);
                         operation_param.content().schema().reference(reference.into(), false);
                     }
                     _ => {}
@@ -350,7 +350,7 @@ impl<'n> OpenApi<'n> {
                         let reference = self
                             .symbol_tables
                             .get_root_declaration_name(file_path, identifier.sym().to_string());
-                        self.add_reference_schema(file_path, &reference);
+                        self.add_reference_schema(&reference, &reference, file_path);
                         operation_param.content().schema().reference(Some(reference), false);
                     }
                     _ => {}
@@ -404,7 +404,7 @@ impl<'n> OpenApi<'n> {
                     Expr::New(new_expression) => match new_expression.callee {
                         Expr::Ident(identifier) => {
                             let type_reference = identifier.sym().to_string();
-                            self.add_reference_schema(file_path, &type_reference);
+                            self.add_reference_schema(&type_reference, &type_reference, file_path);
                             Some(self.symbol_tables.get_root_declaration_name(file_path, type_reference))
                         }
                         _ => None,
@@ -452,29 +452,130 @@ impl<'n> OpenApi<'n> {
         }
     }
 
-    fn add_reference_schema(&mut self, file_path: &str, type_reference: &str) -> () {
+    fn add_reference_schema(&mut self, schema_name: &str, type_reference: &str, file_path: &str) -> () {
         if !self.symbol_tables.has_table(&file_path) {
             self.load_symbols_from_module(&file_path);
         }
 
         match self.symbol_tables.get_root_declaration(file_path, type_reference) {
             Some(Declaration::Export {
-                name: _,
+                name: type_name,
                 source_file_name,
             }) => {
-                self.deferred_schemas.push((source_file_name, type_reference.into()));
+                self.deferred_schemas
+                    .push((schema_name.into(), type_name, source_file_name));
             }
             Some(Declaration::Import {
-                name: _,
+                name: type_name,
                 source_file_name,
             }) => {
-                self.deferred_schemas.push((source_file_name, type_reference.into()));
+                self.deferred_schemas
+                    .push((schema_name.into(), type_name, source_file_name));
             }
             Some(Declaration::Type { node }) => match node {
                 Node::ClassDecl(declaration) => println!("{:?}", declaration.inner),
                 Node::TsArrayType(declaration) => println!("{:?}", declaration.inner),
                 Node::TsEnumDecl(declaration) => println!("{:?}", declaration.inner),
-                Node::TsInterfaceDecl(declaration) => println!("{:?}", declaration.inner),
+                Node::TsInterfaceDecl(ts_interface_declaration) => {
+                    println!("I found a node for {}", type_reference);
+                    self.components.schema(type_reference);
+                    for property in &ts_interface_declaration.body.body {
+                        match property {
+                            TsTypeElement::TsPropertySignature(signature) => match signature.type_ann {
+                                Some(annotation) => match annotation.type_ann {
+                                    // TODO handle enum types
+                                    TsType::TsKeywordType(keyword_type) => match keyword_type.kind() {
+                                        NodeKind::ArrayLit => todo!(),
+                                        NodeKind::BigInt => todo!(),
+                                        NodeKind::Bool => todo!(),
+                                        NodeKind::Number => todo!(),
+                                        NodeKind::ObjectLit => todo!(),
+                                        NodeKind::Str => todo!(),
+                                        NodeKind::TsArrayType => todo!(),
+                                        NodeKind::TsEnumDecl => todo!(),
+                                        NodeKind::TsEnumMember => todo!(),
+                                        NodeKind::TsExportAssignment => todo!(),
+                                        NodeKind::TsExprWithTypeArgs => todo!(),
+                                        NodeKind::TsExternalModuleRef => todo!(),
+                                        NodeKind::TsFnType => todo!(),
+                                        NodeKind::TsGetterSignature => todo!(),
+                                        NodeKind::TsImportEqualsDecl => todo!(),
+                                        NodeKind::TsImportType => todo!(),
+                                        NodeKind::TsIndexSignature => todo!(),
+                                        NodeKind::TsIndexedAccessType => todo!(),
+                                        NodeKind::TsInferType => todo!(),
+                                        NodeKind::TsInstantiation => todo!(),
+                                        NodeKind::TsInterfaceBody => todo!(),
+                                        NodeKind::TsInterfaceDecl => todo!(),
+                                        NodeKind::TsIntersectionType => todo!(),
+                                        NodeKind::TsKeywordType => todo!(),
+                                        NodeKind::TsLitType => todo!(),
+                                        NodeKind::TsMappedType => todo!(),
+                                        NodeKind::TsMethodSignature => todo!(),
+                                        NodeKind::TsModuleBlock => todo!(),
+                                        NodeKind::TsModuleDecl => todo!(),
+                                        NodeKind::TsNamespaceDecl => todo!(),
+                                        NodeKind::TsNamespaceExportDecl => todo!(),
+                                        NodeKind::TsNonNullExpr => todo!(),
+                                        NodeKind::TsOptionalType => todo!(),
+                                        NodeKind::TsParamProp => todo!(),
+                                        NodeKind::TsParenthesizedType => todo!(),
+                                        NodeKind::TsPropertySignature => todo!(),
+                                        NodeKind::TsQualifiedName => todo!(),
+                                        NodeKind::TsRestType => todo!(),
+                                        NodeKind::TsSatisfiesExpr => todo!(),
+                                        NodeKind::TsSetterSignature => todo!(),
+                                        NodeKind::TsThisType => todo!(),
+                                        NodeKind::TsTplLitType => todo!(),
+                                        NodeKind::TsTupleElement => todo!(),
+                                        NodeKind::TsTupleType => todo!(),
+                                        NodeKind::TsTypeAliasDecl => todo!(),
+                                        NodeKind::TsTypeAnn => todo!(),
+                                        NodeKind::TsTypeAssertion => todo!(),
+                                        NodeKind::TsTypeLit => todo!(),
+                                        NodeKind::TsTypeOperator => todo!(),
+                                        NodeKind::TsTypeParam => todo!(),
+                                        NodeKind::TsTypeParamDecl => todo!(),
+                                        NodeKind::TsTypeParamInstantiation => todo!(),
+                                        NodeKind::TsTypePredicate => todo!(),
+                                        NodeKind::TsTypeQuery => todo!(),
+                                        NodeKind::TsTypeRef => todo!(),
+                                        NodeKind::TsUnionType => todo!(),
+                                        NodeKind::UnaryExpr => todo!(),
+                                        NodeKind::UpdateExpr => todo!(),
+                                        NodeKind::UsingDecl => todo!(),
+                                        NodeKind::VarDecl => todo!(),
+                                        NodeKind::VarDeclarator => todo!(),
+                                        NodeKind::WhileStmt => todo!(),
+                                        NodeKind::WithStmt => todo!(),
+                                        NodeKind::YieldExpr => todo!(),
+                                    },
+                                    TsType::TsThisType(_) => todo!(),
+                                    TsType::TsFnOrConstructorType(_) => todo!(),
+                                    TsType::TsTypeRef(_) => todo!(),
+                                    TsType::TsTypeQuery(_) => todo!(),
+                                    TsType::TsTypeLit(_) => todo!(),
+                                    TsType::TsArrayType(_) => todo!(),
+                                    TsType::TsTupleType(_) => todo!(),
+                                    TsType::TsOptionalType(_) => todo!(),
+                                    TsType::TsRestType(_) => todo!(),
+                                    TsType::TsUnionOrIntersectionType(_) => todo!(),
+                                    TsType::TsConditionalType(_) => todo!(),
+                                    TsType::TsInferType(_) => todo!(),
+                                    TsType::TsParenthesizedType(_) => todo!(),
+                                    TsType::TsTypeOperator(_) => todo!(),
+                                    TsType::TsIndexedAccessType(_) => todo!(),
+                                    TsType::TsMappedType(_) => todo!(),
+                                    TsType::TsLitType(_) => todo!(),
+                                    TsType::TsTypePredicate(_) => todo!(),
+                                    TsType::TsImportType(_) => todo!(),
+                                },
+                                None => todo!(),
+                            },
+                            _ => {}
+                        }
+                    }
+                }
                 Node::TsTypeAliasDecl(declaration) => println!("{:?}", declaration.inner),
                 _ => {}
             },
