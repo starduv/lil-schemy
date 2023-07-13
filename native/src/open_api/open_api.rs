@@ -481,7 +481,7 @@ impl<'n> OpenApi<'n> {
                     println!("I found a node for {} in namespace {:?}", type_reference, namespace);
                     let schema = match namespace {
                         Some(ns) => self.components.schema(&ns).property(schema_name),
-                        None => self.components.schema(schema_name)
+                        None => self.components.schema(schema_name),
                     };
 
                     schema._type = Some("object".into());
@@ -491,7 +491,7 @@ impl<'n> OpenApi<'n> {
                             TsTypeElement::TsPropertySignature(signature) => {
                                 let property = match signature.key {
                                     Expr::Ident(identifier) => Some(schema.property(&identifier.sym().to_string())),
-                                    _ => None
+                                    _ => None,
                                 };
 
                                 if let Some(property) = property {
@@ -501,16 +501,16 @@ impl<'n> OpenApi<'n> {
                                             TsType::TsKeywordType(keyword_type) => match keyword_type.inner.kind {
                                                 TsKeywordTypeKind::TsNumberKeyword => {
                                                     property._type = Some("number".into());
-                                                },
+                                                }
                                                 TsKeywordTypeKind::TsBooleanKeyword => {
                                                     property._type = Some("boolean".into());
-                                                },
+                                                }
                                                 TsKeywordTypeKind::TsBigIntKeyword => {
                                                     property._type = Some("number".into());
-                                                },
+                                                }
                                                 TsKeywordTypeKind::TsStringKeyword => {
                                                     property._type = Some("string".into());
-                                                },
+                                                }
                                                 _ => {}
                                             },
                                             _ => {}
@@ -518,7 +518,7 @@ impl<'n> OpenApi<'n> {
                                         None => {}
                                     }
                                 }
-                            },
+                            }
                             _ => {}
                         }
                     }
