@@ -13,7 +13,7 @@ use super::declaration_helpers::store_declaration_maybe;
 pub struct OpenApi<'n> {
     pub components: ApiComponents,
     #[serde(skip)]
-    deferred_schemas: Vec<(String, String, String)>,
+    deferred_schemas: Vec<(String, String, String, Option<String>)>,
     paths: HashMap<String, ApiPath>,
     #[serde(skip)]
     symbol_tables: DeclarationTables<'n>,
@@ -50,9 +50,9 @@ impl<'n> OpenApi<'n> {
             |module| self.find_paths(&module.as_node(), file_path),
         );
 
-        let deferred_schemas: Vec<(String, String, String)> = self.deferred_schemas.drain(..).collect();
+        let deferred_schemas: Vec<(String, String, String, Option<String>)> = self.deferred_schemas.drain(..).collect();
         for deferred in deferred_schemas {
-            self.add_reference_schema(&deferred.0, &deferred.1, &deferred.2)
+            self.add_reference_schema(&deferred.0, &deferred.1, &deferred.2, deferred.3)
         }
     }
 
@@ -261,6 +261,14 @@ impl<'n> OpenApi<'n> {
         let parameter_name = get_parameter_name(Node::from(type_ref));
         let operation_param = operation.param(&parameter_name, location);
         if let Some(type_params) = type_ref.type_params {
+            let namespace = match type_params.params.get(2) {
+                Some(TsType::TsLitType(namespace)) => match &namespace.lit {
+                    TsLit::Str(literal_string) => Some(literal_string.value().to_string()),
+                    _ => None,
+                },
+                _ => None,
+            };
+
             match type_params.params.get(0) {
                 Some(TsType::TsKeywordType(param_type)) => match param_type.inner.kind {
                     TsKeywordTypeKind::TsNumberKeyword => {
@@ -277,7 +285,7 @@ impl<'n> OpenApi<'n> {
                 Some(TsType::TsTypeRef(type_ref)) => match type_ref.type_name {
                     TsEntityName::Ident(identifier) => {
                         let reference = identifier.sym().to_string();
-                        self.add_reference_schema(&reference, &reference, file_path);
+                        self.add_reference_schema(&reference, &reference, file_path, namespace);
                         operation_param.content().schema().reference(reference.into(), false);
                     }
                     _ => {}
@@ -289,19 +297,6 @@ impl<'n> OpenApi<'n> {
                 Some(TsType::TsLitType(required)) => match required.lit {
                     TsLit::Bool(boolean) => {
                         operation_param.required(boolean.value());
-                    }
-                    _ => {}
-                },
-                _ => {}
-            }
-
-            match type_params.params.get(2) {
-                Some(TsType::TsLitType(namespace)) => match &namespace.lit {
-                    TsLit::Str(literal_string) => {
-                        operation_param
-                            .content()
-                            .schema()
-                            .namespace(Some(literal_string.value().to_string()));
                     }
                     _ => {}
                 },
@@ -332,6 +327,14 @@ impl<'n> OpenApi<'n> {
     ) -> () {
         let operation_param = operation.body();
         if let Some(type_params) = type_ref.type_params {
+            let namespace = match type_params.params.get(2) {
+                Some(TsType::TsLitType(namespace)) => match &namespace.lit {
+                    TsLit::Str(literal_string) => Some(literal_string.value().to_string()),
+                    _ => None,
+                },
+                _ => None,
+            };
+
             match type_params.params.get(0) {
                 Some(TsType::TsKeywordType(param_type)) => match param_type.inner.kind {
                     TsKeywordTypeKind::TsNumberKeyword => {
@@ -350,7 +353,7 @@ impl<'n> OpenApi<'n> {
                         let reference = self
                             .symbol_tables
                             .get_root_declaration_name(file_path, identifier.sym().to_string());
-                        self.add_reference_schema(&reference, &reference, file_path);
+                        self.add_reference_schema(&reference, &reference, file_path, namespace);
                         operation_param.content().schema().reference(Some(reference), false);
                     }
                     _ => {}
@@ -362,19 +365,6 @@ impl<'n> OpenApi<'n> {
                 Some(TsType::TsLitType(required)) => match required.lit {
                     TsLit::Bool(boolean) => {
                         operation_param.required(boolean.value());
-                    }
-                    _ => {}
-                },
-                _ => {}
-            }
-
-            match type_params.params.get(2) {
-                Some(TsType::TsLitType(namespace)) => match &namespace.lit {
-                    TsLit::Str(literal_string) => {
-                        operation_param
-                            .content()
-                            .schema()
-                            .namespace(Some(literal_string.value().to_string()));
                     }
                     _ => {}
                 },
@@ -399,12 +389,25 @@ impl<'n> OpenApi<'n> {
     // TODO add schema for ref here
     fn add_response(&mut self, operation: &mut ApiPathOperation, node: Node, file_path: &str) -> () {
         if let Some(call_expression) = node.to::<CallExpr>() {
+            let options = match call_expression.args.get(1) {
+                Some(arg) => match arg.expr {
+                    Expr::Object(options) => Some(get_response_options(options)),
+                    _ => None,
+                },
+                None => None,
+            };
+
+            let namespace = match &options {
+                Some(options) => options.namespace.clone(),
+                None => None,
+            };
+
             let response_type = match call_expression.args.get(0) {
                 Some(arg) => match arg.expr {
                     Expr::New(new_expression) => match new_expression.callee {
                         Expr::Ident(identifier) => {
                             let type_reference = identifier.sym().to_string();
-                            self.add_reference_schema(&type_reference, &type_reference, file_path);
+                            self.add_reference_schema(&type_reference, &type_reference, file_path, namespace);
                             Some(self.symbol_tables.get_root_declaration_name(file_path, type_reference))
                         }
                         _ => None,
@@ -438,21 +441,19 @@ impl<'n> OpenApi<'n> {
                 None => None,
             };
 
-            let options = match call_expression.args.get(1) {
-                Some(arg) => match arg.expr {
-                    Expr::Object(options) => Some(get_response_options(options)),
-                    _ => None,
-                },
-                None => None,
-            };
-
             if let Some(response_options) = options {
                 operation.response(&response_type, response_options);
             }
         }
     }
 
-    fn add_reference_schema(&mut self, schema_name: &str, type_reference: &str, file_path: &str) -> () {
+    fn add_reference_schema(
+        &mut self,
+        schema_name: &str,
+        type_reference: &str,
+        file_path: &str,
+        namespace: Option<String>,
+    ) -> () {
         if !self.symbol_tables.has_table(&file_path) {
             self.load_symbols_from_module(&file_path);
         }
@@ -463,114 +464,60 @@ impl<'n> OpenApi<'n> {
                 source_file_name,
             }) => {
                 self.deferred_schemas
-                    .push((schema_name.into(), type_name, source_file_name));
+                    .push((schema_name.into(), type_name, source_file_name, namespace));
             }
             Some(Declaration::Import {
                 name: type_name,
                 source_file_name,
             }) => {
                 self.deferred_schemas
-                    .push((schema_name.into(), type_name, source_file_name));
+                    .push((schema_name.into(), type_name, source_file_name, namespace));
             }
             Some(Declaration::Type { node }) => match node {
                 Node::ClassDecl(declaration) => println!("{:?}", declaration.inner),
                 Node::TsArrayType(declaration) => println!("{:?}", declaration.inner),
                 Node::TsEnumDecl(declaration) => println!("{:?}", declaration.inner),
                 Node::TsInterfaceDecl(ts_interface_declaration) => {
-                    println!("I found a node for {}", type_reference);
-                    self.components.schema(type_reference);
+                    println!("I found a node for {} in namespace {:?}", type_reference, namespace);
+                    let schema = match namespace {
+                        Some(ns) => self.components.schema(&ns).property(schema_name),
+                        None => self.components.schema(schema_name)
+                    };
+
+                    schema._type = Some("object".into());
+
                     for property in &ts_interface_declaration.body.body {
                         match property {
-                            TsTypeElement::TsPropertySignature(signature) => match signature.type_ann {
-                                Some(annotation) => match annotation.type_ann {
-                                    // TODO handle enum types
-                                    TsType::TsKeywordType(keyword_type) => match keyword_type.kind() {
-                                        NodeKind::ArrayLit => todo!(),
-                                        NodeKind::BigInt => todo!(),
-                                        NodeKind::Bool => todo!(),
-                                        NodeKind::Number => todo!(),
-                                        NodeKind::ObjectLit => todo!(),
-                                        NodeKind::Str => todo!(),
-                                        NodeKind::TsArrayType => todo!(),
-                                        NodeKind::TsEnumDecl => todo!(),
-                                        NodeKind::TsEnumMember => todo!(),
-                                        NodeKind::TsExportAssignment => todo!(),
-                                        NodeKind::TsExprWithTypeArgs => todo!(),
-                                        NodeKind::TsExternalModuleRef => todo!(),
-                                        NodeKind::TsFnType => todo!(),
-                                        NodeKind::TsGetterSignature => todo!(),
-                                        NodeKind::TsImportEqualsDecl => todo!(),
-                                        NodeKind::TsImportType => todo!(),
-                                        NodeKind::TsIndexSignature => todo!(),
-                                        NodeKind::TsIndexedAccessType => todo!(),
-                                        NodeKind::TsInferType => todo!(),
-                                        NodeKind::TsInstantiation => todo!(),
-                                        NodeKind::TsInterfaceBody => todo!(),
-                                        NodeKind::TsInterfaceDecl => todo!(),
-                                        NodeKind::TsIntersectionType => todo!(),
-                                        NodeKind::TsKeywordType => todo!(),
-                                        NodeKind::TsLitType => todo!(),
-                                        NodeKind::TsMappedType => todo!(),
-                                        NodeKind::TsMethodSignature => todo!(),
-                                        NodeKind::TsModuleBlock => todo!(),
-                                        NodeKind::TsModuleDecl => todo!(),
-                                        NodeKind::TsNamespaceDecl => todo!(),
-                                        NodeKind::TsNamespaceExportDecl => todo!(),
-                                        NodeKind::TsNonNullExpr => todo!(),
-                                        NodeKind::TsOptionalType => todo!(),
-                                        NodeKind::TsParamProp => todo!(),
-                                        NodeKind::TsParenthesizedType => todo!(),
-                                        NodeKind::TsPropertySignature => todo!(),
-                                        NodeKind::TsQualifiedName => todo!(),
-                                        NodeKind::TsRestType => todo!(),
-                                        NodeKind::TsSatisfiesExpr => todo!(),
-                                        NodeKind::TsSetterSignature => todo!(),
-                                        NodeKind::TsThisType => todo!(),
-                                        NodeKind::TsTplLitType => todo!(),
-                                        NodeKind::TsTupleElement => todo!(),
-                                        NodeKind::TsTupleType => todo!(),
-                                        NodeKind::TsTypeAliasDecl => todo!(),
-                                        NodeKind::TsTypeAnn => todo!(),
-                                        NodeKind::TsTypeAssertion => todo!(),
-                                        NodeKind::TsTypeLit => todo!(),
-                                        NodeKind::TsTypeOperator => todo!(),
-                                        NodeKind::TsTypeParam => todo!(),
-                                        NodeKind::TsTypeParamDecl => todo!(),
-                                        NodeKind::TsTypeParamInstantiation => todo!(),
-                                        NodeKind::TsTypePredicate => todo!(),
-                                        NodeKind::TsTypeQuery => todo!(),
-                                        NodeKind::TsTypeRef => todo!(),
-                                        NodeKind::TsUnionType => todo!(),
-                                        NodeKind::UnaryExpr => todo!(),
-                                        NodeKind::UpdateExpr => todo!(),
-                                        NodeKind::UsingDecl => todo!(),
-                                        NodeKind::VarDecl => todo!(),
-                                        NodeKind::VarDeclarator => todo!(),
-                                        NodeKind::WhileStmt => todo!(),
-                                        NodeKind::WithStmt => todo!(),
-                                        NodeKind::YieldExpr => todo!(),
-                                    },
-                                    TsType::TsThisType(_) => todo!(),
-                                    TsType::TsFnOrConstructorType(_) => todo!(),
-                                    TsType::TsTypeRef(_) => todo!(),
-                                    TsType::TsTypeQuery(_) => todo!(),
-                                    TsType::TsTypeLit(_) => todo!(),
-                                    TsType::TsArrayType(_) => todo!(),
-                                    TsType::TsTupleType(_) => todo!(),
-                                    TsType::TsOptionalType(_) => todo!(),
-                                    TsType::TsRestType(_) => todo!(),
-                                    TsType::TsUnionOrIntersectionType(_) => todo!(),
-                                    TsType::TsConditionalType(_) => todo!(),
-                                    TsType::TsInferType(_) => todo!(),
-                                    TsType::TsParenthesizedType(_) => todo!(),
-                                    TsType::TsTypeOperator(_) => todo!(),
-                                    TsType::TsIndexedAccessType(_) => todo!(),
-                                    TsType::TsMappedType(_) => todo!(),
-                                    TsType::TsLitType(_) => todo!(),
-                                    TsType::TsTypePredicate(_) => todo!(),
-                                    TsType::TsImportType(_) => todo!(),
-                                },
-                                None => todo!(),
+                            TsTypeElement::TsPropertySignature(signature) => {
+                                let property = match signature.key {
+                                    Expr::Ident(identifier) => Some(schema.property(&identifier.sym().to_string())),
+                                    _ => None
+                                };
+
+                                if let Some(property) = property {
+                                    match signature.type_ann {
+                                        Some(annotation) => match annotation.type_ann {
+                                            // TODO handle enum types
+                                            TsType::TsKeywordType(keyword_type) => match keyword_type.inner.kind {
+                                                TsKeywordTypeKind::TsNumberKeyword => {
+                                                    property._type = Some("number".into());
+                                                },
+                                                TsKeywordTypeKind::TsBooleanKeyword => {
+                                                    property._type = Some("boolean".into());
+                                                },
+                                                TsKeywordTypeKind::TsBigIntKeyword => {
+                                                    property._type = Some("number".into());
+                                                },
+                                                TsKeywordTypeKind::TsStringKeyword => {
+                                                    property._type = Some("string".into());
+                                                },
+                                                _ => {}
+                                            },
+                                            _ => {}
+                                        },
+                                        None => {}
+                                    }
+                                }
                             },
                             _ => {}
                         }
