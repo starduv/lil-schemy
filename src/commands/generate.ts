@@ -1,13 +1,13 @@
 import { Command } from 'commander';
 import path from 'path';
-import { generateSchemas, TypeShiftOptions } from '../generator';
+import { generateSchemas, LilSchemyOptions } from '../generator';
 import { getRootFiles } from '../utils';
 
-export const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
+export const generateOpenApi = (cwd: string, config: LilSchemyOptions) => {
     if (config?.openApi) {
         const { openApi, project } = config;
 
-        const files = getRootFiles(cwd, openApi.paths);
+        const files = getRootFiles(cwd, openApi.entry);
 
         console.debug("Searching for api paths in files %o", files);
 
@@ -15,7 +15,7 @@ export const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
             // getAst: getAst(cwd, { project }),
             openApi: {
                 base: JSON.stringify(openApi.base),
-                paths: files,
+                entry: files,
                 output: openApi.output || undefined
             }
         });
@@ -30,7 +30,7 @@ export const generateOpenApi = (cwd: string, config: TypeShiftOptions) => {
 
 export default new Command('generate')
     .description('Generate one or more schemas')
-    .option('-c, --config <config>', 'configuration module', 'typeshift')
+    .option('-c, --config <config>', 'configuration module', 'schemy-config')
     .action(async (_, command: Command) => {
         let parentOptions = command.parent?.opts();
         const config = await import(path.resolve(parentOptions?.cwd, command.getOptionValue('config')));

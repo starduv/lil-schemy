@@ -1,6 +1,6 @@
 import { OpenAPIV3 } from 'openapi-types';
 
-export interface TypeShiftOptions {
+export interface LilSchemyOptions {
     cwd: string;
     openApi?: OpenApiOptions;
     project: string;
@@ -12,7 +12,7 @@ interface OpenApiOptions {
         paths?: OpenAPIV3.PathsObject;
     },
     output?: string;
-    paths: string[];
+    entry: string[];
 }
 
 export interface SchemasResult {
@@ -22,7 +22,7 @@ export interface SchemasResult {
     };
 }
 
-interface GenerateSchemaArgs extends Omit<TypeShiftOptions, "cwd", "project"> {
+interface GenerateSchemaArgs extends Omit<LilSchemyOptions, "cwd", "project"> {
     // getAst: (reference: string, moduleFileName: string) => string | undefined;
     openApi?: Omit<OpenApiOptions, "base"> & {
         base: string;

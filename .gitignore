@@ -150,4 +150,4 @@ lib/
 !.vscode/tasks.json
 
 # test generated files
-tests/**/typeshift.js
+tests/**/schemy-config.js

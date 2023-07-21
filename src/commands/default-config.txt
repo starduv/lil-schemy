@@ -13,7 +13,7 @@ module.exports = {
             paths: {}
         },
         // Glob patterns to modules declaring api paths.
-        paths: [],
+        entry: [],
         // Where the resultanat OpenApi schema is written.
         output: ""
     }

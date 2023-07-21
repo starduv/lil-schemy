@@ -39,7 +39,7 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
 }
 
 fn generate_schema(open_api_handle: Handle<JsObject>, cx: &mut FunctionContext) -> Result<String, Throw> {
-    let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "paths")?;
+    let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "entry")?;
 
     let mut result = OpenApi::new();
     for path in paths.to_vec(cx)? {
