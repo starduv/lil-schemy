@@ -177,9 +177,6 @@ pub fn store_declaration_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tabl
                 Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
             }
         }
-        Node::TsEnumDecl(ts_enum_declaration) => {
-            println!("Should I store this enum?");
-        }
         Node::TsInterfaceDecl(ts_interface_declaration) => {
             let name = ts_interface_declaration.id.sym();
             symbol_tables.insert(
