@@ -12,7 +12,6 @@ export const generateOpenApi = (cwd: string, config: LilSchemyOptions) => {
         console.debug("Searching for api paths in files %o", files);
 
         const result = generateSchemas({
-            // getAst: getAst(cwd, { project }),
             openApi: {
                 base: JSON.stringify(openApi.base),
                 entry: files,
