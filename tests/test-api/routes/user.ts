@@ -78,7 +78,7 @@ Router.put("", {}, Path(async (request: { tomato: BodyParam<UserPatch, false, "v
     let response = Response({} as AdminUser, {
         statusCode: 202,
         description: "Updated User",
-        namespace: "v1"
+        // namespace: "v1" // TODO Same type name difference namespace in the same file?
     });
 
     reply.send(response);

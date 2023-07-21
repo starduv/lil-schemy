@@ -111,19 +111,32 @@ impl<'a> DeclarationTable<'a> {
     fn get_root_declaration(&self, reference: &str) -> Option<Declaration<'a>> {
         let mut declaration: Option<Declaration> = None;
         let mut queue = VecDeque::from([Rc::clone(&self.current_scope)]);
+        let mut references = vec![reference.to_string()];
+        let mut last_reference = String::from("__none__");
+
         while declaration.is_none() && !queue.is_empty() {
             if let Some(scope) = queue.pop_front() {
                 let scope = scope.borrow();
-                match scope.symbols.get(reference) {
-                    None => {
-                        if let Some(parent) = &scope.parent {
-                            queue.push_back(Rc::clone(&parent))
-                        }
+                while references.len() > 0 {
+                    let temp = references.pop().unwrap();
+                    match scope.symbols.get(&temp){
+                        Some(Declaration::Alias { from: _, to }) => {
+                            references.push(to.clone());
+                        },
+                        _ => {}
                     }
-                    thing => declaration = thing.map(|decl| decl.clone()),
-                };
+                    last_reference = temp;
+                }
+
+                match scope.symbols.get(&last_reference){
+                    Some(decl) => declaration = Some(decl.clone()),
+                    None => if let Some(parent) = &scope.parent {
+                        queue.push_back(Rc::clone(&parent));
+                    },
+                }
             }
         }
+
         return declaration;
     }
 

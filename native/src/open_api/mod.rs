@@ -1,5 +1,5 @@
+mod deferred_schemas;
 mod declaration_helpers;
-mod generator;
 mod open_api;
 
 use std::{fs::File, io::Write, path::PathBuf};

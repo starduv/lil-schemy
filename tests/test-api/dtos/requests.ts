@@ -1,3 +1,5 @@
 export default interface PatchUserRequest { }
 
-export type CreateUserRequest = {}
+export type CreateUserRequest = {
+    name: string
+}

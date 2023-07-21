@@ -34,25 +34,19 @@ describe('open api generator', () => {
                         },
                         required: ["name"]
                     },
-                    AdminUser: {
+                    CreateUserRequest: {
                         type: 'object',
                         properties: {
-                            permissions: {
-                                type: 'array',
-                                items: {
-                                    type: 'string'
-                                }
-                            },
                             name: {
                                 type: 'string'
                             }
                         },
-                        required: ['permissions', 'name']
+                        required: ['name']
                     }
                 },
                 required: [
+                    "CreateUserRequest",
                     "User",
-                    "AdminUser"
                 ]
             },
             Account: {
@@ -78,7 +72,7 @@ describe('open api generator', () => {
                     }
                 },
                 required: ['permissions', 'name']
-            }
+            },
         });
     });
 
@@ -216,7 +210,7 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        $ref: "#/components/schemas/v1/properties/AdminUser"
+                                        $ref: "#/components/schemas/AdminUser"
                                     }
                                 }
                             }

@@ -2,19 +2,20 @@ use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use deno_ast::{ParseParams, ParsedSource, SourceTextInfo};
 use dprint_swc_ext::view::*;
 use lazy_static::__Deref;
+
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 use url::Url;
 
-use crate::typescript::{Declaration, DeclarationTables, KEY_OF_KEYWORD};
+use crate::typescript::{Declaration, DeclarationTables};
 
-use super::declaration_helpers::store_declaration_maybe;
+use super::{declaration_helpers::store_declaration_maybe, deferred_schemas::DeferredSchemas};
 
 #[derive(Serialize, Debug)]
 pub struct OpenApi<'n> {
     pub components: ApiComponents,
+    pub paths: HashMap<String, ApiPath>,
     #[serde(skip)]
-    deferred_schemas: Vec<(String, String, String, Option<String>)>,
-    paths: HashMap<String, ApiPath>,
+    deferred_schemas: DeferredSchemas,
     #[serde(skip)]
     symbol_tables: DeclarationTables<'n>,
 }
@@ -22,7 +23,7 @@ impl<'n> OpenApi<'n> {
     pub(crate) fn new() -> Self {
         OpenApi {
             components: ApiComponents::new(),
-            deferred_schemas: Vec::new(),
+            deferred_schemas: DeferredSchemas::new(),
             paths: HashMap::new(),
             symbol_tables: Default::default(),
         }
@@ -47,12 +48,27 @@ impl<'n> OpenApi<'n> {
                 text_info: Some(result.text_info()),
                 tokens: None,
             },
-            |module| self.find_paths(&module.as_node(), file_path),
+            |module| {
+                self.find_paths(&module.as_node(), file_path);
+            },
         );
 
-        let deferred_schemas: Vec<(String, String, String, Option<String>)> = self.deferred_schemas.drain(..).collect();
-        for deferred in deferred_schemas {
-            self.add_reference_schema(&deferred.0, &deferred.1, &deferred.2, deferred.3)
+        while let Some(source_file_name) = self.deferred_schemas.next_module() {
+            let result = get_syntax_tree(&source_file_name);
+
+            with_ast_view_for_module(
+                ModuleInfo {
+                    module: result.module(),
+                    comments: None,
+                    text_info: Some(result.text_info()),
+                    tokens: None,
+                },
+                |module| {
+                    for child in module.children() {
+                        self.define_deferred_schemas(&child, &source_file_name)
+                    }
+                },
+            );
         }
     }
 
@@ -73,121 +89,6 @@ impl<'n> OpenApi<'n> {
                     None => self.find_paths(&child, file_path),
                 },
                 _ => self.find_paths(&child, file_path),
-            }
-        }
-    }
-
-    fn store_symbol_maybe(&mut self, node: &Node<'n>, file_path: &str) -> () {
-        match node {
-            Node::ClassDecl(class_declaration) => {
-                println!("{:?}", class_declaration.inner);
-            }
-            Node::ExportDecl(export_declaration) => {
-                println!("{:?}", export_declaration.inner);
-            }
-            Node::ExportDefaultDecl(export_default_declaration) => {
-                println!("{:?}", export_default_declaration.inner);
-            }
-            Node::FnDecl(function_declaration) => {
-                println!("{:?}", function_declaration.inner);
-            }
-            Node::ImportDecl(import_declaration) => {
-                for child in import_declaration.children() {
-                    match child {
-                        Node::ImportNamedSpecifier(specifier) => {
-                            // TODO this will need module resolution
-                            let src = import_declaration.src.value().to_string();
-                            let name = specifier.local.sym().to_string();
-                            self.symbol_tables.insert(
-                                file_path,
-                                name.to_string(),
-                                Declaration::Import {
-                                    name,
-                                    source_file_name: src,
-                                },
-                            )
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            Node::TsEnumDecl(ts_enum_declaration) => {
-                println!("{:?}", ts_enum_declaration.inner);
-            }
-            Node::TsInterfaceDecl(ts_interface_declaration) => {
-                println!("{:?}", ts_interface_declaration.inner);
-            }
-            Node::TsTypeAliasDecl(ts_type_alias_declaration) => {
-                println!("{:?}", ts_type_alias_declaration.inner);
-            }
-            Node::VarDecl(variable_declaration) => {
-                for declaration in &variable_declaration.decls {
-                    match declaration.name {
-                        Pat::Ident(identifier) => {
-                            let name = identifier.id.sym().to_string();
-                            match identifier.type_ann {
-                                Some(type_annotation) => match type_annotation.type_ann {
-                                    dprint_swc_ext::view::TsType::TsTypeRef(type_ref) => match type_ref.type_name {
-                                        dprint_swc_ext::view::TsEntityName::Ident(identifier) => {
-                                            let type_name = identifier.sym().to_string();
-                                            self.symbol_tables.insert(
-                                                file_path,
-                                                name.to_string(),
-                                                Declaration::Alias {
-                                                    from: name,
-                                                    to: type_name,
-                                                },
-                                            )
-                                        }
-                                        _ => {}
-                                    },
-                                    _ => {}
-                                },
-                                None => match declaration.init {
-                                    Some(initializer) => {
-                                        self.store_variable(&name, initializer.as_node(), file_path);
-                                    }
-                                    None => {}
-                                },
-                            }
-                        }
-                        _ => {}
-                    };
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn store_variable(&mut self, name: &str, node: Node, file_path: &str) -> () {
-        for child in node.children() {
-            match child {
-                Node::Ident(identifier) => {
-                    let type_name = identifier.sym().to_string();
-                    self.symbol_tables.insert(
-                        file_path,
-                        name.to_string(),
-                        Declaration::Alias {
-                            from: name.to_string(),
-                            to: type_name,
-                        },
-                    )
-                }
-                Node::TsTypeRef(type_ref) => match type_ref.type_name {
-                    dprint_swc_ext::view::TsEntityName::Ident(identifier) => {
-                        let type_name = identifier.sym().to_string();
-                        self.symbol_tables.insert(
-                            file_path,
-                            name.to_string(),
-                            Declaration::Alias {
-                                from: name.to_string(),
-                                to: type_name,
-                            },
-                        )
-                    }
-                    _ => {}
-                },
-                _ => self.store_variable(name, child, file_path),
             }
         }
     }
@@ -272,21 +173,25 @@ impl<'n> OpenApi<'n> {
             match type_params.params.get(0) {
                 Some(TsType::TsKeywordType(param_type)) => match param_type.inner.kind {
                     TsKeywordTypeKind::TsNumberKeyword => {
-                        operation_param.content().schema().primitive("number");
+                        operation_param.content().schema().data_type("number");
                     }
                     TsKeywordTypeKind::TsBooleanKeyword => {
-                        operation_param.content().schema().primitive("boolean");
+                        operation_param.content().schema().data_type("boolean");
                     }
                     TsKeywordTypeKind::TsStringKeyword => {
-                        operation_param.content().schema().primitive("string");
+                        operation_param.content().schema().data_type("string");
                     }
                     _ => {}
                 },
                 Some(TsType::TsTypeRef(type_ref)) => match type_ref.type_name {
                     TsEntityName::Ident(identifier) => {
                         let reference = identifier.sym().to_string();
-                        self.add_reference_schema(&reference, &reference, file_path, namespace);
-                        operation_param.content().schema().reference(reference.into(), false);
+                        self.define_referenced_schema(&reference, &reference, file_path, namespace.clone());
+                        operation_param
+                            .content()
+                            .schema()
+                            .reference(reference.into(), false)
+                            .namespace(namespace);
                     }
                     _ => {}
                 },
@@ -338,13 +243,13 @@ impl<'n> OpenApi<'n> {
             match type_params.params.get(0) {
                 Some(TsType::TsKeywordType(param_type)) => match param_type.inner.kind {
                     TsKeywordTypeKind::TsNumberKeyword => {
-                        operation_param.content().schema().primitive("number");
+                        operation_param.content().schema().data_type("number");
                     }
                     TsKeywordTypeKind::TsBooleanKeyword => {
-                        operation_param.content().schema().primitive("boolean");
+                        operation_param.content().schema().data_type("boolean");
                     }
                     TsKeywordTypeKind::TsStringKeyword => {
-                        operation_param.content().schema().primitive("string");
+                        operation_param.content().schema().data_type("string");
                     }
                     _ => {}
                 },
@@ -353,8 +258,12 @@ impl<'n> OpenApi<'n> {
                         let reference = self
                             .symbol_tables
                             .get_root_declaration_name(file_path, identifier.sym().to_string());
-                        self.add_reference_schema(&reference, &reference, file_path, namespace);
-                        operation_param.content().schema().reference(Some(reference), false);
+                        self.define_referenced_schema(&reference, &reference, file_path, namespace.clone());
+                        operation_param
+                            .content()
+                            .schema()
+                            .reference(Some(reference), false)
+                            .namespace(namespace);
                     }
                     _ => {}
                 },
@@ -405,11 +314,10 @@ impl<'n> OpenApi<'n> {
             let response_type = match call_expression.args.get(0) {
                 Some(arg) => match arg.expr {
                     Expr::New(new_expression) => match new_expression.callee {
-                        Expr::Ident(identifier) => {
-                            let type_reference = identifier.sym().to_string();
-                            self.add_reference_schema(&type_reference, &type_reference, file_path, namespace);
-                            Some(self.symbol_tables.get_root_declaration_name(file_path, type_reference))
-                        }
+                        Expr::Ident(identifier) => Some(
+                            self.symbol_tables
+                                .get_root_declaration_name(file_path, identifier.sym().to_string()),
+                        ),
                         _ => None,
                     },
                     Expr::Ident(response_type) => Some(
@@ -441,113 +349,123 @@ impl<'n> OpenApi<'n> {
                 None => None,
             };
 
+            if let Some(response_type) = &response_type {
+                self.define_referenced_schema(&response_type, &response_type, file_path, namespace);
+            }
+
             if let Some(response_options) = options {
                 operation.response(&response_type, response_options);
             }
         }
     }
 
-    fn add_reference_schema(
+    fn define_referenced_schema(
         &mut self,
         schema_name: &str,
         type_reference: &str,
         file_path: &str,
         namespace: Option<String>,
     ) -> () {
-        if !self.symbol_tables.has_table(&file_path) {
-            self.load_symbols_from_module(&file_path);
-        }
-
         match self.symbol_tables.get_root_declaration(file_path, type_reference) {
             Some(Declaration::Export {
                 name: type_name,
                 source_file_name,
             }) => {
                 self.deferred_schemas
-                    .push((schema_name.into(), type_name, source_file_name, namespace));
+                    .add_deferred_type(source_file_name, schema_name.into(), type_name, namespace);
             }
             Some(Declaration::Import {
                 name: type_name,
                 source_file_name,
             }) => {
                 self.deferred_schemas
-                    .push((schema_name.into(), type_name, source_file_name, namespace));
+                    .add_deferred_type(source_file_name, schema_name.into(), type_name, namespace);
             }
-            Some(Declaration::Type { node }) => match node {
-                Node::ClassDecl(declaration) => println!("{:?}", declaration.inner),
-                Node::TsArrayType(declaration) => println!("{:?}", declaration.inner),
-                Node::TsEnumDecl(declaration) => println!("{:?}", declaration.inner),
-                Node::TsInterfaceDecl(ts_interface_declaration) => {
-                    println!("I found a node for {} in namespace {:?}", type_reference, namespace);
-                    let schema = match namespace {
-                        Some(ns) => self.components.schema(&ns).property(schema_name),
-                        None => self.components.schema(schema_name),
-                    };
+            Some(Declaration::Type { node }) => {
+                let schema = match namespace {
+                    Some(ns) => self.components.schema(&ns).property(schema_name.into()),
+                    None => self.components.schema(schema_name),
+                };
 
-                    schema._type = Some("object".into());
-
-                    for property in &ts_interface_declaration.body.body {
-                        match property {
-                            TsTypeElement::TsPropertySignature(signature) => {
-                                let property = match signature.key {
-                                    Expr::Ident(identifier) => Some(schema.property(&identifier.sym().to_string())),
-                                    _ => None,
-                                };
-
-                                if let Some(property) = property {
-                                    match signature.type_ann {
-                                        Some(annotation) => match annotation.type_ann {
-                                            // TODO handle enum types
-                                            TsType::TsKeywordType(keyword_type) => match keyword_type.inner.kind {
-                                                TsKeywordTypeKind::TsNumberKeyword => {
-                                                    property._type = Some("number".into());
-                                                }
-                                                TsKeywordTypeKind::TsBooleanKeyword => {
-                                                    property._type = Some("boolean".into());
-                                                }
-                                                TsKeywordTypeKind::TsBigIntKeyword => {
-                                                    property._type = Some("number".into());
-                                                }
-                                                TsKeywordTypeKind::TsStringKeyword => {
-                                                    property._type = Some("string".into());
-                                                }
-                                                _ => {}
-                                            },
-                                            _ => {}
-                                        },
-                                        None => {}
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                Node::TsTypeAliasDecl(declaration) => println!("{:?}", declaration.inner),
-                _ => {}
-            },
+                define_referenced_schema_details(schema, node);
+            }
             _ => {}
         };
     }
 
-    fn load_symbols_from_module(&mut self, source_file_name: &str) -> () {
-        let result = get_syntax_tree(source_file_name);
+    fn define_deferred_schemas(&mut self, node: &Node<'n>, source_file_name: &str) -> () {
+        store_declaration_maybe(node, source_file_name, &mut self.symbol_tables);
 
-        with_ast_view_for_module(
-            ModuleInfo {
-                module: result.module(),
-                comments: None,
-                text_info: Some(result.text_info()),
-                tokens: None,
+        match node {
+            Node::ExportDefaultExpr(_) => self.define_deferred_type_maybe("default", source_file_name),
+            Node::ExportDecl(export_declaration) => match export_declaration.decl {
+                Decl::Class(class_declaration) => {
+                    let name = class_declaration.ident.sym().to_string();
+                    self.define_deferred_type_maybe(&name, source_file_name);
+                }
+                Decl::TsInterface(interface_declaration) => {
+                    let name = interface_declaration.id.sym().to_string();
+                    self.define_deferred_type_maybe(&name, source_file_name);
+                }
+                Decl::TsTypeAlias(alias_declaration) => {
+                    let name = alias_declaration.id.sym().to_string();
+                    self.define_deferred_type_maybe(&name, source_file_name);
+                }
+                _ => {}
             },
-            |module| self.load_symbols(&module.as_node(), source_file_name),
-        );
+            Node::NamedExport(named_export) => {
+                for specifier in &named_export.specifiers {
+                    match specifier {
+                        ExportSpecifier::Named(named) => {
+                            let name = match named.exported {
+                                Some(exported) => match exported {
+                                    ModuleExportName::Ident(id) => id.sym().to_string(),
+                                    ModuleExportName::Str(id) => id.value().to_string(),
+                                },
+                                None => match named.orig {
+                                    ModuleExportName::Ident(id) => id.sym().to_string(),
+                                    ModuleExportName::Str(id) => id.value().to_string(),
+                                },
+                            };
+
+                            self.define_deferred_type_maybe(&name, source_file_name);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
-    fn load_symbols(&mut self, node: &Node<'n>, source_file_name: &str) -> () {
-        for child in node.children() {
-            store_declaration_maybe(node, source_file_name, &mut self.symbol_tables);
-            self.load_symbols(&child, source_file_name);
+    fn define_deferred_type_maybe(&mut self, type_name: &str, source_file_name: &str) -> () {
+        if let Some(deferred_type) = self.deferred_schemas.get_deferred_type(type_name, source_file_name) {
+            match self.symbol_tables.get_root_declaration(source_file_name, &type_name) {
+                Some(Declaration::Type { node }) => {
+                    let schema = match &deferred_type.namespace {
+                        Some(ns) => self
+                            .components
+                            .schema(&ns)
+                            .data_type("object")
+                            .property(&deferred_type.schema_name),
+                        None => self.components.schema(&deferred_type.schema_name),
+                    };
+
+                    define_referenced_schema_details(schema, node);
+                }
+                Some(Declaration::Import {
+                    name: imported_name,
+                    source_file_name: module_file_name,
+                }) => {
+                    self.deferred_schemas.add_deferred_type(
+                        module_file_name,
+                        type_name.to_string(),
+                        imported_name,
+                        deferred_type.namespace.clone(),
+                    );
+                }
+                _ => {}
+            }
         }
     }
 }
@@ -775,7 +693,7 @@ impl ApiConent {
 pub struct ApiSchema {
     items: Option<Box<ApiSchema>>,
     format: Option<String>,
-    _type: Option<String>,
+    data_type: Option<String>,
     reference: Option<String>,
     namespace: Option<String>,
     is_example: bool,
@@ -801,8 +719,8 @@ impl Serialize for ApiSchema {
         if !self.required.is_empty() {
             state.serialize_field("required", &self.required)?;
         }
-        if let Some(ref _type) = self._type {
-            state.serialize_field("type", _type)?;
+        if let Some(ref data_type) = self.data_type {
+            state.serialize_field("type", data_type)?;
         }
         if let Some(ref reference) = self.reference {
             let mut path = String::from(match self.is_example {
@@ -829,7 +747,7 @@ impl ApiSchema {
     pub fn new() -> Self {
         ApiSchema {
             format: None,
-            _type: None,
+            data_type: None,
             reference: None,
             namespace: None,
             is_example: false,
@@ -839,30 +757,25 @@ impl ApiSchema {
         }
     }
 
+    pub fn data_type(&mut self, data_type: &str) -> &mut ApiSchema {
+        self.data_type = Some(data_type.into());
+        self
+    }
+
     pub fn format(&mut self, format: Option<String>) -> &mut ApiSchema {
         // TODO add format tests
-        self.format = format.clone();
+        self.format = format;
         self
     }
 
     pub fn namespace(&mut self, namespace: Option<String>) -> &mut ApiSchema {
-        self.namespace = namespace.clone();
-        self
-    }
-
-    pub fn primitive(&mut self, type_name: &str) -> &mut ApiSchema {
-        self._type = Some(type_name.to_string());
+        self.namespace = namespace;
         self
     }
 
     pub fn reference(&mut self, reference: Option<String>, is_example: bool) -> &mut ApiSchema {
         self.is_example = is_example;
         self.reference = reference;
-        self
-    }
-
-    pub fn object(&mut self) -> &mut ApiSchema {
-        self._type = Some(String::from("object"));
         self
     }
 
@@ -876,7 +789,7 @@ impl ApiSchema {
     }
 
     pub fn array(&mut self) -> &mut ApiSchema {
-        self._type = Some(String::from("array"));
+        self.data_type = Some(String::from("array"));
         self
     }
 
@@ -957,6 +870,130 @@ impl ResponseOptions {
 }
 
 // helpers
+fn define_referenced_schema_details(root_schema: &mut ApiSchema, node: Node) {
+    match node {
+        Node::TsKeywordType(keyword_type) => match keyword_type.keyword_kind() {
+            TsKeywordTypeKind::TsNumberKeyword => {
+                root_schema.data_type = Some("number".into());
+            }
+            TsKeywordTypeKind::TsBooleanKeyword => {
+                root_schema.data_type = Some("boolean".into());
+            }
+            TsKeywordTypeKind::TsBigIntKeyword => {
+                root_schema.data_type = Some("number".into());
+            }
+            TsKeywordTypeKind::TsStringKeyword => {
+                root_schema.data_type = Some("string".into());
+            }
+            TsKeywordTypeKind::TsSymbolKeyword => {
+                root_schema.data_type = Some("string".into());
+            }
+            _ => {}
+        },
+        Node::ClassDecl(class_declaration) => {
+            root_schema.data_type = Some("object".into());
+            for property in &class_declaration.class.body {
+                match property {
+                    ClassMember::ClassProp(class_property) => {
+                        let name = match class_property.key {
+                            PropName::Ident(identifier) => Some(identifier.sym().to_string()),
+                            _ => None,
+                        };
+
+                        if let Some(name) = name {
+                            if let Some(annotation) = class_property.type_ann {
+                                define_referenced_schema_details(
+                                    root_schema.property(&name),
+                                    annotation.type_ann.as_node(),
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Node::ClassExpr(class_declaration) => {
+            root_schema.data_type = Some("object".into());
+            for property in &class_declaration.class.body {
+                match property {
+                    ClassMember::ClassProp(class_property) => {
+                        let name = match class_property.key {
+                            PropName::Ident(identifier) => Some(identifier.sym().to_string()),
+                            _ => None,
+                        };
+
+                        if let Some(name) = name {
+                            if let Some(annotation) = class_property.type_ann {
+                                define_referenced_schema_details(
+                                    root_schema.property(&name),
+                                    annotation.type_ann.as_node(),
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Node::TsArrayType(array_type) => {
+            root_schema.data_type = Some("array".into());
+            define_referenced_schema_details(root_schema.items(), array_type.elem_type.as_node());
+        }
+        Node::TsInterfaceDecl(interface_declaration) => {
+            root_schema.data_type = Some("object".into());
+
+            for property in &interface_declaration.body.body {
+                match property {
+                    TsTypeElement::TsPropertySignature(signature) => {
+                        let property_schema = match signature.key {
+                            Expr::Ident(identifier) => {
+                                let name = identifier.sym().to_string();
+                                Some(root_schema.property(&name))
+                            }
+                            _ => None,
+                        };
+
+                        if let Some(property_schema) = property_schema {
+                            if let Some(annotation) = signature.type_ann {
+                                define_referenced_schema_details(property_schema, annotation.type_ann.as_node());
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Node::TsTypeLit(type_literal) => {
+            root_schema.data_type = Some("object".into());
+            for member in &type_literal.members {
+                match member {
+                    TsTypeElement::TsPropertySignature(signature) => {
+                        let property_schema = match signature.key {
+                            Expr::Ident(identifier) => {
+                                let name = identifier.sym().to_string();
+                                Some(root_schema.property(&name))
+                            }
+                            _ => None,
+                        };
+
+                        if let Some(property_schema) = property_schema {
+                            if let Some(annotation) = signature.type_ann {
+                                define_referenced_schema_details(property_schema, annotation.type_ann.as_node());
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Node::TsTypeAliasDecl(type_alias_declaration) => {
+            define_referenced_schema_details(root_schema, type_alias_declaration.type_ann.as_node())
+        }
+        _ => {}
+    }
+}
+
 fn get_syntax_tree(path: &str) -> ParsedSource {
     let specifier = Url::from_file_path(path).unwrap();
     let source_text = std::fs::read_to_string(specifier.path()).unwrap();
