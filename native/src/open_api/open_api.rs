@@ -145,6 +145,10 @@ impl<'n> OpenApi<'n> {
                     TsEntityName::Ident(identifier) if identifier.sym().eq("RouteParam") => {
                         self.add_param_details(operation, "path", type_ref, file_path);
                     }
+                    // TODO support route handler params in separate module
+                    // TsEntityName::Ident(identifier) => {
+                    //     self.add_indirect_param(operation, identifier, file_path);
+                    // }
                     _ => self.add_request_params(operation, type_ref.as_node(), file_path),
                 },
                 _ => self.add_request_params(operation, child, file_path),

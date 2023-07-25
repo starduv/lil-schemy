@@ -3,7 +3,6 @@ import { OpenAPIV3 } from 'openapi-types';
 export interface LilSchemyOptions {
     cwd: string;
     openApi?: OpenApiOptions;
-    project: string;
 }
 
 interface OpenApiOptions {
@@ -22,7 +21,7 @@ export interface SchemasResult {
     };
 }
 
-interface GenerateSchemaArgs extends Omit<LilSchemyOptions, "cwd", "project"> {
+interface GenerateSchemaArgs extends Omit<LilSchemyOptions, "cwd"> {
     // getAst: (reference: string, moduleFileName: string) => string | undefined;
     openApi?: Omit<OpenApiOptions, "base"> & {
         base: string;

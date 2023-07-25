@@ -5,7 +5,7 @@ import { getRootFiles } from '../utils';
 
 export const generateOpenApi = (cwd: string, config: LilSchemyOptions) => {
     if (config?.openApi) {
-        const { openApi, project } = config;
+        const { openApi } = config;
 
         const files = getRootFiles(cwd, openApi.entry);
 

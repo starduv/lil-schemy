@@ -1,7 +1,7 @@
 module.exports = {
     // Path to primary tsconfig.json
-    project: "",
     openApi: {
+        // All values in base take precedence over generated values.
         base: {
             // The only supported version.
             openapi: '3.0.3',
@@ -9,7 +9,6 @@ module.exports = {
                 title: "DEFAULT APPLICATION TITLE",
                 version: '0.0.0'
             },
-            // Paths, optionally defined here, take precedence in merged result.
             paths: {}
         },
         // Glob patterns to modules declaring api paths.
