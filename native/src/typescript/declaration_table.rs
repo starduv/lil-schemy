@@ -1,7 +1,8 @@
 use std::{cell::RefCell, collections::VecDeque, fmt, rc::Rc};
 
 use ahash::{HashMap, HashMapExt};
-use dprint_swc_ext::view::Node;
+
+use super::SchemyNode;
 
 #[derive(Debug, Default)]
 struct Scope<'a> {
@@ -194,9 +195,9 @@ impl<'a> DeclarationTable<'a> {
     }
 }
 
-pub enum Declaration<'a> {
+pub enum Declaration<'m> {
     Alias { from: String, to: String },
-    Type { node: Node<'a> },
+    Type { node: SchemyNode<'m> },
     Export { name: String, source_file_name: String },
     Import { name: String, source_file_name: String },
 }
@@ -239,12 +240,3 @@ impl<'n> fmt::Debug for Declaration<'n> {
         }
     }
 }
-
-// impl<'n> Serialize for Declaration<'n> {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: Serializer,
-//     {
-//         serializer.serialize_none()
-//     }
-// }

@@ -1,68 +1,76 @@
 use std::path::PathBuf;
 
-use dprint_swc_ext::view::{Node, NodeTrait, Pat};
 use es_resolve::{EsResolver, TargetEnv};
 
-use crate::typescript::{Declaration, DeclarationTables};
+use crate::typescript::{Declaration, DeclarationTables, SchemyNode};
 
-pub fn store_declaration_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tables: &mut DeclarationTables<'n>) -> () {
+use super::open_api::ApiSchema;
+
+pub fn store_declaration_maybe<'n>(
+    node: &SchemyNode<'n>,
+    file_path: &str,
+    symbol_tables: &mut DeclarationTables<'n>,
+) -> () {
     match node {
-        Node::ClassDecl(class_declaration) => {
-            let name = class_declaration.ident.sym();
-            symbol_tables.insert(
-                file_path,
-                name.to_string(),
-                Declaration::Type {
-                    node: class_declaration.as_node(),
-                },
-            )
+        SchemyNode::ClassDecl {
+            node: class_declaration,
+            parent: _,
+        } => {
+            let name = class_declaration.ident.sym.to_string();
+            symbol_tables.insert(file_path, name.to_string(), Declaration::Type { node: node.clone() })
         }
-        Node::ExportDecl(export_declaration) => match export_declaration.decl {
-            dprint_swc_ext::view::Decl::Class(declaration) => {
-                let name = declaration.ident.sym().to_string();
+        SchemyNode::ExportDecl {
+            node: export_declaration,
+            parent: _,
+        } => match export_declaration.decl {
+            deno_ast::swc::ast::Decl::Class(declaration) => {
+                let name = declaration.ident.sym.to_string();
                 symbol_tables.insert(
                     file_path,
                     name,
                     Declaration::Type {
-                        node: export_declaration.decl.as_node(),
+                        node: SchemyNode::ClassDecl {
+                            node: &declaration,
+                            parent: Some(Box::from(node)),
+                        },
                     },
                 )
             }
-            dprint_swc_ext::view::Decl::TsInterface(declaration) => {
-                let name = declaration.id.sym().to_string();
+            deno_ast::swc::ast::Decl::TsInterface(interface) => {
+                let name = interface.id.sym.to_string();
                 symbol_tables.insert(
                     file_path,
                     name,
                     Declaration::Type {
-                        node: export_declaration.decl.as_node(),
+                        node: SchemyNode::TsInterfaceDecl(&interface),
                     },
                 )
             }
-            dprint_swc_ext::view::Decl::TsTypeAlias(declaration) => {
-                let name = declaration.id.sym().to_string();
+            deno_ast::swc::ast::Decl::TsTypeAlias(type_alias) => {
+                let name = type_alias.id.sym.to_string();
                 symbol_tables.insert(
                     file_path,
                     name,
                     Declaration::Type {
-                        node: export_declaration.decl.as_node(),
+                        node: SchemyNode::TsTypeAliasDecl(&type_alias),
                     },
                 )
             }
-            dprint_swc_ext::view::Decl::TsEnum(declaration) => {
-                let name = declaration.id.sym().to_string();
+            deno_ast::swc::ast::Decl::TsEnum(enum_declaration) => {
+                let name = enum_declaration.id.sym.to_string();
                 symbol_tables.insert(
                     file_path,
                     name,
                     Declaration::Type {
-                        node: export_declaration.decl.as_node(),
+                        node: SchemyNode::TsEnumDecl(&enum_declaration),
                     },
                 )
             }
             _ => {}
         },
-        Node::ExportDefaultExpr(default_expression) => match default_expression.expr {
-            dprint_swc_ext::view::Expr::Ident(identifier) => {
-                let target_name = identifier.sym().to_string();
+        SchemyNode::ExportDefaultExpr(default_expression) => match *default_expression.expr {
+            deno_ast::swc::ast::Expr::Ident(identifier) => {
+                let target_name = identifier.sym.to_string();
                 symbol_tables.insert(
                     file_path,
                     "default".into(),
@@ -74,31 +82,31 @@ pub fn store_declaration_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tabl
             }
             _ => {}
         },
-        Node::ExportDefaultDecl(default_declaration) => match default_declaration.decl {
-            dprint_swc_ext::view::DefaultDecl::Class(class_declaration) => symbol_tables.insert(
+        SchemyNode::ExportDefaultDecl(default_declaration) => match default_declaration.decl {
+            deno_ast::swc::ast::DefaultDecl::Class(class_expression) => symbol_tables.insert(
                 file_path,
                 "default".into(),
                 Declaration::Type {
-                    node: class_declaration.as_node(),
+                    node: SchemyNode::ClassExpr(&class_expression),
                 },
             ),
-            dprint_swc_ext::view::DefaultDecl::TsInterfaceDecl(interface_declaration) => symbol_tables.insert(
+            deno_ast::swc::ast::DefaultDecl::TsInterfaceDecl(interface_declaration) => symbol_tables.insert(
                 file_path,
                 "default".into(),
                 Declaration::Type {
-                    node: interface_declaration.as_node(),
+                    node: SchemyNode::TsInterfaceDecl(&interface_declaration),
                 },
             ),
             _ => {}
         },
-        Node::ImportDecl(import_declaration) => {
-            for child in import_declaration.children() {
+        node @ SchemyNode::ImportDecl(import_declaration) => {
+            for child in node.children() {
                 match child {
-                    Node::ImportDefaultSpecifier(specifier) => {
-                        let src = import_declaration.src.value().to_string();
+                    SchemyNode::ImportDefaultSpecifier(specifier) => {
+                        let src = import_declaration.src.value.to_string();
                         match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
                             Ok(module_path) => {
-                                let name = specifier.local.sym().to_string();
+                                let name = specifier.local.sym.to_string();
                                 symbol_tables.insert(
                                     file_path,
                                     name,
@@ -111,11 +119,11 @@ pub fn store_declaration_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tabl
                             Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
                         }
                     }
-                    Node::ImportNamedSpecifier(specifier) => {
-                        let src = import_declaration.src.value().to_string();
+                    SchemyNode::ImportNamedSpecifier(specifier) => {
+                        let src = import_declaration.src.value.to_string();
                         match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
                             Ok(module_path) => {
-                                let name = specifier.local.sym().to_string();
+                                let name = specifier.local.sym.to_string();
                                 symbol_tables.insert(
                                     file_path,
                                     name.to_string(),
@@ -132,23 +140,22 @@ pub fn store_declaration_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tabl
                 }
             }
         }
-        Node::NamedExport(named_export) => {
-            let src = named_export.src.unwrap().value();
+        SchemyNode::NamedExport(named_export) => {
+            let src = named_export.src.unwrap().value;
             match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
                 Ok(module_file_name) => {
                     for specifier in &named_export.specifiers {
                         match specifier {
-                            dprint_swc_ext::view::ExportSpecifier::Default(_) => todo!(),
-                            dprint_swc_ext::view::ExportSpecifier::Named(named_specifier) => {
+                            deno_ast::swc::ast::ExportSpecifier::Named(named_specifier) => {
                                 let type_name = match named_specifier.orig {
-                                    dprint_swc_ext::view::ModuleExportName::Ident(identifier) => identifier.sym(),
-                                    dprint_swc_ext::view::ModuleExportName::Str(identifier) => identifier.value(),
+                                    deno_ast::swc::ast::ModuleExportName::Ident(identifier) => identifier.sym,
+                                    deno_ast::swc::ast::ModuleExportName::Str(identifier) => identifier.value,
                                 };
 
                                 if let Some(exported_name) = named_specifier.exported {
                                     let exported_name = match exported_name {
-                                        dprint_swc_ext::view::ModuleExportName::Ident(id) => id.sym(),
-                                        dprint_swc_ext::view::ModuleExportName::Str(id) => id.value(),
+                                        deno_ast::swc::ast::ModuleExportName::Ident(id) => id.sym,
+                                        deno_ast::swc::ast::ModuleExportName::Str(id) => id.value,
                                     };
 
                                     symbol_tables.insert(
@@ -177,36 +184,36 @@ pub fn store_declaration_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tabl
                 Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
             }
         }
-        Node::TsInterfaceDecl(ts_interface_declaration) => {
-            let name = ts_interface_declaration.id.sym();
+        SchemyNode::TsInterfaceDecl(ts_interface_declaration) => {
+            let name = ts_interface_declaration.id.sym;
             symbol_tables.insert(
                 file_path,
                 name.to_string(),
                 Declaration::Type {
-                    node: ts_interface_declaration.as_node(),
+                    node: SchemyNode::TsInterfaceDecl(&ts_interface_declaration),
                 },
             )
         }
-        Node::TsTypeAliasDecl(ts_type_alias_declaration) => {
-            let name = ts_type_alias_declaration.id.sym();
+        SchemyNode::TsTypeAliasDecl(ts_type_alias_declaration) => {
+            let name = ts_type_alias_declaration.id.sym;
             symbol_tables.insert(
                 file_path,
                 name.to_string(),
                 Declaration::Type {
-                    node: ts_type_alias_declaration.type_ann.as_node(),
+                    node: SchemyNode::TsTypeAliasDecl(&ts_type_alias_declaration),
                 },
             )
         }
-        Node::VarDecl(variable_declaration) => {
+        SchemyNode::VarDecl(variable_declaration) => {
             for declaration in &variable_declaration.decls {
                 match declaration.name {
-                    Pat::Ident(identifier) => {
-                        let name = identifier.id.sym().to_string();
+                    deno_ast::swc::ast::Pat::Ident(identifier) => {
+                        let name = identifier.id.sym.to_string();
                         match identifier.type_ann {
-                            Some(type_annotation) => match type_annotation.type_ann {
-                                dprint_swc_ext::view::TsType::TsTypeRef(type_ref) => match type_ref.type_name {
-                                    dprint_swc_ext::view::TsEntityName::Ident(identifier) => {
-                                        let type_name = identifier.sym().to_string();
+                            Some(type_annotation) => match *type_annotation.type_ann {
+                                deno_ast::swc::ast::TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                                    deno_ast::swc::ast::TsEntityName::Ident(identifier) => {
+                                        let type_name = identifier.sym.to_string();
                                         symbol_tables.insert(
                                             file_path,
                                             name.to_string(),
@@ -222,7 +229,7 @@ pub fn store_declaration_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tabl
                             },
                             None => match declaration.init {
                                 Some(initializer) => {
-                                    store_variable(&name, initializer.as_node(), file_path, symbol_tables);
+                                    store_variable(&name, SchemyNode::Expr(&initializer), file_path, symbol_tables);
                                 }
                                 None => {}
                             },
@@ -236,11 +243,11 @@ pub fn store_declaration_maybe<'n>(node: &Node<'n>, file_path: &str, symbol_tabl
     }
 }
 
-fn store_variable(name: &str, node: Node, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
+fn store_variable(name: &str, node: SchemyNode, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
     for child in node.children() {
         match child {
-            Node::Ident(identifier) => {
-                let type_name = identifier.sym().to_string();
+            SchemyNode::Ident(identifier) => {
+                let type_name = identifier.sym.to_string();
                 symbol_tables.insert(
                     file_path,
                     name.to_string(),
@@ -250,9 +257,9 @@ fn store_variable(name: &str, node: Node, file_path: &str, symbol_tables: &mut D
                     },
                 )
             }
-            Node::TsTypeRef(type_ref) => match type_ref.type_name {
-                dprint_swc_ext::view::TsEntityName::Ident(identifier) => {
-                    let type_name = identifier.sym().to_string();
+            SchemyNode::TsTypeRef(type_ref) => match type_ref.type_name {
+                deno_ast::swc::ast::TsEntityName::Ident(identifier) => {
+                    let type_name = identifier.sym.to_string();
                     symbol_tables.insert(
                         file_path,
                         name.to_string(),
