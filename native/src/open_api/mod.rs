@@ -1,5 +1,6 @@
-mod deferred_schemas;
 mod declaration_helpers;
+mod deferred_schemas;
+mod generate_schema;
 mod open_api;
 
 use std::{fs::File, io::Write, path::PathBuf};
@@ -7,7 +8,9 @@ use std::{fs::File, io::Write, path::PathBuf};
 use neon::{prelude::*, result::Throw};
 use serde_json::json;
 
-use self::open_api::OpenApi;
+use crate::typescript::{AstCache, DeclarationTables};
+
+use self::{open_api::OpenApi, generate_schema::from_source_file};
 
 fn merge_schemas(
     open_api: &OpenApi,
@@ -39,12 +42,15 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
 }
 
 fn generate_schema(open_api_handle: Handle<JsObject>, cx: &mut FunctionContext) -> Result<String, Throw> {
+    let mut ast_cache = AstCache::new();
+    let mut declaration_tables = DeclarationTables::default();
+    let mut get_syntax_tree = |path:&str| ast_cache.get_ast(path);
     let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "entry")?;
 
     let mut result = OpenApi::new();
     for path in paths.to_vec(cx)? {
         let path = path.downcast_or_throw::<JsString, _>(cx)?.value(cx);
-        result.from_source_file(&path);
+        from_source_file(&mut result, &path, &mut get_syntax_tree, &mut declaration_tables);
     }
 
     merge_schemas(&mut result, open_api_handle, cx)
