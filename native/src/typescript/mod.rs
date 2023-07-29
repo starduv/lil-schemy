@@ -1,7 +1,7 @@
 mod declaration_table;
+mod syntax_kind;
 mod schemy_node;
-mod ast_cache;
 
 pub use self::declaration_table::*;
+pub use self::syntax_kind::*;
 pub use schemy_node::SchemyNode;
-pub use ast_cache::AstCache;

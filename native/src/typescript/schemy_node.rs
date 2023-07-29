@@ -275,7 +275,7 @@ pub enum SchemyNode<'m> {
 }
 
 impl<'m> SchemyNode<'m> {
-    pub fn children(&'m self) -> Vec<SchemyNode> {
+    pub fn children(&self) -> Vec<SchemyNode<'m>> {
         match self {
             SchemyNode::Module {
                 node: module,
@@ -299,7 +299,8 @@ impl<'m> SchemyNode<'m> {
                     parent: Some(Box::from(self)),
                 })
                 .collect(),
-            SchemyNode::Pat { node, parent: _ } => match node {
+            _ => vec![],
+            SchemyNode::Pat { node, parent } => match node {
                 Pat::Ident(ident) if ident.type_ann.is_some() => {
                     vec![SchemyNode::TsTypeAnnotation {
                         node: ident.type_ann.as_ref().unwrap(),
@@ -308,7 +309,7 @@ impl<'m> SchemyNode<'m> {
                 }
                 _ => vec![],
             },
-            SchemyNode::BlockStmt { node, parent: _ } => node
+            SchemyNode::BlockStmt { node, parent } => node
                 .stmts
                 .iter()
                 .map(|statement| match statement {
@@ -390,7 +391,7 @@ impl<'m> SchemyNode<'m> {
                     },
                 })
                 .collect(),
-            SchemyNode::TsTypeAnnotation { node, parent: _ } => match &*node.type_ann {
+            SchemyNode::TsTypeAnnotation { node, parent } => match *node.type_ann {
                 TsType::TsKeywordType(ts_keyword_type) => vec![SchemyNode::TsKeywordType {
                     node: &ts_keyword_type,
                     parent: Some(Box::from(self)),
@@ -474,11 +475,10 @@ impl<'m> SchemyNode<'m> {
                     parent: Some(Box::from(self)),
                 }],
             },
-            _ => vec![],
         }
     }
 
-    pub(crate) fn callee(&'m self) -> Option<SchemyNode<'m>> {
+    pub(crate) fn callee(&self) -> Option<SchemyNode<'m>> {
         match self {
             SchemyNode::CallExpr {
                 node: call_expr,
@@ -491,7 +491,7 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub(crate) fn args(&'m self) -> Vec<SchemyNode<'m>> {
+    pub(crate) fn args(&self) -> Vec<SchemyNode<'m>> {
         match self {
             SchemyNode::CallExpr {
                 node: call_expr,
@@ -508,9 +508,9 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub(crate) fn params(&'m self) -> Vec<SchemyNode<'m>> {
+    pub(crate) fn params(&self) -> Vec<SchemyNode<'m>> {
         match self {
-            SchemyNode::ArrowExpr { node, parent:_ } => node
+            SchemyNode::ArrowExpr { node, parent } => node
                 .params
                 .iter()
                 .map(|param| SchemyNode::Pat {
@@ -522,9 +522,9 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub(crate) fn body(&'m self) -> Option<SchemyNode<'m>> {
+    pub(crate) fn body(&self) -> Option<SchemyNode<'m>> {
         match self {
-            SchemyNode::ArrowExpr { node, parent: _ } => Some(SchemyNode::BlockStmtOrExpr {
+            SchemyNode::ArrowExpr { node, parent } => Some(SchemyNode::BlockStmtOrExpr {
                 node: &node.body,
                 parent: Some(Box::from(self)),
             }),
@@ -532,75 +532,75 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub(crate) fn parent(&'m self) -> Option<&SchemyNode<'_>> {
+    pub(crate) fn parent(&self) -> Option<&SchemyNode<'_>> {
         match self {
-            SchemyNode::BlockStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsPropertySignature { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsKeywordType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsThisType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsFnOrConstructorType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsTypeRef { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsTypeQuery { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsTypeLit { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsArrayType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsTupleType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsOptionalType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsRestType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsUnionOrIntersectionType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsConditionalType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsInferType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsParenthesizedType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsTypeOperator { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsIndexedAccessType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsMappedType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsLitType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsTypePredicate { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsImportType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsType { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsTypeAnnotation { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ObjectLit { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::BlockStmtOrExpr { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::Pat { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ArrowExpr { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ExprOrSpread { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::Callee { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::CallExpr { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::Ident { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::Expr { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::VarDecl { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::NamedExport { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ImportNamedSpecifier { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ClassDecl { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ClassExpr { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ExportDecl { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ExportDefaultDecl { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ExportDefaultExpr { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ImportDecl { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ImportDefaultSpecifier { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::Module { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ModuleItem { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsEnumDecl { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsInterfaceDecl { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TsTypeAliasDecl { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ImportSpecifier { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::EmptyStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::DebuggerStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::WithStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ReturnStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::LabeledStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::BreakStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ContinueStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::IfStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::SwitchStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ThrowStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::TryStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::WhileStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::DoWhileStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ForStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ForInStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ForOfStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::ExprStmt { node: _, parent } => parent.as_ref().map(|p| **p),
-            SchemyNode::Decl { node: _, parent } => parent.as_ref().map(|p| **p),
+            SchemyNode::BlockStmt { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsPropertySignature { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsKeywordType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsThisType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsFnOrConstructorType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsTypeRef { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsTypeQuery { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsTypeLit { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsArrayType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsTupleType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsOptionalType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsRestType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsUnionOrIntersectionType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsConditionalType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsInferType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsParenthesizedType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsTypeOperator { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsIndexedAccessType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsMappedType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsLitType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsTypePredicate { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsImportType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsType { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsTypeAnnotation { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ObjectLit { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::BlockStmtOrExpr { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::Pat { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ArrowExpr { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ExprOrSpread { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::Callee { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::CallExpr { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::Ident { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::Expr { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::VarDecl { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::NamedExport { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ImportNamedSpecifier { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ClassDecl { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ClassExpr { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ExportDecl { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ExportDefaultDecl { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ExportDefaultExpr { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ImportDecl { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ImportDefaultSpecifier { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::Module { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ModuleItem { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsEnumDecl { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsInterfaceDecl { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::TsTypeAliasDecl { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::ImportSpecifier { node: _, parent } => parent.map(|p| *p),
+            SchemyNode::EmptyStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::DebuggerStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::WithStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::ReturnStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::LabeledStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::BreakStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::ContinueStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::IfStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::SwitchStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::ThrowStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::TryStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::WhileStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::DoWhileStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::ForStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::ForInStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::ForOfStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::ExprStmt { node, parent } => parent.map(|p| *p),
+            SchemyNode::Decl { node, parent } => parent.map(|p| *p),
         }
     }
 }
@@ -610,271 +610,271 @@ impl<'m> Clone for SchemyNode<'m> {
         match self {
             Self::BlockStmt { node, parent } => Self::BlockStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::EmptyStmt { node, parent } => Self::EmptyStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::Decl { node, parent } => Self::Decl {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::DebuggerStmt { node, parent } => Self::DebuggerStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::WithStmt { node, parent } => Self::WithStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ReturnStmt { node, parent } => Self::ReturnStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::LabeledStmt { node, parent } => Self::LabeledStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::BreakStmt { node, parent } => Self::BreakStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ContinueStmt { node, parent } => Self::ContinueStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::IfStmt { node, parent } => Self::IfStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::SwitchStmt { node, parent } => Self::SwitchStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ThrowStmt { node, parent } => Self::ThrowStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TryStmt { node, parent } => Self::TryStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::WhileStmt { node, parent } => Self::WhileStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::DoWhileStmt { node, parent } => Self::DoWhileStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ForStmt { node, parent } => Self::ForStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ForInStmt { node, parent } => Self::ForInStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ForOfStmt { node, parent } => Self::ForOfStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ExprStmt { node, parent } => Self::ExprStmt {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsPropertySignature { node, parent } => Self::TsPropertySignature {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsKeywordType { node, parent } => Self::TsKeywordType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsThisType { node, parent } => Self::TsThisType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsFnOrConstructorType { node, parent } => Self::TsFnOrConstructorType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsTypeRef { node, parent } => Self::TsTypeRef {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsTypeQuery { node, parent } => Self::TsTypeQuery {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsTypeLit { node, parent } => Self::TsTypeLit {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsArrayType { node, parent } => Self::TsArrayType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsTupleType { node, parent } => Self::TsTupleType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsOptionalType { node, parent } => Self::TsOptionalType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsRestType { node, parent } => Self::TsRestType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsUnionOrIntersectionType { node, parent } => Self::TsUnionOrIntersectionType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsConditionalType { node, parent } => Self::TsConditionalType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsInferType { node, parent } => Self::TsInferType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsParenthesizedType { node, parent } => Self::TsParenthesizedType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsTypeOperator { node, parent } => Self::TsTypeOperator {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsIndexedAccessType { node, parent } => Self::TsIndexedAccessType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsMappedType { node, parent } => Self::TsMappedType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsLitType { node, parent } => Self::TsLitType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsTypePredicate { node, parent } => Self::TsTypePredicate {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsImportType { node, parent } => Self::TsImportType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsType { node, parent } => Self::TsType {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsTypeAnnotation { node, parent } => Self::TsTypeAnnotation {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ObjectLit { node, parent } => Self::ObjectLit {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::BlockStmtOrExpr { node, parent } => Self::BlockStmtOrExpr {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::Pat { node, parent } => Self::Pat {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ArrowExpr { node, parent } => Self::ArrowExpr {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ExprOrSpread { node, parent } => Self::ExprOrSpread {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::Callee { node, parent } => Self::Callee {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::CallExpr { node, parent } => Self::CallExpr {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::Ident { node, parent } => Self::Ident {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::Expr { node, parent } => Self::Expr {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::VarDecl { node, parent } => Self::VarDecl {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::NamedExport { node, parent } => Self::NamedExport {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ImportNamedSpecifier { node, parent } => Self::ImportNamedSpecifier {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ClassDecl { node, parent } => Self::ClassDecl {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ClassExpr { node, parent } => Self::ClassExpr {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ExportDecl { node, parent } => Self::ExportDecl {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ExportDefaultDecl { node, parent } => Self::ExportDefaultDecl {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ExportDefaultExpr { node, parent } => Self::ExportDefaultExpr {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ImportDecl { node, parent } => Self::ImportDecl {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ImportDefaultSpecifier { node, parent } => Self::ImportDefaultSpecifier {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::Module { node, parent } => Self::Module {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ModuleItem { node, parent } => Self::ModuleItem {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsEnumDecl { node, parent } => Self::TsEnumDecl {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsInterfaceDecl { node, parent } => Self::TsInterfaceDecl {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::TsTypeAliasDecl { node, parent } => Self::TsTypeAliasDecl {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
             Self::ImportSpecifier { node, parent } => Self::ImportSpecifier {
                 node: node,
-                parent: parent.as_ref().map(|p| p.clone()),
+                parent: parent.map(|p| p),
             },
         }
     }
