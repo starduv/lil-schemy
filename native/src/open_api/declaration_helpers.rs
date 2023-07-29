@@ -4,14 +4,14 @@ use es_resolve::{EsResolver, TargetEnv};
 
 use crate::typescript::{Declaration, DeclarationTables, SchemyNode};
 
-pub fn store_declaration_maybe<'m>(node: SchemyNode<'m>, file_path: &str, symbol_tables: &mut DeclarationTables<'m>) -> () {
-    match node {
+pub fn store_declaration_maybe<'m>(root: SchemyNode<'m>, file_path: &str, symbol_tables: &mut DeclarationTables<'m>) -> () {
+    match root {
         SchemyNode::ClassDecl {
             node: ref class_declaration,
             parent: _,
         } => {
             let name = class_declaration.ident.sym.to_string();
-            symbol_tables.insert(file_path, name.to_string(), Declaration::Type { node: node.clone() })
+            symbol_tables.insert(file_path, name.to_string(), Declaration::Type { node: root })
         }
         SchemyNode::ExportDecl {
             node: export_declaration,
