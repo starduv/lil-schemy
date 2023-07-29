@@ -1,10 +1,10 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, rc::Rc};
 
 use es_resolve::{EsResolver, TargetEnv};
 
 use crate::typescript::{Declaration, DeclarationTables, SchemyNode};
 
-pub fn store_declaration_maybe(node: &SchemyNode, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
+pub fn store_declaration_maybe<'m>(node: SchemyNode<'m>, file_path: &str, symbol_tables: &mut DeclarationTables<'m>) -> () {
     match node {
         SchemyNode::ClassDecl {
             node: ref class_declaration,
@@ -24,7 +24,7 @@ pub fn store_declaration_maybe(node: &SchemyNode, file_path: &str, symbol_tables
                     name,
                     Declaration::Type {
                         node: SchemyNode::ClassDecl {
-                            node: declaration.clone(),
+                            node: Rc::new(declaration),
                             parent: None,
                         },
                     },
@@ -37,7 +37,7 @@ pub fn store_declaration_maybe(node: &SchemyNode, file_path: &str, symbol_tables
                     name,
                     Declaration::Type {
                         node: SchemyNode::TsInterfaceDecl {
-                            node: *interface.clone(),
+                            node: Rc::new(interface),
                             parent: None,
                         },
                     },
@@ -50,7 +50,7 @@ pub fn store_declaration_maybe(node: &SchemyNode, file_path: &str, symbol_tables
                     name,
                     Declaration::Type {
                         node: SchemyNode::TsTypeAliasDecl {
-                            node: *type_alias.clone(),
+                            node: Rc::new(type_alias),
                             parent: None,
                         },
                     },
@@ -63,7 +63,7 @@ pub fn store_declaration_maybe(node: &SchemyNode, file_path: &str, symbol_tables
                     name,
                     Declaration::Type {
                         node: SchemyNode::TsEnumDecl {
-                            node: *enum_declaration.clone(),
+                            node: Rc::new(enum_declaration),
                             parent: None,
                         },
                     },
@@ -97,7 +97,7 @@ pub fn store_declaration_maybe(node: &SchemyNode, file_path: &str, symbol_tables
                 "default".into(),
                 Declaration::Type {
                     node: SchemyNode::ClassExpr {
-                        node: class_expression.clone(),
+                        node: Rc::new(class_expression),
                         parent: None,
                     },
                 },
@@ -107,7 +107,7 @@ pub fn store_declaration_maybe(node: &SchemyNode, file_path: &str, symbol_tables
                 "default".into(),
                 Declaration::Type {
                     node: SchemyNode::TsInterfaceDecl {
-                        node: *interface_declaration.clone(),
+                        node: Rc::new(interface_declaration),
                         parent: None,
                     },
                 },
@@ -274,7 +274,7 @@ pub fn store_declaration_maybe(node: &SchemyNode, file_path: &str, symbol_tables
                                     store_variable(
                                         &name,
                                         SchemyNode::Expr {
-                                            node: *initializer.clone(),
+                                            node: Rc::new(initializer),
                                             parent: None,
                                         },
                                         file_path,

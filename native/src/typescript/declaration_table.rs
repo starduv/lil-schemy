@@ -12,15 +12,15 @@ struct Scope<'m> {
 }
 
 #[derive(Debug, Default)]
-pub struct DeclarationTables<'n> {
-    tables: HashMap<String, DeclarationTable<'n>>,
+pub struct DeclarationTables<'m> {
+    tables: HashMap<String, DeclarationTable<'m>>,
 }
-impl<'n> DeclarationTables<'n> {
+impl<'m> DeclarationTables<'m> {
     pub fn has_table(&self, file_name: &str) -> bool {
         self.tables.contains_key(file_name)
     }
 
-    pub fn insert(&mut self, file_path: &str, name: String, value: Declaration) -> () {
+    pub fn insert(&mut self, file_path: &str, name: String, value: Declaration<'m>) -> () {
         let table = self.tables.entry(file_path.to_owned()).or_insert_with(Default::default);
         table.insert(name, value);
     }
@@ -59,8 +59,8 @@ pub struct DeclarationTable<'m> {
     current_scope: Rc<RefCell<Scope<'m>>>,
     root_scope: Rc<RefCell<Scope<'m>>>,
 }
-impl<'a> DeclarationTable<'a> {
-    pub(crate) fn new() -> DeclarationTable<'a> {
+impl<'m> DeclarationTable<'m> {
+    pub(crate) fn new() -> DeclarationTable<'m> {
         let root_scope = Rc::new(RefCell::new(Scope {
             symbols: HashMap::new(),
             children: None,
@@ -73,11 +73,11 @@ impl<'a> DeclarationTable<'a> {
         }
     }
 
-    fn insert(&mut self, name: String, value: Declaration) -> () {
+    fn insert(&mut self, name: String, value: Declaration<'m>) -> () {
         self.current_scope.borrow_mut().symbols.insert(name, value);
     }
 
-    fn add_child_scope(&mut self) -> &mut DeclarationTable<'a> {
+    fn add_child_scope(&mut self) -> &mut DeclarationTable<'m> {
         let child_scope = Rc::new(RefCell::new(Scope {
             symbols: HashMap::new(),
             children: None,
@@ -95,7 +95,7 @@ impl<'a> DeclarationTable<'a> {
         self
     }
 
-    fn parent_scope(&mut self) -> &mut DeclarationTable<'a> {
+    fn parent_scope(&mut self) -> &mut DeclarationTable<'m> {
         let parent = Rc::clone(
             self.current_scope
                 .borrow()

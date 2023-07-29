@@ -7,7 +7,7 @@ use std::{fs::File, io::Write, path::PathBuf};
 use neon::{prelude::*, result::Throw};
 use serde_json::json;
 
-use self::open_api::OpenApi;
+use self::open_api::{OpenApi, OpenApiFactory};
 
 fn merge_schemas(
     open_api: &OpenApi,
@@ -39,12 +39,14 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
 }
 
 fn generate_schema(open_api_handle: Handle<JsObject>, cx: &mut FunctionContext) -> Result<String, Throw> {
+    let mut factory = OpenApiFactory::new();
     let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "entry")?;
 
     let mut result = OpenApi::new();
     for path in paths.to_vec(cx)? {
         let path = path.downcast_or_throw::<JsString, _>(cx)?.value(cx);
-        result.from_source_file(&path);
+        let temp = factory.from_source_file(&path);
+        result.merge(temp);
     }
 
     merge_schemas(&mut result, open_api_handle, cx)
