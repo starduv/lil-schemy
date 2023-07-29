@@ -5,10 +5,10 @@ use ahash::{HashMap, HashMapExt};
 use super::SchemyNode;
 
 #[derive(Debug, Default)]
-struct Scope<'a> {
-    symbols: HashMap<String, Declaration<'a>>,
-    children: Option<Vec<Rc<RefCell<Scope<'a>>>>>,
-    parent: Option<Rc<RefCell<Scope<'a>>>>,
+struct Scope<'m> {
+    symbols: HashMap<String, Declaration<'m>>,
+    children: Option<Vec<Rc<RefCell<Scope<'m>>>>>,
+    parent: Option<Rc<RefCell<Scope<'m>>>>,
 }
 
 #[derive(Debug, Default)]
@@ -20,7 +20,7 @@ impl<'n> DeclarationTables<'n> {
         self.tables.contains_key(file_name)
     }
 
-    pub fn insert(&mut self, file_path: &str, name: String, value: Declaration<'n>) -> () {
+    pub fn insert(&mut self, file_path: &str, name: String, value: Declaration) -> () {
         let table = self.tables.entry(file_path.to_owned()).or_insert_with(Default::default);
         table.insert(name, value);
     }
@@ -46,7 +46,7 @@ impl<'n> DeclarationTables<'n> {
             .get_root_declaration_name(reference)
     }
 
-    pub(crate) fn get_root_declaration(&mut self, file_path: &str, type_reference: &str) -> Option<Declaration<'n>> {
+    pub(crate) fn get_root_declaration(&mut self, file_path: &str, type_reference: &str) -> Option<Declaration> {
         self.tables
             .entry(file_path.to_owned())
             .or_insert_with(Default::default)
@@ -55,9 +55,9 @@ impl<'n> DeclarationTables<'n> {
 }
 
 #[derive(Debug, Default)]
-pub struct DeclarationTable<'a> {
-    current_scope: Rc<RefCell<Scope<'a>>>,
-    root_scope: Rc<RefCell<Scope<'a>>>,
+pub struct DeclarationTable<'m> {
+    current_scope: Rc<RefCell<Scope<'m>>>,
+    root_scope: Rc<RefCell<Scope<'m>>>,
 }
 impl<'a> DeclarationTable<'a> {
     pub(crate) fn new() -> DeclarationTable<'a> {
@@ -73,7 +73,7 @@ impl<'a> DeclarationTable<'a> {
         }
     }
 
-    fn insert(&mut self, name: String, value: Declaration<'a>) -> () {
+    fn insert(&mut self, name: String, value: Declaration) -> () {
         self.current_scope.borrow_mut().symbols.insert(name, value);
     }
 
@@ -109,7 +109,7 @@ impl<'a> DeclarationTable<'a> {
         self
     }
 
-    fn get_root_declaration(&self, reference: &str) -> Option<Declaration<'a>> {
+    fn get_root_declaration(&self, reference: &str) -> Option<Declaration> {
         let mut declaration: Option<Declaration> = None;
         let mut queue = VecDeque::from([Rc::clone(&self.current_scope)]);
         let mut references = vec![reference.to_string()];
@@ -176,7 +176,7 @@ impl<'a> DeclarationTable<'a> {
         current.to_owned()
     }
 
-    fn get_declaration(&self, type_reference: &str) -> Option<Declaration<'a>> {
+    fn get_declaration(&self, type_reference: &str) -> Option<Declaration> {
         let mut queue = VecDeque::from([Rc::clone(&self.current_scope)]);
         while !queue.is_empty() {
             if let Some(scope) = queue.pop_front() {
@@ -202,7 +202,7 @@ pub enum Declaration<'m> {
     Import { name: String, source_file_name: String },
 }
 
-impl<'n> Clone for Declaration<'n> {
+impl<'m> Clone for Declaration<'m> {
     fn clone(&self) -> Self {
         match self {
             Self::Alias { from, to } => Self::Alias {
@@ -222,7 +222,7 @@ impl<'n> Clone for Declaration<'n> {
     }
 }
 
-impl<'n> fmt::Debug for Declaration<'n> {
+impl<'m> fmt::Debug for Declaration<'m> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Alias { from, to } => f.debug_struct("Alias").field("from", from).field("to", to).finish(),

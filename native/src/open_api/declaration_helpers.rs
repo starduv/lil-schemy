@@ -4,16 +4,10 @@ use es_resolve::{EsResolver, TargetEnv};
 
 use crate::typescript::{Declaration, DeclarationTables, SchemyNode};
 
-use super::open_api::ApiSchema;
-
-pub fn store_declaration_maybe<'n>(
-    node: &SchemyNode<'n>,
-    file_path: &str,
-    symbol_tables: &mut DeclarationTables<'n>,
-) -> () {
+pub fn store_declaration_maybe(node: &SchemyNode, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
     match node {
         SchemyNode::ClassDecl {
-            node: class_declaration,
+            node: ref class_declaration,
             parent: _,
         } => {
             let name = class_declaration.ident.sym.to_string();
@@ -22,7 +16,7 @@ pub fn store_declaration_maybe<'n>(
         SchemyNode::ExportDecl {
             node: export_declaration,
             parent: _,
-        } => match export_declaration.decl {
+        } => match &export_declaration.decl {
             deno_ast::swc::ast::Decl::Class(declaration) => {
                 let name = declaration.ident.sym.to_string();
                 symbol_tables.insert(
@@ -30,8 +24,8 @@ pub fn store_declaration_maybe<'n>(
                     name,
                     Declaration::Type {
                         node: SchemyNode::ClassDecl {
-                            node: &declaration,
-                            parent: Some(Box::from(node)),
+                            node: declaration.clone(),
+                            parent: None,
                         },
                     },
                 )
@@ -42,7 +36,10 @@ pub fn store_declaration_maybe<'n>(
                     file_path,
                     name,
                     Declaration::Type {
-                        node: SchemyNode::TsInterfaceDecl(&interface),
+                        node: SchemyNode::TsInterfaceDecl {
+                            node: *interface.clone(),
+                            parent: None,
+                        },
                     },
                 )
             }
@@ -52,7 +49,10 @@ pub fn store_declaration_maybe<'n>(
                     file_path,
                     name,
                     Declaration::Type {
-                        node: SchemyNode::TsTypeAliasDecl(&type_alias),
+                        node: SchemyNode::TsTypeAliasDecl {
+                            node: *type_alias.clone(),
+                            parent: None,
+                        },
                     },
                 )
             }
@@ -62,13 +62,19 @@ pub fn store_declaration_maybe<'n>(
                     file_path,
                     name,
                     Declaration::Type {
-                        node: SchemyNode::TsEnumDecl(&enum_declaration),
+                        node: SchemyNode::TsEnumDecl {
+                            node: *enum_declaration.clone(),
+                            parent: None,
+                        },
                     },
                 )
             }
             _ => {}
         },
-        SchemyNode::ExportDefaultExpr(default_expression) => match *default_expression.expr {
+        SchemyNode::ExportDefaultExpr {
+            node: default_expression,
+            parent: None,
+        } => match &*default_expression.expr {
             deno_ast::swc::ast::Expr::Ident(identifier) => {
                 let target_name = identifier.sym.to_string();
                 symbol_tables.insert(
@@ -82,27 +88,42 @@ pub fn store_declaration_maybe<'n>(
             }
             _ => {}
         },
-        SchemyNode::ExportDefaultDecl(default_declaration) => match default_declaration.decl {
+        SchemyNode::ExportDefaultDecl {
+            node: default_declaration,
+            parent: None,
+        } => match &default_declaration.decl {
             deno_ast::swc::ast::DefaultDecl::Class(class_expression) => symbol_tables.insert(
                 file_path,
                 "default".into(),
                 Declaration::Type {
-                    node: SchemyNode::ClassExpr(&class_expression),
+                    node: SchemyNode::ClassExpr {
+                        node: class_expression.clone(),
+                        parent: None,
+                    },
                 },
             ),
             deno_ast::swc::ast::DefaultDecl::TsInterfaceDecl(interface_declaration) => symbol_tables.insert(
                 file_path,
                 "default".into(),
                 Declaration::Type {
-                    node: SchemyNode::TsInterfaceDecl(&interface_declaration),
+                    node: SchemyNode::TsInterfaceDecl {
+                        node: *interface_declaration.clone(),
+                        parent: None,
+                    },
                 },
             ),
             _ => {}
         },
-        node @ SchemyNode::ImportDecl(import_declaration) => {
+        ref node @ SchemyNode::ImportDecl {
+            node: ref import_declaration,
+            parent: None,
+        } => {
             for child in node.children() {
                 match child {
-                    SchemyNode::ImportDefaultSpecifier(specifier) => {
+                    SchemyNode::ImportDefaultSpecifier {
+                        node: specifier,
+                        parent: None,
+                    } => {
                         let src = import_declaration.src.value.to_string();
                         match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
                             Ok(module_path) => {
@@ -119,7 +140,10 @@ pub fn store_declaration_maybe<'n>(
                             Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
                         }
                     }
-                    SchemyNode::ImportNamedSpecifier(specifier) => {
+                    SchemyNode::ImportNamedSpecifier {
+                        node: specifier,
+                        parent: None,
+                    } => {
                         let src = import_declaration.src.value.to_string();
                         match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
                             Ok(module_path) => {
@@ -140,22 +164,25 @@ pub fn store_declaration_maybe<'n>(
                 }
             }
         }
-        SchemyNode::NamedExport(named_export) => {
-            let src = named_export.src.unwrap().value;
+        SchemyNode::NamedExport {
+            node: named_export,
+            parent: None,
+        } => {
+            let src = &named_export.src.as_ref().unwrap().value;
             match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
                 Ok(module_file_name) => {
                     for specifier in &named_export.specifiers {
                         match specifier {
                             deno_ast::swc::ast::ExportSpecifier::Named(named_specifier) => {
-                                let type_name = match named_specifier.orig {
-                                    deno_ast::swc::ast::ModuleExportName::Ident(identifier) => identifier.sym,
-                                    deno_ast::swc::ast::ModuleExportName::Str(identifier) => identifier.value,
+                                let type_name = match &named_specifier.orig {
+                                    deno_ast::swc::ast::ModuleExportName::Ident(identifier) => &identifier.sym,
+                                    deno_ast::swc::ast::ModuleExportName::Str(identifier) => &identifier.value,
                                 };
 
-                                if let Some(exported_name) = named_specifier.exported {
+                                if let Some(exported_name) = &named_specifier.exported {
                                     let exported_name = match exported_name {
-                                        deno_ast::swc::ast::ModuleExportName::Ident(id) => id.sym,
-                                        deno_ast::swc::ast::ModuleExportName::Str(id) => id.value,
+                                        deno_ast::swc::ast::ModuleExportName::Ident(id) => &id.sym,
+                                        deno_ast::swc::ast::ModuleExportName::Str(id) => &id.value,
                                     };
 
                                     symbol_tables.insert(
@@ -184,34 +211,49 @@ pub fn store_declaration_maybe<'n>(
                 Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
             }
         }
-        SchemyNode::TsInterfaceDecl(ts_interface_declaration) => {
-            let name = ts_interface_declaration.id.sym;
+        SchemyNode::TsInterfaceDecl {
+            node: ts_interface_declaration,
+            parent: None,
+        } => {
+            let name = &ts_interface_declaration.id.sym;
             symbol_tables.insert(
                 file_path,
                 name.to_string(),
                 Declaration::Type {
-                    node: SchemyNode::TsInterfaceDecl(&ts_interface_declaration),
+                    node: SchemyNode::TsInterfaceDecl {
+                        node: ts_interface_declaration.clone(),
+                        parent: None,
+                    },
                 },
             )
         }
-        SchemyNode::TsTypeAliasDecl(ts_type_alias_declaration) => {
-            let name = ts_type_alias_declaration.id.sym;
+        SchemyNode::TsTypeAliasDecl {
+            node: ts_type_alias_declaration,
+            parent: None,
+        } => {
+            let name = &ts_type_alias_declaration.id.sym;
             symbol_tables.insert(
                 file_path,
                 name.to_string(),
                 Declaration::Type {
-                    node: SchemyNode::TsTypeAliasDecl(&ts_type_alias_declaration),
+                    node: SchemyNode::TsTypeAliasDecl {
+                        node: ts_type_alias_declaration.clone(),
+                        parent: None,
+                    },
                 },
             )
         }
-        SchemyNode::VarDecl(variable_declaration) => {
+        SchemyNode::VarDecl {
+            node: variable_declaration,
+            parent: None,
+        } => {
             for declaration in &variable_declaration.decls {
-                match declaration.name {
+                match &declaration.name {
                     deno_ast::swc::ast::Pat::Ident(identifier) => {
                         let name = identifier.id.sym.to_string();
-                        match identifier.type_ann {
-                            Some(type_annotation) => match *type_annotation.type_ann {
-                                deno_ast::swc::ast::TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                        match &identifier.type_ann {
+                            Some(type_annotation) => match &*type_annotation.type_ann {
+                                deno_ast::swc::ast::TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
                                     deno_ast::swc::ast::TsEntityName::Ident(identifier) => {
                                         let type_name = identifier.sym.to_string();
                                         symbol_tables.insert(
@@ -227,9 +269,17 @@ pub fn store_declaration_maybe<'n>(
                                 },
                                 _ => {}
                             },
-                            None => match declaration.init {
+                            None => match &declaration.init {
                                 Some(initializer) => {
-                                    store_variable(&name, SchemyNode::Expr(&initializer), file_path, symbol_tables);
+                                    store_variable(
+                                        &name,
+                                        SchemyNode::Expr {
+                                            node: *initializer.clone(),
+                                            parent: None,
+                                        },
+                                        file_path,
+                                        symbol_tables,
+                                    );
                                 }
                                 None => {}
                             },
@@ -246,7 +296,10 @@ pub fn store_declaration_maybe<'n>(
 fn store_variable(name: &str, node: SchemyNode, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
     for child in node.children() {
         match child {
-            SchemyNode::Ident(identifier) => {
+            SchemyNode::Ident {
+                node: identifier,
+                parent: None,
+            } => {
                 let type_name = identifier.sym.to_string();
                 symbol_tables.insert(
                     file_path,
@@ -257,7 +310,10 @@ fn store_variable(name: &str, node: SchemyNode, file_path: &str, symbol_tables: 
                     },
                 )
             }
-            SchemyNode::TsTypeRef(type_ref) => match type_ref.type_name {
+            SchemyNode::TsTypeRef {
+                node: type_ref,
+                parent: None,
+            } => match &type_ref.type_name {
                 deno_ast::swc::ast::TsEntityName::Ident(identifier) => {
                     let type_name = identifier.sym.to_string();
                     symbol_tables.insert(

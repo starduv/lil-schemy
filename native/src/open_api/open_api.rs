@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use deno_ast::{swc::ast::*, ParseParams, ParsedSource, SourceTextInfo};
 use lazy_static::__Deref;
@@ -32,50 +34,50 @@ impl<'m> OpenApi<'m> {
         self.paths.entry(key.to_string()).or_insert(ApiPath::new())
     }
 
-    pub(crate) fn merge(&mut self, open_api: OpenApi) -> () {
-        self.components.schemas.extend(open_api.components.schemas);
-        self.paths.extend(open_api.paths);
-    }
-
     pub(crate) fn from_source_file(&mut self, file_path: &str) -> () {
         let result = get_syntax_tree(file_path);
-
-        self.find_paths(
-            SchemyNode::Module {
-                node: result.module(),
-                parent: None,
-            },
-            file_path,
-        );
+        let module = SchemyNode::Module {
+            node: Rc::new(result.module()),
+            parent: None,
+        };
+        
+        self.find_paths(module, file_path);
 
         while let Some(source_file_name) = self.deferred_schemas.next_module() {
             let result = get_syntax_tree(&source_file_name);
             let module = SchemyNode::Module {
-                node: result.module(),
+                node: Rc::new(result.module()),
                 parent: None,
             };
             for child in module.children() {
-                self.define_deferred_schemas(&child, &source_file_name)
+                self.define_deferred_schemas(child, &source_file_name)
             }
         }
     }
 
-    fn find_paths(&mut self, node: SchemyNode<'m>, file_path: &str) {
+    fn find_paths(&mut self, node: SchemyNode, file_path: &str) {
         store_declaration_maybe(&node, file_path, &mut self.symbol_tables);
-
-        for child in node.children() {
+        let children = node.children();
+        if children.len() == 0 {
+            println!("{:?}", node);
+            panic!("No children found")
+        }
+        for child in children {
             match child {
-                call_expression @ SchemyNode::CallExpr { node: _, parent: _ } => match call_expression.callee() {
+                ref call_expression @ SchemyNode::CallExpr { node: _, parent: _ } => match call_expression.callee() {
                     Some(SchemyNode::Callee {
-                        node: Callee::Expr(expression),
+                        node: expression,
                         parent: _,
-                    }) => match **expression {
-                        Expr::Ident(ident) if ident.sym.eq("Path") => {
-                            self.symbol_tables.add_child_scope(file_path);
-                            self.add_path(&call_expression, file_path);
-                            self.symbol_tables.parent_scope(file_path);
-                        }
-                        _ => self.find_paths(child, file_path),
+                    }) => match expression.deref() {
+                        Callee::Expr(ident) => match **ident {
+                            Expr::Ident(ident) if ident.sym.eq("Path") => {
+                                self.symbol_tables.add_child_scope(file_path);
+                                self.add_path(&call_expression, file_path);
+                                self.symbol_tables.parent_scope(file_path);
+                            }
+                            _ => self.find_paths(child, file_path),
+                        },
+                        _ => {}
                     },
                     _ => {}
                 },
@@ -101,7 +103,7 @@ impl<'m> OpenApi<'m> {
     fn add_request_details(
         &mut self,
         operation: &mut ApiPathOperation,
-        route_handler: &SchemyNode<'m>,
+        route_handler: &SchemyNode,
         file_path: &str,
     ) -> () {
         if let arrow_expression @ SchemyNode::ArrowExpr { node: _, parent: _ } = route_handler {
@@ -115,24 +117,24 @@ impl<'m> OpenApi<'m> {
         }
     }
 
-    fn add_request_params(&mut self, operation: &mut ApiPathOperation, node: &SchemyNode<'m>, file_path: &str) {
+    fn add_request_params(&mut self, operation: &mut ApiPathOperation, node: &SchemyNode, file_path: &str) {
         for node in node.children() {
             match node {
                 SchemyNode::TsTypeRef {
-                    node: type_ref,
+                    node: ref type_ref,
                     parent: None,
-                } => match type_ref.type_name {
+                } => match &type_ref.deref().type_name {
                     TsEntityName::Ident(identifier) if identifier.sym.eq("BodyParam") => {
                         self.add_body_param_details(operation, type_ref, file_path);
                     }
                     TsEntityName::Ident(identifier) if identifier.sym.eq("Header") => {
-                        self.add_param_details(operation, "header", &node, file_path);
+                        self.add_param_details(operation, "header", node, file_path);
                     }
                     TsEntityName::Ident(identifier) if identifier.sym.eq("QueryParam") => {
-                        self.add_param_details(operation, "query", &node, file_path);
+                        self.add_param_details(operation, "query", node, file_path);
                     }
                     TsEntityName::Ident(identifier) if identifier.sym.eq("RouteParam") => {
-                        self.add_param_details(operation, "path", &node, file_path);
+                        self.add_param_details(operation, "path", node, file_path);
                     }
                     // TODO support route handler params in separate module
                     TsEntityName::Ident(identifier) => {
@@ -149,19 +151,19 @@ impl<'m> OpenApi<'m> {
         &mut self,
         operation: &mut ApiPathOperation,
         location: &str,
-        type_ref: &SchemyNode<'m>,
+        type_ref: SchemyNode,
         file_path: &str,
     ) {
-        let parameter_name = get_parameter_name(type_ref);
+        let parameter_name = get_parameter_name(&type_ref);
         let operation_param = operation.param(&parameter_name, location);
         if let SchemyNode::TsTypeRef {
-            node: type_ref,
+            node: ref type_ref,
             parent: _,
         } = type_ref
         {
-            if let Some(type_params) = type_ref.type_params {
+            if let Some(type_params) = &type_ref.type_params {
                 let namespace = match type_params.params.get(2) {
-                    Some(namespace) => match **namespace {
+                    Some(namespace) => match &**namespace {
                         TsType::TsLitType(namespace) => match &namespace.lit {
                             TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
                             _ => None,
@@ -172,7 +174,7 @@ impl<'m> OpenApi<'m> {
                 };
 
                 match type_params.params.get(0) {
-                    Some(param) => match **param {
+                    Some(param) => match &**param {
                         TsType::TsKeywordType(param_type) => match param_type.kind {
                             TsKeywordTypeKind::TsNumberKeyword => {
                                 operation_param.content().schema().data_type("number");
@@ -185,7 +187,7 @@ impl<'m> OpenApi<'m> {
                             }
                             _ => {}
                         },
-                        TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                        TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
                             TsEntityName::Ident(identifier) => {
                                 let reference = identifier.sym.to_string();
                                 self.define_referenced_schema(&reference, &reference, file_path, namespace.clone());
@@ -203,7 +205,7 @@ impl<'m> OpenApi<'m> {
                 }
 
                 match type_params.params.get(1) {
-                    Some(param) => match **param {
+                    Some(param) => match &**param {
                         TsType::TsLitType(required) => match required.lit {
                             TsLit::Bool(boolean) => {
                                 operation_param.required(boolean.value);
@@ -216,7 +218,7 @@ impl<'m> OpenApi<'m> {
                 }
 
                 match type_params.params.get(3) {
-                    Some(param) => match **param {
+                    Some(param) => match &**param {
                         TsType::TsLitType(format) => match &format.lit {
                             TsLit::Str(literal_string) => {
                                 operation_param
@@ -242,9 +244,9 @@ impl<'m> OpenApi<'m> {
         file_path: &str,
     ) -> () {
         let operation_param = operation.body();
-        if let Some(type_params) = type_ref.type_params {
+        if let Some(type_params) = &type_ref.type_params {
             let namespace = match type_params.params.get(2) {
-                Some(namespace) => match **namespace {
+                Some(namespace) => match &**namespace {
                     TsType::TsLitType(namespace) => match &namespace.lit {
                         TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
                         _ => None,
@@ -255,7 +257,7 @@ impl<'m> OpenApi<'m> {
             };
 
             match type_params.params.get(0) {
-                Some(param_type) => match **param_type {
+                Some(param_type) => match &**param_type {
                     TsType::TsKeywordType(param_type) => match param_type.kind {
                         TsKeywordTypeKind::TsNumberKeyword => {
                             operation_param.content().schema().data_type("number");
@@ -268,7 +270,7 @@ impl<'m> OpenApi<'m> {
                         }
                         _ => {}
                     },
-                    TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                    TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
                         TsEntityName::Ident(identifier) => {
                             let reference = self
                                 .symbol_tables
@@ -288,7 +290,7 @@ impl<'m> OpenApi<'m> {
             }
 
             match type_params.params.get(1) {
-                Some(required) => match **required {
+                Some(required) => match &**required {
                     TsType::TsLitType(required) => match required.lit {
                         TsLit::Bool(boolean) => {
                             operation_param.required(boolean.value);
@@ -302,13 +304,13 @@ impl<'m> OpenApi<'m> {
         }
     }
 
-    fn find_response(&mut self, operation: &mut ApiPathOperation, body: SchemyNode<'m>, file_path: &str) -> () {
+    fn find_response(&mut self, operation: &mut ApiPathOperation, body: SchemyNode, file_path: &str) -> () {
         for child in body.children() {
             store_declaration_maybe(&child, file_path, &mut self.symbol_tables);
 
             match child {
                 SchemyNode::Ident {
-                    node: identifier,
+                    node: ref identifier,
                     parent: _,
                 } if identifier.sym.eq("Response") => self.add_response(operation, child.parent().unwrap(), file_path),
                 other => self.find_response(operation, other, file_path),
@@ -317,14 +319,14 @@ impl<'m> OpenApi<'m> {
     }
 
     // TODO add schema for ref here
-    fn add_response(&mut self, operation: &mut ApiPathOperation, node: &SchemyNode<'m>, file_path: &str) -> () {
+    fn add_response(&mut self, operation: &mut ApiPathOperation, node: SchemyNode, file_path: &str) -> () {
         if let SchemyNode::CallExpr {
-            node: call_expression,
+            node: ref call_expression,
             parent: _,
         } = node
         {
             let options = match call_expression.args.get(1) {
-                Some(arg) => match *arg.expr {
+                Some(arg) => match &*arg.expr {
                     Expr::Object(options) => Some(get_response_options(&options)),
                     _ => None,
                 },
@@ -337,8 +339,8 @@ impl<'m> OpenApi<'m> {
             };
 
             let response_type = match call_expression.args.get(0) {
-                Some(arg) => match *arg.expr {
-                    Expr::New(new_expression) => match *new_expression.callee {
+                Some(arg) => match &*arg.expr {
+                    Expr::New(new_expression) => match &*new_expression.callee {
                         Expr::Ident(identifier) => Some(
                             self.symbol_tables
                                 .get_root_declaration_name(file_path, identifier.sym.to_string()),
@@ -349,8 +351,8 @@ impl<'m> OpenApi<'m> {
                         self.symbol_tables
                             .get_root_declaration_name(file_path, response_type.sym.to_string()),
                     ),
-                    Expr::TsAs(ts_as) => match *ts_as.type_ann {
-                        TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                    Expr::TsAs(ts_as) => match &*ts_as.type_ann {
+                        TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
                             TsEntityName::Ident(identifier) => Some(
                                 self.symbol_tables
                                     .get_root_declaration_name(file_path, identifier.sym.to_string()),
@@ -359,8 +361,8 @@ impl<'m> OpenApi<'m> {
                         },
                         _ => None,
                     },
-                    Expr::TsTypeAssertion(type_assertion) => match *type_assertion.type_ann {
-                        TsType::TsTypeRef(type_ref) => match type_ref.type_name {
+                    Expr::TsTypeAssertion(type_assertion) => match &*type_assertion.type_ann {
+                        TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
                             TsEntityName::Ident(identifier) => Some(
                                 self.symbol_tables
                                     .get_root_declaration_name(file_path, identifier.sym.to_string()),
@@ -418,17 +420,17 @@ impl<'m> OpenApi<'m> {
         };
     }
 
-    fn define_deferred_schemas(&mut self, node: &SchemyNode, source_file_name: &str) -> () {
-        store_declaration_maybe(node, source_file_name, &mut self.symbol_tables);
+    fn define_deferred_schemas(&mut self, node: SchemyNode, source_file_name: &str) -> () {
+        store_declaration_maybe(&node, source_file_name, &mut self.symbol_tables);
 
         match node {
             SchemyNode::ExportDefaultExpr { node: _, parent: _ } => {
                 self.define_deferred_type_maybe("default", source_file_name)
             }
             SchemyNode::ExportDecl {
-                node: export_declaration,
+                node: ref export_declaration,
                 parent: _,
-            } => match export_declaration.decl {
+            } => match &export_declaration.decl {
                 Decl::Class(class_declaration) => {
                     let name = class_declaration.ident.sym.to_string();
                     self.define_deferred_type_maybe(&name, source_file_name);
@@ -450,12 +452,12 @@ impl<'m> OpenApi<'m> {
                 for specifier in &named_export.specifiers {
                     match specifier {
                         ExportSpecifier::Named(named) => {
-                            let name = match named.exported {
+                            let name = match &named.exported {
                                 Some(exported) => match exported {
                                     ModuleExportName::Ident(id) => id.sym.to_string(),
                                     ModuleExportName::Str(id) => id.value.to_string(),
                                 },
-                                None => match named.orig {
+                                None => match &named.orig {
                                     ModuleExportName::Ident(id) => id.sym.to_string(),
                                     ModuleExportName::Str(id) => id.value.to_string(),
                                 },
@@ -959,17 +961,17 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, node: SchemyNod
             for property in &class_declaration.class.body {
                 match property {
                     ClassMember::ClassProp(class_property) => {
-                        let name = match class_property.key {
+                        let name = match &class_property.key {
                             PropName::Ident(identifier) => Some(identifier.sym.to_string()),
                             _ => None,
                         };
 
                         if let Some(name) = name {
-                            if let Some(annotation) = class_property.type_ann {
+                            if let Some(annotation) = &class_property.type_ann {
                                 define_referenced_schema_details(
                                     root_schema.property(&name),
                                     SchemyNode::TsType {
-                                        node: &annotation.type_ann,
+                                        node: Rc::new(&annotation.type_ann),
                                         parent: None,
                                     },
                                 );
@@ -988,17 +990,17 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, node: SchemyNod
             for property in &class_declaration.class.body {
                 match property {
                     ClassMember::ClassProp(class_property) => {
-                        let name = match class_property.key {
+                        let name = match &class_property.key {
                             PropName::Ident(identifier) => Some(identifier.sym.to_string()),
                             _ => None,
                         };
 
                         if let Some(name) = name {
-                            if let Some(annotation) = class_property.type_ann {
+                            if let Some(annotation) = &class_property.type_ann {
                                 define_referenced_schema_details(
                                     root_schema.property(&name),
                                     SchemyNode::TsType {
-                                        node: &annotation.type_ann,
+                                        node: Rc::new(&annotation.type_ann),
                                         parent: None,
                                     },
                                 );
@@ -1017,7 +1019,7 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, node: SchemyNod
             define_referenced_schema_details(
                 root_schema.items(),
                 SchemyNode::TsType {
-                    node: &array_type.elem_type,
+                    node: Rc::new(&array_type.elem_type),
                     parent: None,
                 },
             );
@@ -1031,7 +1033,7 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, node: SchemyNod
             for property in &interface_declaration.body.body {
                 match property {
                     TsTypeElement::TsPropertySignature(signature) => {
-                        let property_schema = match *signature.key {
+                        let property_schema = match &*signature.key {
                             Expr::Ident(identifier) => {
                                 let name = identifier.sym.to_string();
                                 Some(root_schema.property(&name))
@@ -1040,11 +1042,11 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, node: SchemyNod
                         };
 
                         if let Some(property_schema) = property_schema {
-                            if let Some(annotation) = signature.type_ann {
+                            if let Some(annotation) = &signature.type_ann {
                                 define_referenced_schema_details(
                                     property_schema,
                                     SchemyNode::TsType {
-                                        node: &annotation.type_ann,
+                                        node: Rc::new(&annotation.type_ann),
                                         parent: None,
                                     },
                                 );
@@ -1063,7 +1065,7 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, node: SchemyNod
             for member in &type_literal.members {
                 match member {
                     TsTypeElement::TsPropertySignature(signature) => {
-                        let property_schema = match *signature.key {
+                        let property_schema = match &*signature.key {
                             Expr::Ident(identifier) => {
                                 let name = identifier.sym.to_string();
                                 Some(root_schema.property(&name))
@@ -1072,11 +1074,11 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, node: SchemyNod
                         };
 
                         if let Some(property_schema) = property_schema {
-                            if let Some(annotation) = signature.type_ann {
+                            if let Some(annotation) = &signature.type_ann {
                                 define_referenced_schema_details(
                                     property_schema,
                                     SchemyNode::TsType {
-                                        node: &annotation.type_ann,
+                                        node: Rc::new(&annotation.type_ann),
                                         parent: None,
                                     },
                                 );
@@ -1093,7 +1095,7 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, node: SchemyNod
         } => define_referenced_schema_details(
             root_schema,
             SchemyNode::TsType {
-                node: &type_alias_declaration.type_ann,
+                node: Rc::new(&type_alias_declaration.type_ann),
                 parent: None,
             },
         ),
@@ -1130,7 +1132,7 @@ fn load_options(path_options: &mut PathOptions, node: &SchemyNode) {
         match child {
             SchemyNode::ObjectLit {
                 node: type_literal,
-                parent,
+                parent: _,
             } => {
                 for prop_or_spread in &type_literal.props {
                     match prop_or_spread.as_prop() {
@@ -1197,7 +1199,7 @@ fn get_parameter_name(node: &SchemyNode) -> String {
             identifier.sym.to_string()
         }
         other => match other.parent() {
-            Some(parent) => get_parameter_name(parent),
+            Some(ref parent) => get_parameter_name(parent),
             None => panic!("Could not find parameter name"),
         },
     }
@@ -1208,14 +1210,14 @@ fn get_response_options(options: &ObjectLit) -> ResponseOptions {
 
     for prop in &options.props {
         match prop {
-            PropOrSpread::Prop(prop) => match **prop {
+            PropOrSpread::Prop(prop) => match &**prop {
                 Prop::KeyValue(key_value) => {
-                    let key = match key_value.key {
+                    let key = match &key_value.key {
                         PropName::Ident(identifier) => Some(identifier.sym.to_string()),
                         _ => None,
                     };
 
-                    let value = match *key_value.value {
+                    let value = match &*key_value.value {
                         Expr::Lit(Lit::Str(value)) => Some(value.value.to_string()),
                         Expr::Lit(Lit::Num(value)) => value.raw.as_ref().map(|v| v.to_string()),
                         _ => None,
