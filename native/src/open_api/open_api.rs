@@ -11,13 +11,13 @@ use crate::typescript::{Declaration, DeclarationTables, SchemyNode};
 
 use super::{declaration_helpers::store_declaration_maybe, deferred_schemas::DeferredSchemas};
 
-pub struct OpenApiFactory<'m> {
+pub struct OpenApiFactory<'n> {
     ast_cache: HashMap<String, ParsedSource>,
-    symbol_tables: DeclarationTables<'m>,
+    symbol_tables: DeclarationTables<'n>,
 }
 
-impl<'m> OpenApiFactory<'m> {
-    pub(crate) fn from_source_file(&'m mut self, file_path: &str) -> OpenApi {
+impl<'n> OpenApiFactory<'n> {
+    pub(crate) fn from_source_file(&mut self, file_path: &str) -> OpenApi {
         let mut open_api = OpenApi::new();
         let mut deferred_schemas = DeferredSchemas::new();
         let symbol_tables = &mut DeclarationTables::default();
@@ -50,7 +50,7 @@ impl<'m> OpenApiFactory<'m> {
         open_api
     }
 
-    fn get_syntax_tree<'s: 'm>(&'s mut self, path: &str) -> &'m Module {
+    fn get_syntax_tree(&mut self, path: &str) -> &Module {
         self.ast_cache
             .entry(path.to_string())
             .or_insert_with(|| {
@@ -106,14 +106,14 @@ impl<'m> OpenApiFactory<'m> {
 }
 
 // BEGIN HELPER FUNCTINOS
-fn find_paths<'m>(
+fn find_paths<'n>(
     open_api: &mut OpenApi,
-    node: SchemyNode<'m>,
+    node: SchemyNode<'n>,
     file_path: &str,
     deferred_schemas: &mut DeferredSchemas,
-    symbol_tables: &mut DeclarationTables<'m>,
+    symbol_tables: &mut DeclarationTables<'n>,
 ) {
-    store_declaration_maybe(node, file_path, symbol_tables);
+    store_declaration_maybe(node.clone(), file_path, symbol_tables);
     let children = node.children();
     for child in children {
         match child {
@@ -145,12 +145,12 @@ fn find_paths<'m>(
     }
 }
 
-fn add_path<'m>(
+fn add_path<'n>(
     open_api: &mut OpenApi,
-    node: SchemyNode<'m>,
+    node: SchemyNode,
     file_path: &str,
     deferred_schemas: &mut DeferredSchemas,
-    symbol_tables: &mut DeclarationTables<'m>,
+    symbol_tables: &mut DeclarationTables<'n>,
 ) -> () {
     let args = node.args();
     let route_handler = args.first();
@@ -175,13 +175,13 @@ fn add_path<'m>(
         .add_operation(&options.method.unwrap(), operation);
 }
 
-fn add_request_details<'m>(
+fn add_request_details<'n>(
     open_api: &mut OpenApi,
     operation: &mut ApiPathOperation,
-    route_handler: SchemyNode<'m>,
+    route_handler: SchemyNode,
     file_path: &str,
     deferred_schemas: &mut DeferredSchemas,
-    symbol_tables: &mut DeclarationTables<'m>,
+    symbol_tables: &mut DeclarationTables<'n>,
 ) -> () {
     if let arrow_expression @ SchemyNode::ArrowExpr { node: _, parent: _ } = route_handler {
         for param in &arrow_expression.params() {
@@ -196,14 +196,18 @@ fn add_request_details<'m>(
         }
 
         symbol_tables.add_child_scope(file_path);
-        find_response(
-            open_api,
-            operation,
-            arrow_expression.body().unwrap().clone(),
-            file_path,
-            deferred_schemas,
-            symbol_tables,
-        );
+
+        if let Some(body) = arrow_expression.body() {
+            find_response(
+                open_api,
+                operation,
+                body.clone(),
+                file_path,
+                deferred_schemas,
+                symbol_tables,
+            );
+        }
+
         symbol_tables.parent_scope(file_path);
     }
 }
@@ -451,33 +455,33 @@ fn add_body_param_details(
     }
 }
 
-fn find_response<'m>(
+fn find_response<'n>(
     open_api: &mut OpenApi,
     operation: &mut ApiPathOperation,
-    body: SchemyNode<'m>,
+    root: SchemyNode<'n>,
     file_path: &str,
     deferred_schemas: &mut DeferredSchemas,
-    symbol_tables: &mut DeclarationTables<'m>,
+    symbol_tables: &mut DeclarationTables<'n>,
 ) -> () {
-    for child in body.children() {
+    for ref child in root.children() {
         store_declaration_maybe(child.clone(), file_path, symbol_tables);
 
         match child {
             SchemyNode::Ident {
-                node: ref identifier,
+                node: identifier,
                 parent: _,
             } if identifier.sym.eq("Response") => add_response(
                 open_api,
                 operation,
-                child.parent().unwrap().clone(),
+                root.clone(),
                 file_path,
                 deferred_schemas,
                 symbol_tables,
             ),
-            other => find_response(
+            _ => find_response(
                 open_api,
                 operation,
-                other.clone(),
+                child.clone(),
                 file_path,
                 deferred_schemas,
                 symbol_tables,
@@ -599,12 +603,12 @@ fn define_referenced_schema(
     };
 }
 
-fn define_deferred_schemas<'m>(
+fn define_deferred_schemas<'n>(
     open_api: &mut OpenApi,
-    node: SchemyNode<'m>,
+    node: SchemyNode<'n>,
     source_file_name: &str,
     deferred_schemas: &mut DeferredSchemas,
-    symbol_tables: &mut DeclarationTables<'m>,
+    symbol_tables: &mut DeclarationTables<'n>,
 ) -> () {
     store_declaration_maybe(node.clone(), source_file_name, symbol_tables);
 

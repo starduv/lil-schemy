@@ -4,297 +4,297 @@ use deno_ast::swc::ast::*;
 use lazy_static::__Deref;
 
 #[derive(Debug)]
-pub enum SchemyNode<'m> {
+pub enum SchemyNode<'n> {
     TsNamespaceExport {
-        node: Rc<&'m TsNamespaceExportDecl>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsNamespaceExportDecl>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsExportAssignment {
-        node: Rc<&'m TsExportAssignment>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsExportAssignment>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsImportEquals {
-        node: Rc<&'m TsImportEqualsDecl>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsImportEqualsDecl>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ExportAll {
-        node: Rc<&'m ExportAll>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ExportAll>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     BlockStmt {
-        node: Rc<&'m BlockStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n BlockStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     EmptyStmt {
-        node: Rc<&'m EmptyStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n EmptyStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     Decl {
-        node: Rc<&'m Decl>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n Decl>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     DebuggerStmt {
-        node: Rc<&'m DebuggerStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n DebuggerStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     WithStmt {
-        node: Rc<&'m WithStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n WithStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ReturnStmt {
-        node: Rc<&'m ReturnStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ReturnStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     LabeledStmt {
-        node: Rc<&'m LabeledStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n LabeledStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     BreakStmt {
-        node: Rc<&'m BreakStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n BreakStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ContinueStmt {
-        node: Rc<&'m ContinueStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ContinueStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     IfStmt {
-        node: Rc<&'m IfStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n IfStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     SwitchStmt {
-        node: Rc<&'m SwitchStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n SwitchStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ThrowStmt {
-        node: Rc<&'m ThrowStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ThrowStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TryStmt {
-        node: Rc<&'m TryStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TryStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     WhileStmt {
-        node: Rc<&'m WhileStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n WhileStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     DoWhileStmt {
-        node: Rc<&'m DoWhileStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n DoWhileStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ForStmt {
-        node: Rc<&'m ForStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ForStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ForInStmt {
-        node: Rc<&'m ForInStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ForInStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ForOfStmt {
-        node: Rc<&'m ForOfStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ForOfStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ExprStmt {
-        node: Rc<&'m ExprStmt>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ExprStmt>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsPropertySignature {
-        node: Rc<&'m TsPropertySignature>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsPropertySignature>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsKeywordType {
-        node: Rc<&'m TsKeywordType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsKeywordType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsThisType {
-        node: Rc<&'m TsThisType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsThisType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsFnOrConstructorType {
-        node: Rc<&'m TsFnOrConstructorType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsFnOrConstructorType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsTypeRef {
-        node: Rc<&'m TsTypeRef>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsTypeRef>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsTypeQuery {
-        node: Rc<&'m TsTypeQuery>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsTypeQuery>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsTypeLit {
-        node: Rc<&'m TsTypeLit>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsTypeLit>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsArrayType {
-        node: Rc<&'m TsArrayType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsArrayType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsTupleType {
-        node: Rc<&'m TsTupleType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsTupleType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsOptionalType {
-        node: Rc<&'m TsOptionalType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsOptionalType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsRestType {
-        node: Rc<&'m TsRestType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsRestType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsUnionOrIntersectionType {
-        node: Rc<&'m TsUnionOrIntersectionType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsUnionOrIntersectionType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsConditionalType {
-        node: Rc<&'m TsConditionalType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsConditionalType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsInferType {
-        node: Rc<&'m TsInferType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsInferType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsParenthesizedType {
-        node: Rc<&'m TsParenthesizedType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsParenthesizedType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsTypeOperator {
-        node: Rc<&'m TsTypeOperator>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsTypeOperator>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsIndexedAccessType {
-        node: Rc<&'m TsIndexedAccessType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsIndexedAccessType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsMappedType {
-        node: Rc<&'m TsMappedType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsMappedType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsLitType {
-        node: Rc<&'m TsLitType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsLitType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsTypePredicate {
-        node: Rc<&'m TsTypePredicate>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsTypePredicate>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsImportType {
-        node: Rc<&'m TsImportType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsImportType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsType {
-        node: Rc<&'m TsType>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsType>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsTypeAnnotation {
-        node: Rc<&'m TsTypeAnn>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsTypeAnn>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ObjectLit {
-        node: Rc<&'m ObjectLit>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ObjectLit>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     BlockStmtOrExpr {
-        node: Rc<&'m BlockStmtOrExpr>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n BlockStmtOrExpr>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     Pat {
-        node: Rc<&'m Pat>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n Pat>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ArrowExpr {
-        node: Rc<&'m ArrowExpr>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ArrowExpr>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ExprOrSpread {
-        node: Rc<&'m ExprOrSpread>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ExprOrSpread>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     Callee {
-        node: Rc<&'m Callee>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n Callee>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     CallExpr {
-        node: Rc<&'m CallExpr>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n CallExpr>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     Ident {
-        node: Rc<&'m Ident>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n Ident>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     Expr {
-        node: Rc<&'m Expr>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n Expr>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     VarDecl {
-        node: Rc<&'m VarDecl>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n VarDecl>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     NamedExport {
-        node: Rc<&'m NamedExport>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n NamedExport>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ImportNamedSpecifier {
-        node: Rc<&'m ImportNamedSpecifier>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ImportNamedSpecifier>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ClassDecl {
-        node: Rc<&'m ClassDecl>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ClassDecl>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ClassExpr {
-        node: Rc<&'m ClassExpr>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ClassExpr>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ExportDecl {
-        node: Rc<&'m ExportDecl>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ExportDecl>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ExportDefaultDecl {
-        node: Rc<&'m ExportDefaultDecl>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ExportDefaultDecl>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ExportDefaultExpr {
-        node: Rc<&'m ExportDefaultExpr>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ExportDefaultExpr>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ImportDecl {
-        node: Rc<&'m ImportDecl>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ImportDecl>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ImportDefaultSpecifier {
-        node: Rc<&'m ImportDefaultSpecifier>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ImportDefaultSpecifier>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     Module {
-        node: Rc<&'m Module>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n Module>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ModuleItem {
-        node: Rc<&'m ModuleItem>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ModuleItem>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsEnumDecl {
-        node: Rc<&'m TsEnumDecl>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsEnumDecl>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsInterfaceDecl {
-        node: Rc<&'m TsInterfaceDecl>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsInterfaceDecl>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     TsTypeAliasDecl {
-        node: Rc<&'m TsTypeAliasDecl>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n TsTypeAliasDecl>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
     ImportSpecifier {
-        node: Rc<&'m ImportSpecifier>,
-        parent: Option<Box<SchemyNode<'m>>>,
+        node: Rc<&'n ImportSpecifier>,
+        parent: Option<Box<SchemyNode<'n>>>,
     },
 }
 
-impl<'m> SchemyNode<'m> {
-    pub fn children(&self) -> Vec<SchemyNode> {
+impl<'n> SchemyNode<'n> {
+    pub fn children(&'n self) -> Vec<SchemyNode<'n>> {
         match self {
-            SchemyNode::ModuleItem { node, parent:_ } => match node.deref() {
+            SchemyNode::ModuleItem { node, parent: _ } => match node.deref() {
                 ModuleItem::ModuleDecl(declaration) => match declaration {
                     ModuleDecl::Import(declaration) => vec![SchemyNode::ImportDecl {
                         node: Rc::new(declaration),
@@ -667,8 +667,8 @@ impl<'m> SchemyNode<'m> {
     }
 }
 
-impl<'m> Clone for SchemyNode<'m> {
-    fn clone(&self) -> Self {
+impl<'n> Clone for SchemyNode<'n> {
+    fn clone(&self) -> SchemyNode<'n> {
         match self {
             SchemyNode::TsNamespaceExport { node, parent } => SchemyNode::TsNamespaceExport {
                 node: node.clone(),
@@ -954,7 +954,6 @@ impl<'m> Clone for SchemyNode<'m> {
                 node: node.clone(),
                 parent: parent.as_ref().map(|p| p.clone()),
             },
-            
         }
     }
 }

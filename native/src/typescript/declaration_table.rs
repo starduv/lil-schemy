@@ -5,22 +5,22 @@ use ahash::{HashMap, HashMapExt};
 use super::SchemyNode;
 
 #[derive(Debug, Default)]
-struct Scope<'m> {
-    symbols: HashMap<String, Declaration<'m>>,
-    children: Option<Vec<Rc<RefCell<Scope<'m>>>>>,
-    parent: Option<Rc<RefCell<Scope<'m>>>>,
+struct Scope<'n> {
+    symbols: HashMap<String, Declaration<'n>>,
+    children: Option<Vec<Rc<RefCell<Scope<'n>>>>>,
+    parent: Option<Rc<RefCell<Scope<'n>>>>,
 }
 
 #[derive(Debug, Default)]
-pub struct DeclarationTables<'m> {
-    tables: HashMap<String, DeclarationTable<'m>>,
+pub struct DeclarationTables<'n> {
+    tables: HashMap<String, DeclarationTable<'n>>,
 }
-impl<'m> DeclarationTables<'m> {
+impl<'n> DeclarationTables<'n> {
     pub fn has_table(&self, file_name: &str) -> bool {
         self.tables.contains_key(file_name)
     }
 
-    pub fn insert(&mut self, file_path: &str, name: String, value: Declaration<'m>) -> () {
+    pub fn insert(&mut self, file_path: &str, name: String, value: Declaration<'n>) -> () {
         let table = self.tables.entry(file_path.to_owned()).or_insert_with(Default::default);
         table.insert(name, value);
     }
@@ -55,12 +55,12 @@ impl<'m> DeclarationTables<'m> {
 }
 
 #[derive(Debug, Default)]
-pub struct DeclarationTable<'m> {
-    current_scope: Rc<RefCell<Scope<'m>>>,
-    root_scope: Rc<RefCell<Scope<'m>>>,
+pub struct DeclarationTable<'n> {
+    current_scope: Rc<RefCell<Scope<'n>>>,
+    root_scope: Rc<RefCell<Scope<'n>>>,
 }
-impl<'m> DeclarationTable<'m> {
-    pub(crate) fn new() -> DeclarationTable<'m> {
+impl<'n> DeclarationTable<'n> {
+    pub(crate) fn new() -> DeclarationTable<'n> {
         let root_scope = Rc::new(RefCell::new(Scope {
             symbols: HashMap::new(),
             children: None,
@@ -73,11 +73,11 @@ impl<'m> DeclarationTable<'m> {
         }
     }
 
-    fn insert(&mut self, name: String, value: Declaration<'m>) -> () {
+    fn insert(&mut self, name: String, value: Declaration<'n>) -> () {
         self.current_scope.borrow_mut().symbols.insert(name, value);
     }
 
-    fn add_child_scope(&mut self) -> &mut DeclarationTable<'m> {
+    fn add_child_scope(&mut self) -> &mut DeclarationTable<'n> {
         let child_scope = Rc::new(RefCell::new(Scope {
             symbols: HashMap::new(),
             children: None,
@@ -95,7 +95,7 @@ impl<'m> DeclarationTable<'m> {
         self
     }
 
-    fn parent_scope(&mut self) -> &mut DeclarationTable<'m> {
+    fn parent_scope(&mut self) -> &mut DeclarationTable<'n> {
         let parent = Rc::clone(
             self.current_scope
                 .borrow()
@@ -195,14 +195,14 @@ impl<'m> DeclarationTable<'m> {
     }
 }
 
-pub enum Declaration<'m> {
+pub enum Declaration<'n> {
     Alias { from: String, to: String },
-    Type { node: SchemyNode<'m> },
+    Type { node: SchemyNode<'n> },
     Export { name: String, source_file_name: String },
     Import { name: String, source_file_name: String },
 }
 
-impl<'m> Clone for Declaration<'m> {
+impl<'n> Clone for Declaration<'n> {
     fn clone(&self) -> Self {
         match self {
             Self::Alias { from, to } => Self::Alias {
@@ -222,7 +222,7 @@ impl<'m> Clone for Declaration<'m> {
     }
 }
 
-impl<'m> fmt::Debug for Declaration<'m> {
+impl<'n> fmt::Debug for Declaration<'n> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Alias { from, to } => f.debug_struct("Alias").field("from", from).field("to", to).finish(),

@@ -4,7 +4,7 @@ use es_resolve::{EsResolver, TargetEnv};
 
 use crate::typescript::{Declaration, DeclarationTables, SchemyNode};
 
-pub fn store_declaration_maybe<'m>(root: SchemyNode<'m>, file_path: &str, symbol_tables: &mut DeclarationTables<'m>) -> () {
+pub fn store_declaration_maybe<'t, 'n : 't>(root: SchemyNode<'n>, file_path: &str, symbol_tables: &mut DeclarationTables<'t>) -> () {
     match root {
         SchemyNode::ClassDecl {
             node: ref class_declaration,
