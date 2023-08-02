@@ -18,28 +18,24 @@ impl<'m> ModuleCache<'m> {
         }
     }
 
-    pub fn get_syntax_tree(&self, path: &str) -> Rc<SchemyNode<'m>> {
-        {
-            let mut borrow = self.cache.borrow_mut();
-            borrow.entry(path.to_string()).or_insert_with(|| {
-                let specifier = Url::from_file_path(path).unwrap();
-                let source_text = std::fs::read_to_string(specifier.path()).unwrap();
-                let parsed_source = deno_ast::parse_module(ParseParams {
-                    capture_tokens: true,
-                    maybe_syntax: None,
-                    media_type: deno_ast::MediaType::TypeScript,
-                    scope_analysis: false,
-                    specifier: specifier.to_string(),
-                    text_info: SourceTextInfo::new(source_text.into()),
-                })
-                .unwrap();
-    
-                Rc::new(parsed_source)
-            });
-        }
+    pub fn get_syntax_tree(&'m self, path: &str) -> Rc<SchemyNode<'m>> {
+        let mut borrow = self.cache.borrow_mut();
+        borrow.entry(path.to_string()).or_insert_with(|| {
+            let specifier = Url::from_file_path(path).unwrap();
+            let source_text = std::fs::read_to_string(specifier.path()).unwrap();
+            let parsed_source = deno_ast::parse_module(ParseParams {
+                capture_tokens: true,
+                maybe_syntax: None,
+                media_type: deno_ast::MediaType::TypeScript,
+                scope_analysis: false,
+                specifier: specifier.to_string(),
+                text_info: SourceTextInfo::new(source_text.into()),
+            })
+            .unwrap();
 
-        let borrow = self.cache.borrow();
-        let source = borrow.get(path).map(|n| n.clone()).unwrap();
+            Rc::new(parsed_source)
+        });
+        let source = borrow.get(path).unwrap();
         SchemyNode::from_module(source.module(), &self.context.clone())
     }
 }

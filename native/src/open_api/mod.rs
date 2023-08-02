@@ -2,12 +2,12 @@ mod deferred;
 mod factory;
 mod schema;
 
-use std::{cell::RefCell, fs::File, io::Write, path::PathBuf, rc::Rc};
+use std::{fs::File, io::Write, path::PathBuf};
 
 use neon::{prelude::{*, Context}, result::Throw};
 use serde_json::json;
 
-use crate::typescript::{ModuleCache, SchemyNode};
+use crate::typescript::ModuleCache;
 
 use self::{factory::OpenApiFactory, schema::OpenApi};
 
@@ -41,15 +41,14 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
 }
 
 fn generate_schema(open_api_handle: Handle<JsObject>, cx: &mut FunctionContext) -> Result<String, Throw> {
-    let mut ast_cache = ModuleCache::new();
+    let ast_cache = ModuleCache::new();
     let mut factory = OpenApiFactory::new();
-    let context = Rc::new(RefCell::new(crate::typescript::Context::default()));
     let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "entry")?;
 
     let mut open_api = OpenApi::new();
     for path in paths.to_vec(cx)? {
         let path = path.downcast_or_throw::<JsString, _>(cx)?.value(cx);
-        factory.append_schema(&mut open_api, &mut ast_cache, &path);
+        factory.append_schema(&mut open_api, &ast_cache, &path);
     }
 
     merge_schemas(&mut open_api, open_api_handle, cx)

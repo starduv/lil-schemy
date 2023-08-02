@@ -24,7 +24,7 @@ impl OpenApiFactory {
         }
     }
 
-    pub fn append_schema(&mut self, open_api: &mut OpenApi, module_cache: &ModuleCache, file_path: &str) -> () {
+    pub fn append_schema<'m>(&mut self, open_api: &mut OpenApi, module_cache: &'m ModuleCache<'m>, file_path: &str) -> () {
         let module = module_cache.get_syntax_tree(file_path);
         self.find_paths(open_api, module, file_path);
         while let Some(source_file_name) = self.deferred_schemas.next_module() {
