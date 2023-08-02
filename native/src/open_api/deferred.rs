@@ -1,21 +1,12 @@
 use std::collections::BTreeMap;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DeferredSchemas {
-    deferred: u32,
     modules: Vec<String>,
     types: BTreeMap<String, BTreeMap<String, DeferredType>>,
 }
 
 impl DeferredSchemas {
-    pub(crate) fn new() -> DeferredSchemas {
-        DeferredSchemas {
-            deferred: 0,
-            modules: Vec::new(),
-            types: BTreeMap::new(),
-        }
-    }
-
     pub(crate) fn next_module(&mut self) -> Option<String> {
         self.modules.pop()
     }
