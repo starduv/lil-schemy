@@ -1,12 +1,12 @@
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
-use deno_ast::{ParseParams, ParsedSource, SourceTextInfo};
+use deno_ast::{ParseParams, SourceTextInfo, ParsedSource};
 use url::Url;
 
 use super::{Context, SchemyNode};
 
 pub struct ModuleCache<'m> {
-    cache: RefCell<BTreeMap<String, Rc<ParsedSource>>>,
+    cache: RefCell<BTreeMap<String, ParsedSource>>,
     context: Rc<RefCell<Context<'m>>>,
 }
 
@@ -18,7 +18,7 @@ impl<'m> ModuleCache<'m> {
         }
     }
 
-    pub fn get_syntax_tree(&'m self, path: &str) -> Rc<SchemyNode<'m>> {
+    pub fn get_syntax_tree(&self, path: &str) -> &ParsedSource {
         let mut borrow = self.cache.borrow_mut();
         borrow.entry(path.to_string()).or_insert_with(|| {
             let specifier = Url::from_file_path(path).unwrap();
@@ -33,9 +33,8 @@ impl<'m> ModuleCache<'m> {
             })
             .unwrap();
 
-            Rc::new(parsed_source)
+            parsed_source
         });
-        let source = borrow.get(path).unwrap();
-        SchemyNode::from_module(source.module(), &self.context.clone())
+        borrow.get(path).unwrap()
     }
 }

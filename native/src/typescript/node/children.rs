@@ -1,18 +1,18 @@
 use std::rc::Rc;
 
-use deno_ast::swc::ast::*;
+use deno_ast::{swc::ast::*, ParsedSource};
 
 use super::{NodeKind, SchemyNode};
 
 impl<'n> SchemyNode<'n> {
-    pub fn children(&self) -> Vec<usize> {
+    pub fn children<'m>(&self) -> Vec<usize> {
         let mut children = vec![];
-        match self.kind {
+        match &self.kind {
+            NodeKind::Source(raw) => self.get_module_children(raw, &self.index, &mut children),
             NodeKind::ExportDecl(raw) => self.get_export_declartion_children(raw, &self.index, &mut children),
             NodeKind::ExportDefaultDecl(raw) => self.get_export_default_decl_children(raw, &self.index, &mut children),
             NodeKind::ExportDefaultExpr(raw) => self.get_export_default_expr_children(raw, &self.index, &mut children),
             NodeKind::ModuleItem(raw) => self.get_module_item_children(raw, &self.index, &mut children),
-            NodeKind::Module(raw) => self.get_module_children(raw, &self.index, &mut children),
             NodeKind::ImportDecl(raw) => self.get_import_decl_children(raw, &self.index, &mut children),
             NodeKind::Pat(raw) => self.get_pat_children(raw, &self.index, &mut children),
             NodeKind::BlockStmt(raw) => self.get_statement_children(raw, &self.index, &mut children),
@@ -21,19 +21,6 @@ impl<'n> SchemyNode<'n> {
             _ => {}
         }
         children
-    }
-
-    fn get_source_children(&self, source: &'n Module, index: &usize, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
-        let child_index = borrow.nodes.len();
-        let child_node = SchemyNode {
-            index: child_index,
-            parent_index: Some(index.clone()),
-            kind: NodeKind::Module(source),
-            context: self.context.clone(),
-        };
-        borrow.nodes.push(Rc::new(child_node));
-        children.push(child_index);
     }
 
     fn get_export_declartion_children(&self, export_decl: &'n ExportDecl, index: &usize, children: &mut Vec<usize>) {

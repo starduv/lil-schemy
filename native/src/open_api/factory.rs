@@ -1,10 +1,10 @@
-use std::{path::PathBuf, rc::Rc};
+use std::{path::PathBuf, rc::Rc, cell::RefCell};
 
 use deno_ast::swc::ast::*;
 use es_resolve::{EsResolver, TargetEnv};
 use lazy_static::__Deref;
 
-use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode};
+use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode, Context};
 
 use super::{
     deferred::DeferredSchemas,
@@ -25,10 +25,12 @@ impl OpenApiFactory {
     }
 
     pub fn append_schema<'m>(&mut self, open_api: &mut OpenApi, module_cache: &'m ModuleCache<'m>, file_path: &str) -> () {
-        let module = module_cache.get_syntax_tree(file_path);
+        let source = module_cache.get_syntax_tree(file_path);
+        let module = SchemyNode::from_module(source.module(), &Rc::new(RefCell::new(Context::default())));
         self.find_paths(open_api, module, file_path);
         while let Some(source_file_name) = self.deferred_schemas.next_module() {
-            let module = module_cache.get_syntax_tree(&source_file_name);
+            let source = module_cache.get_syntax_tree(&source_file_name);
+            let module = SchemyNode::from_module(source.module(), &Rc::new(RefCell::new(Context::default())));
             self.define_deferred_schemas(open_api, module, &source_file_name);
         }
     }

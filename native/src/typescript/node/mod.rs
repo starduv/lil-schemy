@@ -5,6 +5,7 @@ mod node_kind;
 
 use std::{cell::RefCell, rc::Rc};
 
+use deno_ast::ParsedSource;
 use deno_ast::swc::ast::Module;
 
 pub use self::context::Context;
@@ -18,7 +19,7 @@ pub struct SchemyNode<'m> {
     pub context: Rc<RefCell<Context<'m>>>,
 }
 
-impl<'m> SchemyNode<'m> {
+impl<'m, 'c> SchemyNode<'m> {
     pub fn from_module(module: &'m Module, context: &Rc<RefCell<Context<'m>>>) -> Rc<Self> {
         let mut borrow = context.borrow_mut();
         let index = borrow.nodes.len();
