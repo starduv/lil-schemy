@@ -1,6 +1,6 @@
-use std::{rc::Rc, vec};
+use std::{rc::Rc, vec, cell::RefCell};
 
-use super::{NodeKind, SchemyNode};
+use super::{NodeKind, SchemyNode, Context};
 
 impl<'m> SchemyNode<'m> {
     pub fn args(&self) -> Vec<Rc<SchemyNode<'m>>> {
@@ -61,23 +61,6 @@ impl<'m> SchemyNode<'m> {
                     .collect()
             }
             _ => vec![],
-        }
-    }
-
-    pub fn interface_body(&self) -> Option<Rc<SchemyNode<'m>>> {
-        match self.kind {
-            NodeKind::TsInterfaceDecl(decl) => {
-                let mut borrow = self.context.borrow_mut();
-                let callee_index = borrow.nodes.len();
-                borrow.nodes.push(Rc::new(SchemyNode {
-                    index: callee_index,
-                    parent_index: Some(self.index),
-                    kind: NodeKind::TsInterfaceBody(&decl.body),
-                    context: self.context.clone(),
-                }));
-                borrow.nodes.get(callee_index).map(|n| n.clone())
-            }
-            _ => None,
         }
     }
 
@@ -150,6 +133,35 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
+    pub fn get(&self, index: usize) -> Option<Rc<SchemyNode<'m>>> {
+        let borrow = self.context.borrow();
+        match borrow.nodes.get(index) {
+            Some(node) => Some(node.clone()),
+            None => None,
+        }
+    }
+
+    pub fn get_context(&self) -> Rc<RefCell<Context<'m>>> {
+        self.context.clone()
+    }
+
+    pub fn interface_body(&self) -> Option<Rc<SchemyNode<'m>>> {
+        match self.kind {
+            NodeKind::TsInterfaceDecl(decl) => {
+                let mut borrow = self.context.borrow_mut();
+                let callee_index = borrow.nodes.len();
+                borrow.nodes.push(Rc::new(SchemyNode {
+                    index: callee_index,
+                    parent_index: Some(self.index),
+                    kind: NodeKind::TsInterfaceBody(&decl.body),
+                    context: self.context.clone(),
+                }));
+                borrow.nodes.get(callee_index).map(|n| n.clone())
+            }
+            _ => None,
+        }
+    }
+
     pub fn members(&self) -> Vec<Rc<SchemyNode<'m>>> {
         match self.kind {
             NodeKind::TsTypeLit(type_lit) => {
@@ -191,6 +203,14 @@ impl<'m> SchemyNode<'m> {
                 })
                 .collect(),
             _ => vec![],
+        }
+    }
+
+    pub fn parent(&self) -> Option<Rc<SchemyNode<'m>>> {
+        let borrow = self.context.borrow();
+        match self.parent_index {
+            Some(index) => borrow.nodes.get(index).map(|n| n.clone()),
+            None => None,
         }
     }
 
@@ -257,14 +277,6 @@ impl<'m> SchemyNode<'m> {
                     .collect()
             }
             _ => vec![],
-        }
-    }
-
-    pub fn parent(&self) -> Option<Rc<SchemyNode<'m>>> {
-        let borrow = self.context.borrow();
-        match self.parent_index {
-            Some(index) => borrow.nodes.get(index).map(|n| n.clone()),
-            None => None,
         }
     }
 }

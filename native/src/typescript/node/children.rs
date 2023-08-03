@@ -1,14 +1,14 @@
 use std::rc::Rc;
 
-use deno_ast::{swc::ast::*, ParsedSource};
+use swc_ecma_ast::*;
 
 use super::{NodeKind, SchemyNode};
 
 impl<'n> SchemyNode<'n> {
-    pub fn children<'m>(&self) -> Vec<usize> {
+    pub fn children(&self) -> Vec<usize> {
         let mut children = vec![];
-        match &self.kind {
-            NodeKind::Source(raw) => self.get_module_children(raw, &self.index, &mut children),
+        match self.kind {
+            NodeKind::Module(module) => self.get_module_children(module, &self.index, &mut children),
             NodeKind::ExportDecl(raw) => self.get_export_declartion_children(raw, &self.index, &mut children),
             NodeKind::ExportDefaultDecl(raw) => self.get_export_default_decl_children(raw, &self.index, &mut children),
             NodeKind::ExportDefaultExpr(raw) => self.get_export_default_expr_children(raw, &self.index, &mut children),
@@ -21,6 +21,21 @@ impl<'n> SchemyNode<'n> {
             _ => {}
         }
         children
+    }
+
+    fn get_module_children(&self, module: &'n Module, index: &usize, children: &mut Vec<usize>) {
+        let mut borrow = self.context.borrow_mut();
+        for item in &module.body {
+            let child_index = borrow.nodes.len();
+            let child_node = SchemyNode {
+                index: child_index,
+                parent_index: Some(index.clone()),
+                kind: NodeKind::ModuleItem(item),
+                context: self.context.clone(),
+            };
+            borrow.nodes.push(Rc::new(child_node));
+            children.push(child_index);
+        }
     }
 
     fn get_export_declartion_children(&self, export_decl: &'n ExportDecl, index: &usize, children: &mut Vec<usize>) {
@@ -120,7 +135,7 @@ impl<'n> SchemyNode<'n> {
         children: &mut Vec<usize>,
     ) {
         match &*expression.expr {
-            deno_ast::swc::ast::Expr::Ident(identifier) => {
+            Expr::Ident(identifier) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
                 let child_node = SchemyNode {
@@ -143,7 +158,7 @@ impl<'n> SchemyNode<'n> {
         children: &mut Vec<usize>,
     ) {
         match &export_declaration.decl {
-            deno_ast::swc::ast::DefaultDecl::Class(declaration) => {
+            DefaultDecl::Class(declaration) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
                 let child_node = SchemyNode {
@@ -155,7 +170,7 @@ impl<'n> SchemyNode<'n> {
                 borrow.nodes.push(Rc::new(child_node));
                 children.push(child_index);
             }
-            deno_ast::swc::ast::DefaultDecl::TsInterfaceDecl(declaration) => {
+            DefaultDecl::TsInterfaceDecl(declaration) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
                 let child_node = SchemyNode {
@@ -184,21 +199,6 @@ impl<'n> SchemyNode<'n> {
             borrow.nodes.push(Rc::new(child_node));
             children.push(child_index);
         }
-    }
-
-    fn get_module_children(&self, module: &'n Module, index: &usize, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
-        module.body.iter().for_each(|item| {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                kind: NodeKind::ModuleItem(item),
-                index: child_index,
-                parent_index: Some(index.clone()),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
-        })
     }
 
     fn get_module_item_children(&self, module_item: &'n ModuleItem, index: &usize, children: &mut Vec<usize>) {

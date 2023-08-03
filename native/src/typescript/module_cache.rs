@@ -1,40 +1,54 @@
-use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
+use std::{rc::Rc, collections::BTreeMap, path::Path};
+use swc_common::{
+    errors::{ColorConfig, Handler},
+    sync::Lrc,
+    SourceMap,
+};
+use swc_ecma_ast::Module;
+use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax};
 
-use deno_ast::{ParseParams, SourceTextInfo, ParsedSource};
-use url::Url;
+use super::SchemyNode;
 
-use super::{Context, SchemyNode};
-
-pub struct ModuleCache<'m> {
-    cache: RefCell<BTreeMap<String, ParsedSource>>,
-    context: Rc<RefCell<Context<'m>>>,
+pub struct ModuleCache {
+    cm: Lrc<SourceMap>,
+    cache: BTreeMap<String, Module>,
 }
 
-impl<'m> ModuleCache<'m> {
+impl<'m> ModuleCache {
     pub fn new() -> Self {
         Self {
-            cache: RefCell::new(BTreeMap::new()),
-            context: Rc::new(RefCell::new(Context::default())),
+            cm: Default::default(),
+            cache: BTreeMap::new(),
         }
     }
 
-    pub fn get_syntax_tree(&self, path: &str) -> &ParsedSource {
-        let mut borrow = self.cache.borrow_mut();
-        borrow.entry(path.to_string()).or_insert_with(|| {
-            let specifier = Url::from_file_path(path).unwrap();
-            let source_text = std::fs::read_to_string(specifier.path()).unwrap();
-            let parsed_source = deno_ast::parse_module(ParseParams {
-                capture_tokens: true,
-                maybe_syntax: None,
-                media_type: deno_ast::MediaType::TypeScript,
-                scope_analysis: false,
-                specifier: specifier.to_string(),
-                text_info: SourceTextInfo::new(source_text.into()),
-            })
-            .unwrap();
+    pub fn parse(&mut self, path: &str) -> Rc<SchemyNode> {
+        self.cache.entry(path.to_string()).or_insert_with(|| {
+            let fm = self.cm.load_file(Path::new(path)).expect("failed to load test.js");
+            let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(self.cm.clone()));
 
-            parsed_source
+            let lexer = Lexer::new(
+                Syntax::Typescript(Default::default()),
+                Default::default(),
+                StringInput::from(&*fm),
+                None,
+            );
+
+            let mut parser = Parser::new_from(lexer);
+
+            for e in parser.take_errors() {
+                e.into_diagnostic(&handler).emit();
+            }
+
+            parser
+                .parse_module()
+                .map_err(|e| {
+                    // Unrecoverable fatal error occurred
+                    e.into_diagnostic(&handler).emit()
+                })
+                .expect("failed to parser module")
         });
-        borrow.get(path).unwrap()
+
+        SchemyNode::from_module(self.cache.get(path).unwrap())
     }
 }

@@ -5,8 +5,7 @@ mod node_kind;
 
 use std::{cell::RefCell, rc::Rc};
 
-use deno_ast::ParsedSource;
-use deno_ast::swc::ast::Module;
+use swc_ecma_ast::Module;
 
 pub use self::context::Context;
 pub use self::node_kind::NodeKind;
@@ -20,24 +19,19 @@ pub struct SchemyNode<'m> {
 }
 
 impl<'m, 'c> SchemyNode<'m> {
-    pub fn from_module(module: &'m Module, context: &Rc<RefCell<Context<'m>>>) -> Rc<Self> {
+    pub fn from_module(module: &'m Module) -> Rc<SchemyNode<'m>> {
+        let context = Rc::new(RefCell::new(Context::new()));
         let mut borrow = context.borrow_mut();
         let index = borrow.nodes.len();
-        borrow.nodes.push(Rc::new(Self {
+        let parent_index = None;
+        let node = SchemyNode {
             index,
-            parent_index: None,
+            parent_index,
             kind: NodeKind::Module(module),
             context: context.clone(),
-        }));
+        };
+        borrow.nodes.push(Rc::new(node));
         borrow.nodes.last().map(|n| n.clone()).unwrap()
-    }
-
-    pub fn get(&self, index: usize) -> Option<Rc<SchemyNode<'m>>> {
-        let borrow = self.context.borrow();
-        match borrow.nodes.get(index) {
-            Some(node) => Some(node.clone()),
-            None => None,
-        }
     }
 
     pub fn to_child(&self, kind: NodeKind<'m>) -> Rc<SchemyNode<'m>> {

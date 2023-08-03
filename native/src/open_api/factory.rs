@@ -1,10 +1,10 @@
-use std::{path::PathBuf, rc::Rc, cell::RefCell};
+use std::{path::PathBuf, rc::Rc};
 
-use deno_ast::swc::ast::*;
 use es_resolve::{EsResolver, TargetEnv};
 use lazy_static::__Deref;
+use swc_ecma_ast::*;
 
-use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode, Context};
+use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode};
 
 use super::{
     deferred::DeferredSchemas,
@@ -24,27 +24,27 @@ impl OpenApiFactory {
         }
     }
 
-    pub fn append_schema<'m>(&mut self, open_api: &mut OpenApi, module_cache: &'m ModuleCache<'m>, file_path: &str) -> () {
-        let source = module_cache.get_syntax_tree(file_path);
-        let module = SchemyNode::from_module(source.module(), &Rc::new(RefCell::new(Context::default())));
-        self.find_paths(open_api, module, file_path);
+    pub fn append_schema(&mut self, open_api: &mut OpenApi, file_path: &str, module_cache: &mut ModuleCache) -> () {
+        let root = module_cache.parse(&file_path);
+        self.find_paths(open_api, root.clone(), file_path);
+
         while let Some(source_file_name) = self.deferred_schemas.next_module() {
-            let source = module_cache.get_syntax_tree(&source_file_name);
-            let module = SchemyNode::from_module(source.module(), &Rc::new(RefCell::new(Context::default())));
-            self.define_deferred_schemas(open_api, module, &source_file_name);
+            let deferred_root = module_cache.parse(&source_file_name);
+            self.define_deferred_schemas(open_api, deferred_root, &source_file_name);
         }
     }
 
-    fn find_paths(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode>, file_path: &str) {
+    fn find_paths<'m>(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode<'m>>, file_path: &str) {
         store_declaration_maybe(root.clone(), file_path, &mut self.symbol_tables);
 
         for child_index in root.children() {
             let child = root.get(child_index).unwrap();
-            match child.kind {
+            match &child.kind {
                 NodeKind::CallExpr(_) => match child.callee() {
                     Some(callee) => match callee.kind {
                         NodeKind::Expr(expression) => match expression {
                             Expr::Ident(identifier) if identifier.sym.eq("Path") => {
+                                println!("I found a path!");
                                 self.symbol_tables.add_child_scope(file_path);
                                 self.add_path(open_api, child, file_path);
                                 self.symbol_tables.parent_scope(file_path);
@@ -55,7 +55,10 @@ impl OpenApiFactory {
                     },
                     None => panic!("Expected call expression to have callee property and found None"),
                 },
-                _ => self.find_paths(open_api, child, file_path),
+                other => {
+                    println!("I'm not a path. I'm a {:?}", other);
+                    self.find_paths(open_api, child, file_path)
+                },
             }
         }
     }
@@ -626,16 +629,16 @@ fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables:
                 Ok(module_file_name) => {
                     for specifier in &raw.specifiers {
                         match specifier {
-                            deno_ast::swc::ast::ExportSpecifier::Named(named_specifier) => {
+                            ExportSpecifier::Named(named_specifier) => {
                                 let type_name = match &named_specifier.orig {
-                                    deno_ast::swc::ast::ModuleExportName::Ident(identifier) => &identifier.sym,
-                                    deno_ast::swc::ast::ModuleExportName::Str(identifier) => &identifier.value,
+                                    ModuleExportName::Ident(identifier) => &identifier.sym,
+                                    ModuleExportName::Str(identifier) => &identifier.value,
                                 };
 
                                 if let Some(exported_name) = &named_specifier.exported {
                                     let exported_name = match exported_name {
-                                        deno_ast::swc::ast::ModuleExportName::Ident(id) => &id.sym,
-                                        deno_ast::swc::ast::ModuleExportName::Str(id) => &id.value,
+                                        ModuleExportName::Ident(id) => &id.sym,
+                                        ModuleExportName::Str(id) => &id.value,
                                     };
 
                                     symbol_tables.insert(
@@ -666,12 +669,12 @@ fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables:
         }
         NodeKind::VarDeclarator(raw) => {
             match &raw.name {
-                deno_ast::swc::ast::Pat::Ident(identifier) => {
+                Pat::Ident(identifier) => {
                     let name = identifier.id.sym.to_string();
                     match &identifier.type_ann {
                         Some(type_annotation) => match &*type_annotation.type_ann {
-                            deno_ast::swc::ast::TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
-                                deno_ast::swc::ast::TsEntityName::Ident(identifier) => {
+                            TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
+                                TsEntityName::Ident(identifier) => {
                                     let type_name = identifier.sym.to_string();
                                     symbol_tables.insert(
                                         file_path,
@@ -718,7 +721,7 @@ fn store_variable(name: &str, root: Rc<SchemyNode>, file_path: &str, symbol_tabl
                 )
             }
             NodeKind::TsTypeRef(raw) => match &raw.type_name {
-                deno_ast::swc::ast::TsEntityName::Ident(identifier) => {
+                TsEntityName::Ident(identifier) => {
                     let type_name = identifier.sym.to_string();
                     symbol_tables.insert(
                         file_path,
@@ -901,33 +904,27 @@ fn load_options(path_options: &mut PathOptions, root: Rc<SchemyNode>) {
         for prop_or_spread in &object_literal.props {
             match prop_or_spread.as_prop() {
                 Some(prop) => match prop.as_ref() {
-                    deno_ast::swc::ast::Prop::KeyValue(key_value) => match &key_value.key {
-                        deno_ast::swc::ast::PropName::Ident(i) if i.sym.eq("method") => {
+                    Prop::KeyValue(key_value) => match &key_value.key {
+                        PropName::Ident(i) if i.sym.eq("method") => {
                             path_options.method = match key_value.value.deref() {
-                                deno_ast::swc::ast::Expr::Lit(deno_ast::swc::ast::Lit::Str(s)) => {
-                                    Some(s.value.to_string())
-                                }
+                                Expr::Lit(Lit::Str(s)) => Some(s.value.to_string()),
                                 _ => None,
                             }
                         }
-                        deno_ast::swc::ast::PropName::Ident(i) if i.sym.eq("path") => {
+                        PropName::Ident(i) if i.sym.eq("path") => {
                             path_options.path = match key_value.value.deref() {
-                                deno_ast::swc::ast::Expr::Lit(deno_ast::swc::ast::Lit::Str(s)) => {
-                                    Some(s.value.to_string())
-                                }
+                                Expr::Lit(Lit::Str(s)) => Some(s.value.to_string()),
                                 _ => None,
                             }
                         }
-                        deno_ast::swc::ast::PropName::Ident(i) if i.sym.eq("tags") => {
+                        PropName::Ident(i) if i.sym.eq("tags") => {
                             let mut tags = vec![];
                             match key_value.value.deref() {
-                                deno_ast::swc::ast::Expr::Array(literal) => {
+                                Expr::Array(literal) => {
                                     for element in &literal.elems {
                                         if let Some(element) = element {
                                             match element.expr.deref() {
-                                                deno_ast::swc::ast::Expr::Lit(deno_ast::swc::ast::Lit::Str(s)) => {
-                                                    tags.push(s.value.to_string())
-                                                }
+                                                Expr::Lit(Lit::Str(s)) => tags.push(s.value.to_string()),
                                                 _ => {}
                                             }
                                         }
