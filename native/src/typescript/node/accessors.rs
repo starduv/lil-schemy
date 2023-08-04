@@ -1,6 +1,6 @@
-use std::{rc::Rc, vec, cell::RefCell};
+use std::{cell::RefCell, rc::Rc, vec};
 
-use super::{NodeKind, SchemyNode, Context};
+use super::{Context, NodeKind, SchemyNode};
 
 impl<'m> SchemyNode<'m> {
     pub fn args(&self) -> Vec<Rc<SchemyNode<'m>>> {
@@ -187,21 +187,45 @@ impl<'m> SchemyNode<'m> {
 
     pub fn params(&self) -> Vec<Rc<SchemyNode<'m>>> {
         match self.kind {
-            NodeKind::ArrowExpr(expr) => expr
-                .params
-                .iter()
-                .map(|param| {
+            NodeKind::TsTypeRef(raw_ref) => {
+                if let Some(raw_params) = &raw_ref.type_params {
                     let mut borrow = self.context.borrow_mut();
-                    let params_index = borrow.nodes.len();
-                    borrow.nodes.push(Rc::new(SchemyNode {
-                        index: params_index,
-                        parent_index: Some(self.index),
-                        kind: NodeKind::Pat(param),
-                        context: self.context.clone(),
-                    }));
-                    borrow.nodes.get(params_index).map(|n| n.clone()).unwrap()
-                })
-                .collect(),
+                    raw_params
+                        .params
+                        .iter()
+                        .map(|param| {
+                            let params_index = borrow.nodes.len();
+                            borrow.nodes.push(Rc::new(SchemyNode {
+                                index: params_index,
+                                parent_index: Some(self.index),
+                                kind: NodeKind::TsType(&*param),
+                                context: self.context.clone(),
+                            }));
+                            borrow.nodes.get(params_index).map(|n| n.clone()).unwrap()
+                        })
+                        .collect()
+                } else {
+                    vec![]
+                }
+            }
+            NodeKind::ExprOrSpread(raw) => match &*raw.expr {
+                swc_ecma_ast::Expr::Arrow(expr) => expr
+                    .params
+                    .iter()
+                    .map(|param| {
+                        let mut borrow = self.context.borrow_mut();
+                        let params_index = borrow.nodes.len();
+                        borrow.nodes.push(Rc::new(SchemyNode {
+                            index: params_index,
+                            parent_index: Some(self.index),
+                            kind: NodeKind::Pat(param),
+                            context: self.context.clone(),
+                        }));
+                        borrow.nodes.get(params_index).map(|n| n.clone()).unwrap()
+                    })
+                    .collect(),
+                _ => vec![],
+            },
             _ => vec![],
         }
     }

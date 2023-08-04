@@ -3,6 +3,16 @@ use swc_ecma_ast::*;
 
 // #[derive(Debug)]
 pub enum NodeKind<'m> {
+    TsTypeParamDecl(&'m TsTypeParamDecl),
+    MemberProp(&'m MemberProp),
+    TsModuleBlock(&'m TsModuleBlock),
+    TsNamespaceDecl(&'m TsNamespaceDecl),
+    TsEnumMember(&'m TsEnumMember),
+    TsFnParam(&'m TsFnParam),
+    ArrayPat(&'m ArrayPat),
+    RestPat(&'m RestPat),
+    ObjectPat(&'m ObjectPat),
+    AssignPat(&'m AssignPat),
     ThisExpr(&'m ThisExpr),
     ArrayLit(&'m ArrayLit),
     FnExpr(&'m FnExpr),
@@ -228,6 +238,16 @@ impl<'n> Clone for NodeKind<'n> {
             NodeKind::PrivateNameExpr(raw) => NodeKind::PrivateNameExpr(raw),
             NodeKind::OptChainExpr(raw) => NodeKind::OptChainExpr(raw),
             NodeKind::InvalidExpr(raw) => NodeKind::InvalidExpr(raw),
+            NodeKind::ArrayPat(raw) => NodeKind::ArrayPat(raw),
+            NodeKind::RestPat(raw) => NodeKind::RestPat(raw),
+            NodeKind::ObjectPat(raw) => NodeKind::ObjectPat(raw),
+            NodeKind::AssignPat(raw) => NodeKind::AssignPat(raw),
+            NodeKind::TsFnParam(raw) => NodeKind::TsFnParam(raw),
+            NodeKind::TsEnumMember(raw) => NodeKind::TsEnumMember(raw),
+            NodeKind::TsModuleBlock(raw) => NodeKind::TsModuleBlock(raw),
+            NodeKind::TsNamespaceDecl(raw) => NodeKind::TsNamespaceDecl(raw),
+            NodeKind::MemberProp(raw) => NodeKind::MemberProp(raw),
+            NodeKind::TsTypeParamDecl(raw) => NodeKind::TsTypeParamDecl(raw),
         }
     }
 }
@@ -345,6 +365,16 @@ impl<'m> Debug for NodeKind<'m> {
             NodeKind::PrivateNameExpr(_) => f.debug_tuple("PrivateNameExpr").finish(),
             NodeKind::OptChainExpr(_) => f.debug_tuple("OptChainExpr").finish(),
             NodeKind::InvalidExpr(_) => f.debug_tuple("InvalidExpr").finish(),
+            NodeKind::ArrayPat(_) => f.debug_tuple("ArrayPat").finish(),
+            NodeKind::RestPat(_) => f.debug_tuple("RestPat").finish(),
+            NodeKind::ObjectPat(_) => f.debug_tuple("ObjectPat").finish(),
+            NodeKind::AssignPat(_) => f.debug_tuple("AssignPat").finish(),
+            NodeKind::TsFnParam(_) => f.debug_tuple("TsFnParam").finish(),
+            NodeKind::TsEnumMember(_) => f.debug_tuple("TsEnumMember").finish(),
+            NodeKind::TsModuleBlock(_) => f.debug_tuple("TsModuleBlock").finish(),
+            NodeKind::TsNamespaceDecl(_) => f.debug_tuple("TsNamespaceDecl").finish(),
+            NodeKind::MemberProp(_) => f.debug_tuple("MemberProp").finish(),
+            NodeKind::TsTypeParamDecl(_) => f.debug_tuple("TsTypeParamDecl").finish(),
         }
     }
 }

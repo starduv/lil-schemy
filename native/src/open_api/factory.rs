@@ -2,6 +2,7 @@ use std::{path::PathBuf, rc::Rc};
 
 use es_resolve::{EsResolver, TargetEnv};
 use lazy_static::__Deref;
+use neon::macro_internal::runtime::raw;
 use swc_ecma_ast::*;
 
 use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode};
@@ -26,7 +27,7 @@ impl OpenApiFactory {
 
     pub fn append_schema(&mut self, open_api: &mut OpenApi, file_path: &str, module_cache: &mut ModuleCache) -> () {
         let root = module_cache.parse(&file_path);
-        self.find_paths(open_api, root.clone(), file_path, 0);
+        self.find_paths(open_api, root.clone(), file_path);
 
         while let Some(source_file_name) = self.deferred_schemas.next_module() {
             let deferred_root = module_cache.parse(&source_file_name);
@@ -34,10 +35,8 @@ impl OpenApiFactory {
         }
     }
 
-    fn find_paths<'m>(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode<'m>>, file_path: &str, depth: u32) {
+    fn find_paths<'m>(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode<'m>>, file_path: &str) {
         store_declaration_maybe(root.clone(), file_path, &mut self.symbol_tables);
-
-        println!("{} - {:?} ", depth, root.kind);
 
         for child_index in root.children() {
             let child = root.get(child_index).unwrap();
@@ -45,23 +44,21 @@ impl OpenApiFactory {
                 NodeKind::CallExpr(_) => {
                     if let Some(callee) = child.callee() {
                         if let NodeKind::Callee(raw) = callee.kind {
-                            println!("I found a callee!");
                             match raw {
                                 Callee::Expr(raw_expr) => match &**raw_expr {
                                     Expr::Ident(raw_ident) if raw_ident.sym.eq("Path") => {
-                                        println!("I found a path!");
                                         self.symbol_tables.add_child_scope(file_path);
                                         self.add_path(open_api, child, file_path);
                                         self.symbol_tables.parent_scope(file_path);
                                     }
-                                    _ => self.find_paths(open_api, child, file_path, depth + 1),
+                                    _ => self.find_paths(open_api, child, file_path),
                                 },
                                 _ => {}
                             }
                         }
                     }
                 }
-                _ => self.find_paths(open_api, child, file_path, depth + 1),
+                _ => self.find_paths(open_api, child, file_path),
             }
         }
     }
@@ -96,7 +93,7 @@ impl OpenApiFactory {
 
         self.symbol_tables.add_child_scope(file_path);
 
-        self.find_response(open_api, operation, route_handler, file_path);
+        self.find_response(open_api, operation, route_handler, file_path, &mut String::from(""));
 
         self.symbol_tables.parent_scope(file_path);
     }
@@ -128,9 +125,13 @@ impl OpenApiFactory {
                     // TsEntityName::Ident(identifier) => {
                     //     self.add_param_from_referenced_type(&identifier.sym, operation, file_path);
                     // }
-                    _ => self.add_request_params(open_api, operation, child, file_path),
+                    _ => {
+                        self.add_request_params(open_api, operation, child, file_path);
+                    }
                 },
-                _ => self.add_request_params(open_api, operation, child, file_path),
+                _ => {
+                    self.add_request_params(open_api, operation, child, file_path);
+                }
             }
         }
     }
@@ -149,8 +150,11 @@ impl OpenApiFactory {
         let type_params = root.params();
         let namespace = match type_params.get(2) {
             Some(namespace) => match namespace.kind {
-                NodeKind::TsLitType(namespace) => match &namespace.lit {
-                    TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
+                NodeKind::TsType(raw_type) => match raw_type {
+                    TsType::TsLitType(raw_lit) => match &raw_lit.lit {
+                        TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
+                        _ => None,
+                    },
                     _ => None,
                 },
                 _ => None,
@@ -160,53 +164,63 @@ impl OpenApiFactory {
 
         match type_params.get(0) {
             Some(param) => match param.kind {
-                NodeKind::TsKeywordType(param_type) => match param_type.kind {
-                    TsKeywordTypeKind::TsNumberKeyword => {
-                        operation_param.content().schema().data_type("number");
-                    }
-                    TsKeywordTypeKind::TsBooleanKeyword => {
-                        operation_param.content().schema().data_type("boolean");
-                    }
-                    TsKeywordTypeKind::TsStringKeyword => {
-                        operation_param.content().schema().data_type("string");
-                    }
+                NodeKind::TsType(raw_type) => match raw_type {
+                    TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
+                        TsKeywordTypeKind::TsNumberKeyword => {
+                            operation_param.content().schema().data_type("number");
+                        }
+                        TsKeywordTypeKind::TsBooleanKeyword => {
+                            operation_param.content().schema().data_type("boolean");
+                        }
+                        TsKeywordTypeKind::TsStringKeyword => {
+                            operation_param.content().schema().data_type("string");
+                        }
+                        _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
+                    },
+                    TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
+                        TsEntityName::Ident(identifier) => {
+                            let root_name = self
+                                .symbol_tables
+                                .get_root_declaration_name(file_path, identifier.sym.to_string());
+
+                            self.define_referenced_schema(
+                                param.clone(),
+                                &root_name,
+                                &root_name,
+                                open_api,
+                                file_path,
+                                namespace.clone(),
+                            );
+                            
+                            operation_param
+                                .content()
+                                .schema()
+                                .reference(root_name.into(), false)
+                                .namespace(namespace);
+                        }
+                        _ => println!("found some strang type ref"),
+                    },
                     _ => {}
                 },
-                NodeKind::TsTypeRef(type_ref) => match &type_ref.type_name {
-                    TsEntityName::Ident(identifier) => {
-                        let reference = identifier.sym.to_string();
-                        self.define_referenced_schema(
-                            param.clone(),
-                            &reference,
-                            &reference,
-                            open_api,
-                            file_path,
-                            namespace.clone(),
-                        );
-                        operation_param
-                            .content()
-                            .schema()
-                            .reference(reference.into(), false)
-                            .namespace(namespace);
-                    }
-                    _ => {}
-                },
-                _ => {}
+                _ => println!("found some abstraction around your type ref {:?}", param.kind),
             },
             None => {}
         }
 
         match type_params.get(1) {
-            Some(param) => match param.kind {
-                NodeKind::TsLitType(required) => match required.lit {
-                    TsLit::Bool(boolean) => {
-                        operation_param.required(boolean.value);
-                    }
+            Some(param) => match &param.kind {
+                NodeKind::TsType(required) => match required {
+                    TsType::TsLitType(raw) => match raw.lit {
+                        TsLit::Bool(raw_bool) => {
+                            operation_param.required(raw_bool.value);
+                        }
+                        _ => {}
+                    },
                     _ => {}
                 },
-                _ => {}
+                other => println!("found this while looking for required: {:?}", other),
             },
-            None => {}
+            None => println!("i didn't find a second param at all!"),
         }
 
         match type_params.get(3) {
@@ -232,15 +246,18 @@ impl OpenApiFactory {
         operation: &mut ApiPathOperation,
         root: Rc<SchemyNode>,
         file_path: &str,
+        depth: &mut String,
     ) -> () {
+        depth.push_str("-");
+
         for child_index in root.children() {
             let child = root.get(child_index.clone()).unwrap();
             store_declaration_maybe(child.clone(), file_path, &mut self.symbol_tables);
             match child.kind {
                 NodeKind::Ident(raw) if raw.sym.eq("Response") => {
-                    self.add_response(open_api, operation, root.clone(), file_path)
+                    self.add_response(open_api, operation, root.parent().unwrap(), file_path)
                 }
-                _ => self.find_response(open_api, operation, child, file_path),
+                _ => self.find_response(open_api, operation, child, file_path, &mut depth.clone()),
             }
         }
     }
@@ -269,7 +286,7 @@ impl OpenApiFactory {
             None => None,
         };
 
-        let response_type = match args.get(0) {
+        let response_type_name = match args.get(0) {
             Some(arg) => match &arg.kind {
                 NodeKind::ExprOrSpread(raw) => match &*raw.expr {
                     Expr::New(new_expression) => match &*new_expression.callee {
@@ -310,12 +327,12 @@ impl OpenApiFactory {
             None => None,
         };
 
-        if let Some(response_type) = &response_type {
-            self.define_referenced_schema(root, &response_type, &response_type, open_api, file_path, namespace);
+        if let Some(response_type_name) = &response_type_name {
+            self.define_referenced_schema(root, &response_type_name, &response_type_name, open_api, file_path, namespace);
         }
 
         if let Some(response_options) = options {
-            operation.response(&response_type, response_options);
+            operation.response(&response_type_name, response_options);
         }
     }
 
@@ -525,6 +542,25 @@ impl OpenApiFactory {
 
 fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
     match root.kind {
+        // NodeKind::TsAsExpr(raw_expr) => match &*raw_expr.type_ann {
+        //     TsType::TsTypeRef(raw) => {
+        //         let name = match &raw.type_name {
+        //             TsEntityName::Ident(identifier) => &identifier.sym,
+        //             _ => "",
+        //         };
+
+        //         println!("I'm storing the type {}", name);
+                
+        //         symbol_tables.insert(
+        //             file_path,
+        //             name.to_string(),
+        //             Declaration::Type {
+        //                 node: root.index.clone(),
+        //             }
+        //         )
+        //     },
+        //     _ => {}
+        // }
         NodeKind::ClassDecl(raw) => {
             let name = raw.ident.sym.to_string();
             symbol_tables.insert(
@@ -679,6 +715,7 @@ fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables:
                             TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
                                 TsEntityName::Ident(identifier) => {
                                     let type_name = identifier.sym.to_string();
+                                    println!("storing the alias {} to {}", name, type_name);
                                     symbol_tables.insert(
                                         file_path,
                                         name.to_string(),
@@ -701,7 +738,7 @@ fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables:
                         },
                     }
                 }
-                _ => {}
+                _ => println!("yeah there's a pat")
             };
         }
         _ => {}
@@ -957,7 +994,7 @@ fn load_options(path_options: &mut PathOptions, root: Rc<SchemyNode>) {
 
 fn get_parameter_name(root: Rc<SchemyNode>) -> String {
     match &root.kind {
-        NodeKind::TsPropertySignature(raw) if raw.key.is_ident() => {
+        NodeKind::TsTypeElement(TsTypeElement::TsPropertySignature(raw)) if raw.key.is_ident() => {
             let identifier = raw.key.as_ident().unwrap();
             identifier.sym.to_string()
         }

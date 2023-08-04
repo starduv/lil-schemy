@@ -361,8 +361,7 @@ pub struct ApiParam {
     location: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<HashMap<String, ApiConent>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    required: Option<bool>,
+    required: bool,
 }
 
 impl ApiParam {
@@ -371,7 +370,7 @@ impl ApiParam {
             content: None,
             location: location.map(|l| l.to_string()),
             name: name.map(|n| n.to_string()),
-            required: None,
+            required: false,
         }
     }
 
@@ -384,7 +383,7 @@ impl ApiParam {
     }
 
     pub(crate) fn required(&mut self, required: bool) -> &mut ApiParam {
-        self.required = Some(required);
+        self.required = required;
         self
     }
 }
