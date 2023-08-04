@@ -26,7 +26,7 @@ impl OpenApiFactory {
 
     pub fn append_schema(&mut self, open_api: &mut OpenApi, file_path: &str, module_cache: &mut ModuleCache) -> () {
         let root = module_cache.parse(&file_path);
-        self.find_paths(open_api, root.clone(), file_path);
+        self.find_paths(open_api, root.clone(), file_path, 0);
 
         while let Some(source_file_name) = self.deferred_schemas.next_module() {
             let deferred_root = module_cache.parse(&source_file_name);
@@ -34,31 +34,34 @@ impl OpenApiFactory {
         }
     }
 
-    fn find_paths<'m>(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode<'m>>, file_path: &str) {
+    fn find_paths<'m>(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode<'m>>, file_path: &str, depth: u32) {
         store_declaration_maybe(root.clone(), file_path, &mut self.symbol_tables);
+
+        println!("{} - {:?} ", depth, root.kind);
 
         for child_index in root.children() {
             let child = root.get(child_index).unwrap();
             match &child.kind {
-                NodeKind::CallExpr(_) => match child.callee() {
-                    Some(callee) => match callee.kind {
-                        NodeKind::Expr(expression) => match expression {
-                            Expr::Ident(identifier) if identifier.sym.eq("Path") => {
-                                println!("I found a path!");
-                                self.symbol_tables.add_child_scope(file_path);
-                                self.add_path(open_api, child, file_path);
-                                self.symbol_tables.parent_scope(file_path);
+                NodeKind::CallExpr(_) => {
+                    if let Some(callee) = child.callee() {
+                        if let NodeKind::Callee(raw) = callee.kind {
+                            println!("I found a callee!");
+                            match raw {
+                                Callee::Expr(raw_expr) => match &**raw_expr {
+                                    Expr::Ident(raw_ident) if raw_ident.sym.eq("Path") => {
+                                        println!("I found a path!");
+                                        self.symbol_tables.add_child_scope(file_path);
+                                        self.add_path(open_api, child, file_path);
+                                        self.symbol_tables.parent_scope(file_path);
+                                    }
+                                    _ => self.find_paths(open_api, child, file_path, depth + 1),
+                                },
+                                _ => {}
                             }
-                            _ => self.find_paths(open_api, child, file_path),
-                        },
-                        _ => {}
-                    },
-                    None => panic!("Expected call expression to have callee property and found None"),
-                },
-                other => {
-                    println!("I'm not a path. I'm a {:?}", other);
-                    self.find_paths(open_api, child, file_path)
-                },
+                        }
+                    }
+                }
+                _ => self.find_paths(open_api, child, file_path, depth + 1),
             }
         }
     }
@@ -900,49 +903,54 @@ fn get_path_options(options: Option<Rc<SchemyNode>>) -> PathOptions {
 }
 
 fn load_options(path_options: &mut PathOptions, root: Rc<SchemyNode>) {
-    if let NodeKind::ObjectLit(object_literal) = root.kind {
-        for prop_or_spread in &object_literal.props {
-            match prop_or_spread.as_prop() {
-                Some(prop) => match prop.as_ref() {
-                    Prop::KeyValue(key_value) => match &key_value.key {
-                        PropName::Ident(i) if i.sym.eq("method") => {
-                            path_options.method = match key_value.value.deref() {
-                                Expr::Lit(Lit::Str(s)) => Some(s.value.to_string()),
-                                _ => None,
-                            }
-                        }
-                        PropName::Ident(i) if i.sym.eq("path") => {
-                            path_options.path = match key_value.value.deref() {
-                                Expr::Lit(Lit::Str(s)) => Some(s.value.to_string()),
-                                _ => None,
-                            }
-                        }
-                        PropName::Ident(i) if i.sym.eq("tags") => {
-                            let mut tags = vec![];
-                            match key_value.value.deref() {
-                                Expr::Array(literal) => {
-                                    for element in &literal.elems {
-                                        if let Some(element) = element {
-                                            match element.expr.deref() {
-                                                Expr::Lit(Lit::Str(s)) => tags.push(s.value.to_string()),
-                                                _ => {}
+    if let NodeKind::ExprOrSpread(raw_expr) = root.kind {
+        match &*raw_expr.expr {
+            Expr::Object(raw_literal) => {
+                for prop_or_spread in &raw_literal.props {
+                    match prop_or_spread.as_prop() {
+                        Some(prop) => match prop.as_ref() {
+                            Prop::KeyValue(key_value) => match &key_value.key {
+                                PropName::Ident(i) if i.sym.eq("method") => {
+                                    path_options.method = match key_value.value.deref() {
+                                        Expr::Lit(Lit::Str(s)) => Some(s.value.to_string()),
+                                        _ => None,
+                                    }
+                                }
+                                PropName::Ident(i) if i.sym.eq("path") => {
+                                    path_options.path = match key_value.value.deref() {
+                                        Expr::Lit(Lit::Str(s)) => Some(s.value.to_string()),
+                                        _ => None,
+                                    }
+                                }
+                                PropName::Ident(i) if i.sym.eq("tags") => {
+                                    let mut tags = vec![];
+                                    match key_value.value.deref() {
+                                        Expr::Array(literal) => {
+                                            for element in &literal.elems {
+                                                if let Some(element) = element {
+                                                    match element.expr.deref() {
+                                                        Expr::Lit(Lit::Str(s)) => tags.push(s.value.to_string()),
+                                                        _ => {}
+                                                    }
+                                                }
                                             }
                                         }
+                                        _ => {}
+                                    }
+
+                                    if tags.len() > 0 {
+                                        path_options.tags = Some(tags);
                                     }
                                 }
                                 _ => {}
-                            }
-
-                            if tags.len() > 0 {
-                                path_options.tags = Some(tags);
-                            }
-                        }
-                        _ => {}
-                    },
-                    _ => {}
-                },
-                None => {}
+                            },
+                            _ => {}
+                        },
+                        None => {}
+                    }
+                }
             }
+            _ => {}
         }
     }
 }
