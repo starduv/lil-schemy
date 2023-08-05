@@ -191,7 +191,7 @@ impl OpenApiFactory {
                                 file_path,
                                 namespace.clone(),
                             );
-                            
+
                             operation_param
                                 .content()
                                 .schema()
@@ -225,16 +225,19 @@ impl OpenApiFactory {
 
         match type_params.get(3) {
             Some(param) => match param.kind {
-                NodeKind::TsLitType(format) => match &format.lit {
-                    TsLit::Str(literal_string) => {
-                        operation_param
-                            .content()
-                            .schema()
-                            .format(Some(literal_string.value.to_string()));
-                    }
+                NodeKind::TsType(raw_type) => match raw_type {
+                    TsType::TsLitType(raw_lit) => match &raw_lit.lit {
+                        TsLit::Str(raw_str) => {
+                            operation_param
+                                .content()
+                                .schema()
+                                .format(Some(raw_str.value.to_string()));
+                        }
+                        _ => {}
+                    },
                     _ => {}
                 },
-                _ => {}
+                _ => println!("found this while looking for format: {:?}", param.kind),
             },
             None => {}
         }
@@ -328,7 +331,14 @@ impl OpenApiFactory {
         };
 
         if let Some(response_type_name) = &response_type_name {
-            self.define_referenced_schema(root, &response_type_name, &response_type_name, open_api, file_path, namespace);
+            self.define_referenced_schema(
+                root,
+                &response_type_name,
+                &response_type_name,
+                open_api,
+                file_path,
+                namespace,
+            );
         }
 
         if let Some(response_options) = options {
@@ -340,73 +350,85 @@ impl OpenApiFactory {
         &mut self,
         open_api: &mut OpenApi,
         operation: &mut ApiPathOperation,
-        type_ref: Rc<SchemyNode>,
+        root: Rc<SchemyNode>,
         file_path: &str,
     ) -> () {
         let operation_param = operation.body();
-        let type_params = type_ref.type_params();
+        let type_params = root.params();
+        println!("type params: {:?}", type_params.len());
         let namespace = match type_params.get(2) {
             Some(namespace) => match namespace.kind {
-                NodeKind::TsLitType(namespace) => match &namespace.lit {
-                    TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
+                NodeKind::TsType(raw_type) => match raw_type {
+                    TsType::TsLitType(raw_lit) => match &raw_lit.lit {
+                        TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
+                        _ => None,
+                    },
                     _ => None,
                 },
                 _ => None,
             },
-            None => None,
+            _ => None,
         };
 
         match type_params.get(0) {
-            Some(param_type) => match param_type.kind {
-                NodeKind::TsKeywordType(param_type) => match param_type.kind {
-                    TsKeywordTypeKind::TsNumberKeyword => {
-                        operation_param.content().schema().data_type("number");
-                    }
-                    TsKeywordTypeKind::TsBooleanKeyword => {
-                        operation_param.content().schema().data_type("boolean");
-                    }
-                    TsKeywordTypeKind::TsStringKeyword => {
-                        operation_param.content().schema().data_type("string");
-                    }
+            Some(param) => match param.kind {
+                NodeKind::TsType(raw_type) => match raw_type {
+                    TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
+                        TsKeywordTypeKind::TsNumberKeyword => {
+                            operation_param.content().schema().data_type("number");
+                        }
+                        TsKeywordTypeKind::TsBooleanKeyword => {
+                            operation_param.content().schema().data_type("boolean");
+                        }
+                        TsKeywordTypeKind::TsStringKeyword => {
+                            operation_param.content().schema().data_type("string");
+                        }
+                        _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
+                    },
+                    TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
+                        TsEntityName::Ident(identifier) => {
+                            let root_name = self
+                                .symbol_tables
+                                .get_root_declaration_name(file_path, identifier.sym.to_string());
+
+                            self.define_referenced_schema(
+                                param.clone(),
+                                &root_name,
+                                &root_name,
+                                open_api,
+                                file_path,
+                                namespace.clone(),
+                            );
+
+                            operation_param
+                                .content()
+                                .schema()
+                                .reference(root_name.into(), false)
+                                .namespace(namespace);
+                        }
+                        _ => println!("found some strang type ref"),
+                    },
                     _ => {}
                 },
-                NodeKind::TsTypeRef(type_ref) => match &type_ref.type_name {
-                    TsEntityName::Ident(identifier) => {
-                        let reference = self
-                            .symbol_tables
-                            .get_root_declaration_name(file_path, identifier.sym.to_string());
-                        self.define_referenced_schema(
-                            param_type.clone(),
-                            &reference,
-                            &reference,
-                            open_api,
-                            file_path,
-                            namespace.clone(),
-                        );
-                        operation_param
-                            .content()
-                            .schema()
-                            .reference(Some(reference), false)
-                            .namespace(namespace);
-                    }
-                    _ => {}
-                },
-                _ => {}
+                _ => println!("found some abstraction around your type ref {:?}", param.kind),
             },
             None => {}
         }
 
         match type_params.get(1) {
-            Some(required) => match required.kind {
-                NodeKind::TsLitType(required) => match required.lit {
-                    TsLit::Bool(boolean) => {
-                        operation_param.required(boolean.value);
-                    }
+            Some(param) => match &param.kind {
+                NodeKind::TsType(required) => match required {
+                    TsType::TsLitType(raw) => match raw.lit {
+                        TsLit::Bool(raw_bool) => {
+                            operation_param.required(raw_bool.value);
+                        }
+                        _ => {}
+                    },
                     _ => {}
                 },
-                _ => {}
+                other => println!("found this while looking for required: {:?}", other),
             },
-            None => {}
+            None => println!("i didn't find a second param at all!"),
         }
     }
 
@@ -550,7 +572,7 @@ fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables:
         //         };
 
         //         println!("I'm storing the type {}", name);
-                
+
         //         symbol_tables.insert(
         //             file_path,
         //             name.to_string(),
@@ -713,18 +735,14 @@ fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables:
                     match &identifier.type_ann {
                         Some(type_annotation) => match &*type_annotation.type_ann {
                             TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
-                                TsEntityName::Ident(identifier) => {
-                                    let type_name = identifier.sym.to_string();
-                                    println!("storing the alias {} to {}", name, type_name);
-                                    symbol_tables.insert(
-                                        file_path,
-                                        name.to_string(),
-                                        Declaration::Alias {
-                                            from: name,
-                                            to: type_name,
-                                        },
-                                    )
-                                }
+                                TsEntityName::Ident(identifier) => symbol_tables.insert(
+                                    file_path,
+                                    name.to_string(),
+                                    Declaration::Alias {
+                                        from: name,
+                                        to: identifier.sym.to_string(),
+                                    },
+                                ),
                                 _ => {}
                             },
                             _ => {}
@@ -738,7 +756,7 @@ fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables:
                         },
                     }
                 }
-                _ => println!("yeah there's a pat")
+                _ => println!("yeah there's a pat"),
             };
         }
         _ => {}
