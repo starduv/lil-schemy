@@ -44,11 +44,31 @@ impl<'n> DeclarationTables {
             .get_root_declaration_name(reference)
     }
 
-    pub(crate) fn get_root_declaration(&mut self, file_path: &str, type_reference: &str) -> Option<Declaration> {
+    pub(crate) fn get_root_declaration(&mut self, file_path: &str, reference: &str) -> Option<Declaration> {
         self.tables
             .entry(file_path.to_owned())
             .or_insert_with(Default::default)
-            .get_root_declaration(type_reference)
+            .get_root_declaration(reference)
+    }
+
+    pub fn debug(&self, file_path: &str, reference: &str) -> () {
+        let table = self.tables.get(file_path);
+        match table {
+            Some(table) => {
+                table.debug(reference);
+            }, 
+            None => println!("No table found for file path: {}", file_path),
+        }
+    }
+
+    pub fn has_key(&self, file_path: &str, reference: &str) -> bool {
+        let table = self.tables.get(file_path);
+        match table {
+            Some(table) => {
+                table.get_declaration(reference).is_some()
+            }, 
+            None => false,
+        }
     }
 }
 
@@ -68,6 +88,37 @@ impl DeclarationTable {
         DeclarationTable {
             current_scope: Rc::clone(&root_scope),
             root_scope,
+        }
+    }
+
+    fn debug(&self, reference: &str) -> () {
+        let mut declaration: Option<Declaration> = None;
+        let mut queue = VecDeque::from([Rc::clone(&self.current_scope)]);
+        let mut references = vec![reference.to_string()];
+        let mut last_reference = String::from("__none__");
+
+        while declaration.is_none() && !queue.is_empty() {
+            if let Some(scope) = queue.pop_front() {
+                let scope = scope.borrow();
+                while references.len() > 0 {
+                    let temp = references.pop().unwrap();
+                    match scope.symbols.get(&temp){
+                        Some(Declaration::Alias { from: _, to }) => {
+                            println!("Alias: {} -> {}", temp, to);
+                            references.push(to.clone());
+                        },
+                        _ => {}
+                    }
+                    last_reference = temp;
+                }
+
+                match scope.symbols.get(&last_reference){
+                    Some(decl) => declaration = Some(decl.clone()),
+                    None => if let Some(parent) = &scope.parent {
+                        queue.push_back(Rc::clone(&parent));
+                    },
+                }
+            }
         }
     }
 

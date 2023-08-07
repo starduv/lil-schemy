@@ -2,7 +2,7 @@ use std::{path::PathBuf, rc::Rc};
 
 use es_resolve::{EsResolver, TargetEnv};
 use lazy_static::__Deref;
-use neon::macro_internal::runtime::raw;
+
 use swc_ecma_ast::*;
 
 use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode};
@@ -31,7 +31,10 @@ impl OpenApiFactory {
 
         while let Some(source_file_name) = self.deferred_schemas.next_module() {
             let deferred_root = module_cache.parse(&source_file_name);
-            self.define_deferred_schemas(open_api, deferred_root, &source_file_name);
+            for item_index in deferred_root.children() {
+                let item = deferred_root.get(item_index).unwrap();
+                self.define_deferred_schemas(open_api, item, &source_file_name);
+            }
         }
     }
 
@@ -93,7 +96,7 @@ impl OpenApiFactory {
 
         self.symbol_tables.add_child_scope(file_path);
 
-        self.find_response(open_api, operation, route_handler, file_path, &mut String::from(""));
+        self.find_response(open_api, operation, route_handler, file_path);
 
         self.symbol_tables.parent_scope(file_path);
     }
@@ -249,10 +252,7 @@ impl OpenApiFactory {
         operation: &mut ApiPathOperation,
         root: Rc<SchemyNode>,
         file_path: &str,
-        depth: &mut String,
     ) -> () {
-        depth.push_str("-");
-
         for child_index in root.children() {
             let child = root.get(child_index.clone()).unwrap();
             store_declaration_maybe(child.clone(), file_path, &mut self.symbol_tables);
@@ -260,7 +260,7 @@ impl OpenApiFactory {
                 NodeKind::Ident(raw) if raw.sym.eq("Response") => {
                     self.add_response(open_api, operation, root.parent().unwrap(), file_path)
                 }
-                _ => self.find_response(open_api, operation, child, file_path, &mut depth.clone()),
+                _ => self.find_response(open_api, operation, child, file_path),
             }
         }
     }
@@ -355,7 +355,6 @@ impl OpenApiFactory {
     ) -> () {
         let operation_param = operation.body();
         let type_params = root.params();
-        println!("type params: {:?}", type_params.len());
         let namespace = match type_params.get(2) {
             Some(namespace) => match namespace.kind {
                 NodeKind::TsType(raw_type) => match raw_type {
@@ -470,50 +469,44 @@ impl OpenApiFactory {
 
     fn define_deferred_schemas(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode>, source_file_name: &str) -> () {
         store_declaration_maybe(root.clone(), source_file_name, &mut self.symbol_tables);
-
         match &root.kind {
-            NodeKind::ExportDefaultExpr(_) => {
+            NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(raw_expr))) => {
+                let root = root.to_child(NodeKind::ExportDefaultExpr(raw_expr));
                 self.define_deferred_type_maybe(root, open_api, "default", source_file_name)
             }
-            NodeKind::ExportDecl(_) => {
-                if let Some(declaration) = root.decl() {
-                    match declaration.kind {
-                        NodeKind::ClassDecl(class_declaration) => {
-                            let name = class_declaration.ident.sym.to_string();
-                            self.define_deferred_type_maybe(declaration, open_api, &name, source_file_name);
-                        }
-                        NodeKind::TsInterfaceDecl(interface_declaration) => {
-                            let name = interface_declaration.id.sym.to_string();
-                            self.define_deferred_type_maybe(declaration, open_api, &name, source_file_name);
-                        }
-                        NodeKind::TsTypeAliasDecl(alias_declaration) => {
-                            let name = alias_declaration.id.sym.to_string();
-                            self.define_deferred_type_maybe(declaration, open_api, &name, source_file_name);
-                        }
-                        _ => {}
-                    }
+            NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(raw_decl))) => match &raw_decl.decl {
+                Decl::Class(ref raw_class) => {
+                    let root = root.to_child(NodeKind::ClassDecl(raw_class));
+                    self.define_deferred_type_maybe(root, open_api, &raw_class.ident.sym, source_file_name)
                 }
-            }
-            NodeKind::NamedExport(_) => {
+                Decl::TsInterface(ref raw_interface) => {
+                    let root = root.to_child(NodeKind::TsInterfaceDecl(raw_interface));
+                    self.define_deferred_type_maybe(root, open_api, &raw_interface.id.sym, source_file_name)
+                }
+                Decl::TsTypeAlias(ref raw_alias) => {
+                    let root = root.to_child(NodeKind::TsTypeAliasDecl(raw_alias));
+                    self.define_deferred_type_maybe(root, open_api, &raw_alias.id.sym, source_file_name)
+                }
+                _ => {}
+            },
+            NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportNamed(raw_export))) => {
+                let root = root.to_child(NodeKind::NamedExport(raw_export));
                 for specifier in root.specifiers() {
                     match specifier.kind {
-                        NodeKind::ExportSpecifier(export_specifier) => match export_specifier {
-                            ExportSpecifier::Named(named) => {
-                                let name = match &named.exported {
-                                    Some(exported) => match exported {
-                                        ModuleExportName::Ident(id) => id.sym.to_string(),
-                                        ModuleExportName::Str(id) => id.value.to_string(),
-                                    },
-                                    None => match &named.orig {
-                                        ModuleExportName::Ident(id) => id.sym.to_string(),
-                                        ModuleExportName::Str(id) => id.value.to_string(),
-                                    },
-                                };
+                        NodeKind::ExportSpecifier(ExportSpecifier::Named(named)) => {
+                            let name = match &named.exported {
+                                Some(exported) => match exported {
+                                    ModuleExportName::Ident(id) => id.sym.to_string(),
+                                    ModuleExportName::Str(id) => id.value.to_string(),
+                                },
+                                None => match &named.orig {
+                                    ModuleExportName::Ident(id) => id.sym.to_string(),
+                                    ModuleExportName::Str(id) => id.value.to_string(),
+                                },
+                            };
 
-                                self.define_deferred_type_maybe(specifier, open_api, &name, source_file_name);
-                            }
-                            _ => {}
-                        },
+                            self.define_deferred_type_maybe(specifier, open_api, &name, source_file_name);
+                        }
                         _ => {}
                     }
                 }
@@ -564,25 +557,29 @@ impl OpenApiFactory {
 
 fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
     match root.kind {
-        // NodeKind::TsAsExpr(raw_expr) => match &*raw_expr.type_ann {
-        //     TsType::TsTypeRef(raw) => {
-        //         let name = match &raw.type_name {
-        //             TsEntityName::Ident(identifier) => &identifier.sym,
-        //             _ => "",
-        //         };
-
-        //         println!("I'm storing the type {}", name);
-
-        //         symbol_tables.insert(
-        //             file_path,
-        //             name.to_string(),
-        //             Declaration::Type {
-        //                 node: root.index.clone(),
-        //             }
-        //         )
-        //     },
-        //     _ => {}
-        // }
+        NodeKind::ModuleItem(_) => {
+            for child_item in root.children() {
+                store_declaration_maybe(root.get(child_item).unwrap(), file_path, symbol_tables)
+            }
+        }
+        NodeKind::ExportDecl(_) => {
+            for child_index in root.children() {
+                let child = root.get(child_index).unwrap();
+                store_declaration_maybe(child, file_path, symbol_tables)
+            }
+        }
+        NodeKind::ExportDefaultExpr(_) => {
+            for child_index in root.children() {
+                let child = root.get(child_index).unwrap();
+                store_default_declaration(child, file_path, symbol_tables)
+            }
+        }
+        NodeKind::Decl(_) => {
+            for child_index in root.children() {
+                let child = root.get(child_index).unwrap();
+                store_declaration_maybe(child, file_path, symbol_tables)
+            }
+        }
         NodeKind::ClassDecl(raw) => {
             let name = raw.ident.sym.to_string();
             symbol_tables.insert(
@@ -646,7 +643,7 @@ fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables:
             for child_index in root.children() {
                 let child = root.get(child_index).unwrap();
                 match child.kind {
-                    NodeKind::ImportDefaultSpecifier(raw_specifier) => {
+                    NodeKind::ImportSpecifier(ImportSpecifier::Default(raw_specifier)) => {
                         let src = raw.src.value.to_string();
                         match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
                             Ok(module_path) => {
@@ -663,16 +660,16 @@ fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables:
                             Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
                         }
                     }
-                    NodeKind::ImportNamedSpecifier(raw_specifier) => {
+                    NodeKind::ImportSpecifier(ImportSpecifier::Named(raw_specifier)) => {
                         let src = raw.src.value.to_string();
                         match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
                             Ok(module_path) => {
-                                let name = raw_specifier.local.sym.to_string();
+                                let name = &raw_specifier.local.sym;
                                 symbol_tables.insert(
                                     file_path,
                                     name.to_string(),
                                     Declaration::Import {
-                                        name,
+                                        name: name.to_string(),
                                         source_file_name: module_path,
                                     },
                                 )
@@ -763,6 +760,98 @@ fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables:
     }
 }
 
+fn store_default_declaration(root: Rc<SchemyNode>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
+    match root.kind {
+        NodeKind::CallExpr(raw_call) => match &raw_call.callee {
+            Callee::Expr(raw_callee) => match &**raw_callee {
+                Expr::Ident(raw_ident) => symbol_tables.insert(
+                    file_path,
+                    "default".into(),
+                    Declaration::Alias {
+                        from: "default".into(),
+                        to: raw_ident.sym.to_string(),
+                    },
+                ),
+                _ => {}
+            },
+            _ => {}
+        },
+        NodeKind::ArrayLit(_) => symbol_tables.insert(
+            file_path,
+            "default".into(),
+            Declaration::Type {
+                node: root.index.clone(),
+            },
+        ),
+        NodeKind::ObjectLit(_) => symbol_tables.insert(
+            file_path,
+            "default".into(),
+            Declaration::Type {
+                node: root.index.clone(),
+            },
+        ),
+        NodeKind::NewExpr(expr) => match &*expr.callee {
+            Expr::Ident(raw_ident) => symbol_tables.insert(
+                file_path,
+                "default".into(),
+                Declaration::Alias {
+                    from: "default".into(),
+                    to: raw_ident.sym.to_string(),
+                },
+            ),
+            _ => {}
+        },
+        NodeKind::Ident(raw_ident) => symbol_tables.insert(
+            file_path,
+            "default".into(),
+            Declaration::Alias {
+                from: "default".into(),
+                to: raw_ident.sym.to_string(),
+            },
+        ),
+        NodeKind::ArrowExpr(_) => {
+            symbol_tables.insert(file_path, "default".into(), Declaration::Type { node: root.index })
+        }
+        NodeKind::ClassExpr(expr) => match &expr.ident {
+            Some(raw_ident) => symbol_tables.insert(
+                file_path,
+                "default".into(),
+                Declaration::Alias {
+                    from: "default".into(),
+                    to: raw_ident.sym.to_string(),
+                },
+            ),
+            None => {}
+        },
+        NodeKind::TsAsExpr(raw_expr) => match &*raw_expr.type_ann {
+            TsType::TsTypeRef(raw_ref) => match &raw_ref.type_name {
+                TsEntityName::Ident(raw_ident) => symbol_tables.insert(
+                    file_path,
+                    "default".into(),
+                    Declaration::Alias {
+                        from: "default".into(),
+                        to: raw_ident.sym.to_string(),
+                    },
+                ),
+                _ => {}
+            },
+            _ => {}
+        },
+        NodeKind::TsInstantiationExpr(raw_expr) => match &*raw_expr.expr {
+            Expr::Ident(raw_ident) => symbol_tables.insert(
+                file_path,
+                "default".into(),
+                Declaration::Alias {
+                    from: "default".into(),
+                    to: raw_ident.sym.to_string(),
+                },
+            ),
+            _ => {}
+        },
+        _ => {}
+    }
+}
+
 fn store_variable(name: &str, root: Rc<SchemyNode>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
     for child_index in root.children() {
         let child = root.get(child_index).unwrap();
@@ -825,6 +914,12 @@ fn store_variable(name: &str, root: Rc<SchemyNode>, file_path: &str, symbol_tabl
 
 fn define_referenced_schema_details(root_schema: &mut ApiSchema, root: Rc<SchemyNode>) -> () {
     match root.kind {
+        NodeKind::TsTypeAnnotation(_) => {
+            for child_index in root.children() {
+                let child = root.get(child_index).unwrap();
+                define_referenced_schema_details(root_schema, child)
+            }
+        }
         NodeKind::TsKeywordType(raw) => match raw.kind {
             TsKeywordTypeKind::TsNumberKeyword => {
                 root_schema.data_type("number".into());
@@ -848,15 +943,21 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, root: Rc<Schemy
             if let Some(class_node) = root.class() {
                 for property in class_node.body() {
                     match property.kind {
-                        NodeKind::ClassProp(class_property) => {
-                            let name = match &class_property.key {
-                                PropName::Ident(identifier) => Some(identifier.sym.to_string()),
-                                _ => None,
-                            };
+                        NodeKind::ClassMember(_) => {
+                            let class_prop = property.class_prop().unwrap();
+                            if let NodeKind::ClassProp(raw_prop) = class_prop.kind {
+                                let name = match &raw_prop.key {
+                                    PropName::Ident(identifier) => Some(identifier.sym.to_string()),
+                                    _ => None,
+                                };
 
-                            if let Some(name) = name {
-                                if let Some(annotation) = &property.type_ann() {
-                                    define_referenced_schema_details(root_schema.property(&name), annotation.clone());
+                                if let Some(name) = name {
+                                    if let Some(annotation) = class_prop.type_ann() {
+                                        define_referenced_schema_details(
+                                            root_schema.property(&name),
+                                            annotation.clone(),
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -897,8 +998,8 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, root: Rc<Schemy
             if let Some(interface_body) = root.interface_body() {
                 for interface_member in interface_body.body() {
                     match interface_member.kind {
-                        NodeKind::TsPropertySignature(signature) => {
-                            let property_schema = match &*signature.key {
+                        NodeKind::TsTypeElement(TsTypeElement::TsPropertySignature(raw_prop)) => {
+                            let property_schema = match &*raw_prop.key {
                                 Expr::Ident(identifier) => {
                                     let name = identifier.sym.to_string();
                                     Some(root_schema.property(&name))
@@ -921,21 +1022,24 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, root: Rc<Schemy
             root_schema.data_type("object".into());
             for member in root.members() {
                 match member.kind {
-                    NodeKind::TsPropertySignature(signature) => {
-                        let property_schema = match &*signature.key {
-                            Expr::Ident(identifier) => {
-                                let name = identifier.sym.to_string();
-                                Some(root_schema.property(&name))
-                            }
-                            _ => None,
-                        };
+                    NodeKind::TsTypeElement(raw_element) => match raw_element {
+                        TsTypeElement::TsPropertySignature(raw_prop) => {
+                            let property_schema = match &*raw_prop.key {
+                                Expr::Ident(identifier) => {
+                                    let name = identifier.sym.to_string();
+                                    Some(root_schema.property(&name))
+                                }
+                                _ => None,
+                            };
 
-                        if let Some(property_schema) = property_schema {
-                            if let Some(annotation) = member.type_ann() {
-                                define_referenced_schema_details(property_schema, annotation.clone());
+                            if let Some(property_schema) = property_schema {
+                                if let Some(annotation) = member.type_ann() {
+                                    define_referenced_schema_details(property_schema, annotation.clone());
+                                }
                             }
                         }
-                    }
+                        _ => {}
+                    },
                     _ => {}
                 }
             }
@@ -945,6 +1049,68 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, root: Rc<Schemy
                 define_referenced_schema_details(root_schema, annotation.clone())
             }
         }
+        NodeKind::TsType(raw_type) => match raw_type {
+            TsType::TsKeywordType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsKeywordType(raw)))
+            }
+            TsType::TsThisType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsThisType(raw)))
+            }
+            TsType::TsFnOrConstructorType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsFnOrConstructorType(raw)))
+            }
+            TsType::TsTypeRef(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTypeRef(raw)))
+            }
+            TsType::TsTypeQuery(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTypeQuery(raw)))
+            }
+            TsType::TsTypeLit(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTypeLit(raw)))
+            }
+            TsType::TsArrayType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsArrayType(raw)))
+            }
+            TsType::TsTupleType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTupleType(raw)))
+            }
+            TsType::TsOptionalType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsOptionalType(raw)))
+            }
+            TsType::TsRestType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsRestType(raw)))
+            }
+            TsType::TsUnionOrIntersectionType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsUnionOrIntersectionType(raw)))
+            }
+            TsType::TsConditionalType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsConditionalType(raw)))
+            }
+            TsType::TsInferType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsInferType(raw)))
+            }
+            TsType::TsParenthesizedType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsParenthesizedType(raw)))
+            }
+            TsType::TsTypeOperator(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTypeOperator(raw)))
+            }
+            TsType::TsIndexedAccessType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsIndexedAccessType(raw)))
+            }
+            TsType::TsMappedType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsMappedType(raw)))
+            }
+            TsType::TsLitType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsLitType(raw)))
+            }
+            TsType::TsTypePredicate(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTypePredicate(raw)))
+            }
+            TsType::TsImportType(raw) => {
+                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsImportType(raw)))
+            }
+        },
         _ => {}
     }
 }
