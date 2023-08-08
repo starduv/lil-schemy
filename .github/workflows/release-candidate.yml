@@ -96,12 +96,11 @@ jobs:
 
       - if: ${{ steps.cache-rustup.outputs.cache-hit != 'true' }}
         name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: moonrepo/setup-rust@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.build.TOOLCHAIN }}
-          target: ${{ matrix.build.TARGET }}
-          override: true
+          targets: ${{ matrix.build.TARGET }}
+          cache-target: release
 
       - name: Build ${{ matrix.build.TARGET }} Binary
         uses: actions-rs/cargo@v1
