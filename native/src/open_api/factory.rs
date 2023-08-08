@@ -114,7 +114,7 @@ impl OpenApiFactory {
         for child_index in root.children() {
             let child = root.get(child_index).unwrap();
             match child.kind {
-                NodeKind::TsTypeRef(raw) => match &raw.deref().type_name {
+                NodeKind::TsTypeRef(raw) => match &raw.type_name {
                     TsEntityName::Ident(identifier) if identifier.sym.eq("BodyParam") => {
                         self.add_body_param_details(open_api, operation, child, file_path);
                     }
