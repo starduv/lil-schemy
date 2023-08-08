@@ -1,5 +1,5 @@
-use ahash::{HashMap, HashSet, HashSetExt, HashMapExt};
-use serde::{Serialize, Serializer, ser::SerializeStruct};
+use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
+use serde::{ser::SerializeStruct, Serialize, Serializer};
 
 #[derive(Serialize, Debug)]
 pub struct OpenApi {
@@ -91,16 +91,16 @@ impl<'v> ApiPath {
         }
     }
 
-    pub fn add_operation(&mut self, method: &str, operation: ApiPathOperation) -> &mut ApiPathOperation {
+    pub fn add_operation(&mut self, method: &str) -> *mut ApiPathOperation {
         match method.to_lowercase().as_str() {
-            "get" => self.get.insert(operation),
-            "put" => self.put.insert(operation),
-            "post" => self.post.insert(operation),
-            "delete" => self.delete.insert(operation),
-            "options" => self.options.insert(operation),
-            "head" => self.head.insert(operation),
-            "patch" => self.patch.insert(operation),
-            "trace" => self.trace.insert(operation),
+            "get" => self.get.insert(ApiPathOperation::new()),
+            "put" => self.put.insert(ApiPathOperation::new()),
+            "post" => self.post.insert(ApiPathOperation::new()),
+            "delete" => self.delete.insert(ApiPathOperation::new()),
+            "options" => self.options.insert(ApiPathOperation::new()),
+            "head" => self.head.insert(ApiPathOperation::new()),
+            "patch" => self.patch.insert(ApiPathOperation::new()),
+            "trace" => self.trace.insert(ApiPathOperation::new()),
             other => panic!("Unsupported http method '{}'", other),
         }
     }

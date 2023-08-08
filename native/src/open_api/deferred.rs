@@ -1,8 +1,11 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, rc::Rc, cell::RefCell};
+
+use super::schema::ApiPathOperation;
 
 #[derive(Debug, Default)]
 pub struct DeferredSchemas {
     modules: Vec<String>,
+    operation_types: BTreeMap<String, BTreeMap<String, DeferredOperationType>>,
     types: BTreeMap<String, BTreeMap<String, DeferredType>>,
 }
 
@@ -33,10 +36,55 @@ impl DeferredSchemas {
             None => None,
         }
     }
+
+    pub(crate) fn add_deferred_operation_type(
+        &mut self,
+        source_file_name: &str,
+        operation: *mut ApiPathOperation,
+        type_name: &str,
+    ) -> () {
+        if !self.modules.contains(&source_file_name.to_string()) {
+            self.modules.push(source_file_name.to_string());
+        }
+
+        let types = self
+            .operation_types
+            .entry(source_file_name.to_string())
+            .or_insert(BTreeMap::new());
+
+        types.insert(
+            type_name.to_string(),
+            DeferredOperationType {
+                operation,
+                type_name: type_name.to_string(),
+            },
+        );
+    }
+
+    pub fn get_deferred_operation_type(
+        &self,
+        type_name: &str,
+        source_file_name: &str,
+    ) -> Option<&DeferredOperationType> {
+        match self.operation_types.get(source_file_name) {
+            Some(types) => types.get(type_name),
+            None => None,
+        }
+    }
+
+    pub fn debug(&self) -> () {
+        println!("{:?}", self.modules);
+    }
 }
 
 #[derive(Debug)]
 pub struct DeferredType {
     pub schema_name: String,
     pub namespace: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct DeferredOperationType {
+    pub operation: *mut ApiPathOperation,
+    pub type_name: String,
 }

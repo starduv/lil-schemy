@@ -34,6 +34,8 @@ impl<'n> SchemyNode<'n> {
             NodeKind::TsTypeAnnotation(raw) => self.get_type_annotation_children(raw, &mut children),
             NodeKind::TsTypeElement(raw) => self.get_ts_type_element_children(raw, &mut children),
             NodeKind::TsTypeLit(raw) => self.get_type_lit_children(raw, &mut children),
+            NodeKind::TsInterfaceDecl(raw) => self.get_ts_interface_decl_children(raw, &mut children),
+            NodeKind::TsTypeAliasDecl(raw) => self.get_ts_type_alias_declaration(raw, &mut children),
             NodeKind::VarDecl(raw) => self.get_var_decl_children(raw, &mut children),
             NodeKind::VarDeclarator(raw) => self.get_var_declarator_children(raw, &mut children),
             _ => {}
@@ -532,6 +534,19 @@ impl<'n> SchemyNode<'n> {
             borrow.nodes.push(Rc::new(child_node));
             children.push(child_index);
         });
+    }
+
+    fn get_ts_type_alias_declaration(&self, decl: &'n TsTypeAliasDecl, children: &mut Vec<usize>) {
+        let mut borrow = self.context.borrow_mut();
+        let child_index = borrow.nodes.len();
+        let child_node = SchemyNode {
+            index: child_index,
+            parent_index: Some(self.index.clone()),
+            kind: NodeKind::TsType(&decl.type_ann),
+            context: self.context.clone(),
+        };
+        borrow.nodes.push(Rc::new(child_node));
+        children.push(child_index);
     }
 
     fn get_module_decl_children(&self, decl: &'n ModuleDecl, children: &mut Vec<usize>) {

@@ -1,5 +1,6 @@
 import { BodyParam, Header, Path, QueryParam, Response, RouteParam } from '../../../src';
 import AdminUser, { Account, CreateUserRequest, User, UserPatch } from '../dtos';
+import { GetAccountRequest } from './requests'
 import { Router } from './router';
 
 export default Router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: QueryParam<number, false>; headers: { user: Header<User, true, "v1">; }; }, reply: any): Promise<void> => {
@@ -78,7 +79,6 @@ Router.put("", {}, Path(async (request: { tomato: BodyParam<UserPatch, false, "v
     let response = Response({} as AdminUser, {
         statusCode: 202,
         description: "Updated User",
-        // namespace: "v1" // TODO Same type name difference namespace in the same file?
     });
 
     reply.send(response);
@@ -92,7 +92,7 @@ const ledger = {
     getAccount: () => ({} as Account)
 };
 
-Router.get("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
+Router.get("", {}, Path(async (request: GetAccountRequest, reply: any): Promise<void> => {
     let success: Account = ledger.getAccount();
 
     let response = Response(success, {

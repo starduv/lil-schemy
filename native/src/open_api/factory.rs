@@ -9,7 +9,7 @@ use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, S
 
 use super::{
     deferred::DeferredSchemas,
-    schema::{ApiPathOperation, ApiSchema, OpenApi, PathOptions, ResponseOptions},
+    schema::{ApiPath, ApiPathOperation, ApiSchema, OpenApi, PathOptions, ResponseOptions},
 };
 
 pub struct OpenApiFactory {
@@ -72,21 +72,24 @@ impl OpenApiFactory {
         let route_options = args.last();
         let options = get_path_options(route_options.map(|n| n.clone()));
 
-        let mut operation = ApiPathOperation::new();
+        let operation = open_api
+            .path(&options.path.unwrap())
+            .add_operation(&options.method.unwrap());
+
+        unsafe {
+            let operation: &mut ApiPathOperation = &mut *operation;
+            operation.tags(options.tags.clone());
+        }
 
         let route_handler = route_handler.map(|n| n.clone()).unwrap();
 
-        self.add_request_details(open_api, operation.tags(options.tags), route_handler, file_path);
-
-        open_api
-            .path(&options.path.unwrap())
-            .add_operation(&options.method.unwrap(), operation);
+        self.add_request_details(open_api, operation, route_handler, file_path);
     }
 
     fn add_request_details(
         &mut self,
         open_api: &mut OpenApi,
-        operation: &mut ApiPathOperation,
+        operation: *mut ApiPathOperation,
         route_handler: Rc<SchemyNode>,
         file_path: &str,
     ) -> () {
@@ -104,7 +107,7 @@ impl OpenApiFactory {
     fn add_request_params(
         &mut self,
         open_api: &mut OpenApi,
-        operation: &mut ApiPathOperation,
+        operation: *mut ApiPathOperation,
         root: Rc<SchemyNode>,
         file_path: &str,
     ) {
@@ -124,10 +127,14 @@ impl OpenApiFactory {
                     TsEntityName::Ident(identifier) if identifier.sym.eq("RouteParam") => {
                         self.add_param_details(open_api, operation, "path", child, file_path);
                     }
-                    // TODO support route handler params in separate module
-                    // TsEntityName::Ident(identifier) => {
-                    //     self.add_param_from_referenced_type(&identifier.sym, operation, file_path);
-                    // }
+                    TsEntityName::Ident(identifier) => {
+                        match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
+                            Some(Declaration::Import { name, source_file_name }) => self
+                                .deferred_schemas
+                                .add_deferred_operation_type(&source_file_name, operation, &name),
+                            _ => {}
+                        }
+                    }
                     _ => {
                         self.add_request_params(open_api, operation, child, file_path);
                     }
@@ -142,114 +149,117 @@ impl OpenApiFactory {
     fn add_param_details(
         &mut self,
         open_api: &mut OpenApi,
-        operation: &mut ApiPathOperation,
+        operation: *mut ApiPathOperation,
         location: &str,
         root: Rc<SchemyNode>,
         file_path: &str,
     ) {
-        let parameter_name = get_parameter_name(root.clone());
-        let operation_param = operation.param(&parameter_name, location);
+        unsafe {
+            let operation: &mut ApiPathOperation = &mut *operation;
+            let parameter_name = get_parameter_name(root.clone());
+            let operation_param = operation.param(&parameter_name, location);
 
-        let type_params = root.params();
-        let namespace = match type_params.get(2) {
-            Some(namespace) => match namespace.kind {
-                NodeKind::TsType(raw_type) => match raw_type {
-                    TsType::TsLitType(raw_lit) => match &raw_lit.lit {
-                        TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
+            let type_params = root.params();
+            let namespace = match type_params.get(2) {
+                Some(namespace) => match namespace.kind {
+                    NodeKind::TsType(raw_type) => match raw_type {
+                        TsType::TsLitType(raw_lit) => match &raw_lit.lit {
+                            TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
+                            _ => None,
+                        },
                         _ => None,
                     },
                     _ => None,
                 },
                 _ => None,
-            },
-            _ => None,
-        };
+            };
 
-        match type_params.get(0) {
-            Some(param) => match param.kind {
-                NodeKind::TsType(raw_type) => match raw_type {
-                    TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
-                        TsKeywordTypeKind::TsNumberKeyword => {
-                            operation_param.content().schema().data_type("number");
-                        }
-                        TsKeywordTypeKind::TsBooleanKeyword => {
-                            operation_param.content().schema().data_type("boolean");
-                        }
-                        TsKeywordTypeKind::TsStringKeyword => {
-                            operation_param.content().schema().data_type("string");
-                        }
-                        _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
-                    },
-                    TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
-                        TsEntityName::Ident(identifier) => {
-                            let root_name = self
-                                .symbol_tables
-                                .get_root_declaration_name(file_path, identifier.sym.to_string());
+            match type_params.get(0) {
+                Some(param) => match param.kind {
+                    NodeKind::TsType(raw_type) => match raw_type {
+                        TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
+                            TsKeywordTypeKind::TsNumberKeyword => {
+                                operation_param.content().schema().data_type("number");
+                            }
+                            TsKeywordTypeKind::TsBooleanKeyword => {
+                                operation_param.content().schema().data_type("boolean");
+                            }
+                            TsKeywordTypeKind::TsStringKeyword => {
+                                operation_param.content().schema().data_type("string");
+                            }
+                            _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
+                        },
+                        TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
+                            TsEntityName::Ident(identifier) => {
+                                let root_name = self
+                                    .symbol_tables
+                                    .get_root_declaration_name(file_path, identifier.sym.to_string());
 
-                            self.define_referenced_schema(
-                                param.clone(),
-                                &root_name,
-                                &root_name,
-                                open_api,
-                                file_path,
-                                namespace.clone(),
-                            );
+                                self.define_referenced_schema(
+                                    param.clone(),
+                                    &root_name,
+                                    &root_name,
+                                    open_api,
+                                    file_path,
+                                    namespace.clone(),
+                                );
 
-                            operation_param
-                                .content()
-                                .schema()
-                                .reference(root_name.into(), false)
-                                .namespace(namespace);
-                        }
-                        _ => println!("found some strang type ref"),
-                    },
-                    _ => {}
-                },
-                _ => println!("found some abstraction around your type ref {:?}", param.kind),
-            },
-            None => {}
-        }
-
-        match type_params.get(1) {
-            Some(param) => match &param.kind {
-                NodeKind::TsType(required) => match required {
-                    TsType::TsLitType(raw) => match raw.lit {
-                        TsLit::Bool(raw_bool) => {
-                            operation_param.required(raw_bool.value);
-                        }
+                                operation_param
+                                    .content()
+                                    .schema()
+                                    .reference(root_name.into(), false)
+                                    .namespace(namespace);
+                            }
+                            _ => println!("found some strang type ref"),
+                        },
                         _ => {}
                     },
-                    _ => {}
+                    _ => println!("found some abstraction around your type ref {:?}", param.kind),
                 },
-                other => println!("found this while looking for required: {:?}", other),
-            },
-            None => println!("i didn't find a second param at all!"),
-        }
+                None => {}
+            }
 
-        match type_params.get(3) {
-            Some(param) => match param.kind {
-                NodeKind::TsType(raw_type) => match raw_type {
-                    TsType::TsLitType(raw_lit) => match &raw_lit.lit {
-                        TsLit::Str(raw_str) => {
-                            operation_param
-                                .content()
-                                .schema()
-                                .format(Some(raw_str.value.to_string()));
-                        }
+            match type_params.get(1) {
+                Some(param) => match &param.kind {
+                    NodeKind::TsType(required) => match required {
+                        TsType::TsLitType(raw) => match raw.lit {
+                            TsLit::Bool(raw_bool) => {
+                                operation_param.required(raw_bool.value);
+                            }
+                            _ => {}
+                        },
                         _ => {}
                     },
-                    _ => {}
+                    other => println!("found this while looking for required: {:?}", other),
                 },
-                _ => println!("found this while looking for format: {:?}", param.kind),
-            },
-            None => {}
+                None => println!("i didn't find a second param at all!"),
+            }
+
+            match type_params.get(3) {
+                Some(param) => match param.kind {
+                    NodeKind::TsType(raw_type) => match raw_type {
+                        TsType::TsLitType(raw_lit) => match &raw_lit.lit {
+                            TsLit::Str(raw_str) => {
+                                operation_param
+                                    .content()
+                                    .schema()
+                                    .format(Some(raw_str.value.to_string()));
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    },
+                    _ => println!("found this while looking for format: {:?}", param.kind),
+                },
+                None => {}
+            }
         }
     }
 
     fn find_response(
         &mut self,
         open_api: &mut OpenApi,
-        operation: &mut ApiPathOperation,
+        operation: *mut ApiPathOperation,
         root: Rc<SchemyNode>,
         file_path: &str,
     ) -> () {
@@ -268,7 +278,7 @@ impl OpenApiFactory {
     fn add_response(
         &mut self,
         open_api: &mut OpenApi,
-        operation: &mut ApiPathOperation,
+        operation: *mut ApiPathOperation,
         root: Rc<SchemyNode>,
         file_path: &str,
     ) -> () {
@@ -342,92 +352,98 @@ impl OpenApiFactory {
         }
 
         if let Some(response_options) = options {
-            operation.response(&response_type_name, response_options);
+            unsafe {
+                let operation: &mut ApiPathOperation = &mut *operation;
+                operation.response(&response_type_name, response_options);
+            }
         }
     }
 
     fn add_body_param_details(
         &mut self,
         open_api: &mut OpenApi,
-        operation: &mut ApiPathOperation,
+        operation: *mut ApiPathOperation,
         root: Rc<SchemyNode>,
         file_path: &str,
     ) -> () {
-        let operation_param = operation.body();
-        let type_params = root.params();
-        let namespace = match type_params.get(2) {
-            Some(namespace) => match namespace.kind {
-                NodeKind::TsType(raw_type) => match raw_type {
-                    TsType::TsLitType(raw_lit) => match &raw_lit.lit {
-                        TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
+        unsafe {
+            let operation: &mut ApiPathOperation = &mut *operation;
+            let operation_param = operation.body();
+            let type_params = root.params();
+            let namespace = match type_params.get(2) {
+                Some(namespace) => match namespace.kind {
+                    NodeKind::TsType(raw_type) => match raw_type {
+                        TsType::TsLitType(raw_lit) => match &raw_lit.lit {
+                            TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
+                            _ => None,
+                        },
                         _ => None,
                     },
                     _ => None,
                 },
                 _ => None,
-            },
-            _ => None,
-        };
+            };
 
-        match type_params.get(0) {
-            Some(param) => match param.kind {
-                NodeKind::TsType(raw_type) => match raw_type {
-                    TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
-                        TsKeywordTypeKind::TsNumberKeyword => {
-                            operation_param.content().schema().data_type("number");
-                        }
-                        TsKeywordTypeKind::TsBooleanKeyword => {
-                            operation_param.content().schema().data_type("boolean");
-                        }
-                        TsKeywordTypeKind::TsStringKeyword => {
-                            operation_param.content().schema().data_type("string");
-                        }
-                        _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
-                    },
-                    TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
-                        TsEntityName::Ident(identifier) => {
-                            let root_name = self
-                                .symbol_tables
-                                .get_root_declaration_name(file_path, identifier.sym.to_string());
+            match type_params.get(0) {
+                Some(param) => match param.kind {
+                    NodeKind::TsType(raw_type) => match raw_type {
+                        TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
+                            TsKeywordTypeKind::TsNumberKeyword => {
+                                operation_param.content().schema().data_type("number");
+                            }
+                            TsKeywordTypeKind::TsBooleanKeyword => {
+                                operation_param.content().schema().data_type("boolean");
+                            }
+                            TsKeywordTypeKind::TsStringKeyword => {
+                                operation_param.content().schema().data_type("string");
+                            }
+                            _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
+                        },
+                        TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
+                            TsEntityName::Ident(identifier) => {
+                                let root_name = self
+                                    .symbol_tables
+                                    .get_root_declaration_name(file_path, identifier.sym.to_string());
 
-                            self.define_referenced_schema(
-                                param.clone(),
-                                &root_name,
-                                &root_name,
-                                open_api,
-                                file_path,
-                                namespace.clone(),
-                            );
+                                self.define_referenced_schema(
+                                    param.clone(),
+                                    &root_name,
+                                    &root_name,
+                                    open_api,
+                                    file_path,
+                                    namespace.clone(),
+                                );
 
-                            operation_param
-                                .content()
-                                .schema()
-                                .reference(root_name.into(), false)
-                                .namespace(namespace);
-                        }
-                        _ => println!("found some strang type ref"),
-                    },
-                    _ => {}
-                },
-                _ => println!("found some abstraction around your type ref {:?}", param.kind),
-            },
-            None => {}
-        }
-
-        match type_params.get(1) {
-            Some(param) => match &param.kind {
-                NodeKind::TsType(required) => match required {
-                    TsType::TsLitType(raw) => match raw.lit {
-                        TsLit::Bool(raw_bool) => {
-                            operation_param.required(raw_bool.value);
-                        }
+                                operation_param
+                                    .content()
+                                    .schema()
+                                    .reference(root_name.into(), false)
+                                    .namespace(namespace);
+                            }
+                            _ => println!("found some strang type ref"),
+                        },
                         _ => {}
                     },
-                    _ => {}
+                    _ => println!("found some abstraction around your type ref {:?}", param.kind),
                 },
-                other => println!("found this while looking for required: {:?}", other),
-            },
-            None => println!("i didn't find a second param at all!"),
+                None => {}
+            }
+
+            match type_params.get(1) {
+                Some(param) => match &param.kind {
+                    NodeKind::TsType(required) => match required {
+                        TsType::TsLitType(raw) => match raw.lit {
+                            TsLit::Bool(raw_bool) => {
+                                operation_param.required(raw_bool.value);
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    },
+                    other => println!("found this while looking for required: {:?}", other),
+                },
+                None => println!("i didn't find a second param at all!"),
+            }
         }
     }
 
@@ -522,6 +538,34 @@ impl OpenApiFactory {
         type_name: &str,
         source_file_name: &str,
     ) -> () {
+        if type_name.eq("GetAccountRequest") {
+            self.symbol_tables.debug(source_file_name, type_name);
+        }
+
+        if let Some(deferred_operation_type) = self
+            .deferred_schemas
+            .get_deferred_operation_type(type_name, source_file_name)
+        {
+            match self.symbol_tables.get_root_declaration(source_file_name, type_name) {
+                Some(Declaration::Type { node }) => unsafe {
+                    let root = root.get(node).unwrap();
+                    let operation: &mut ApiPathOperation = &mut *deferred_operation_type.operation;
+                    self.add_request_params(open_api, operation, root, source_file_name);
+                },
+                Some(Declaration::Import {
+                    name: imported_name,
+                    source_file_name: module_file_name,
+                }) => {
+                    self.deferred_schemas.add_deferred_operation_type(
+                        &module_file_name,
+                        deferred_operation_type.operation,
+                        &imported_name,
+                    );
+                }
+                _ => {}
+            }
+        }
+
         if let Some(deferred_type) = self.deferred_schemas.get_deferred_type(type_name, source_file_name) {
             match self.symbol_tables.get_root_declaration(source_file_name, &type_name) {
                 Some(Declaration::Type { node }) => {
@@ -885,32 +929,6 @@ fn store_variable(name: &str, root: Rc<SchemyNode>, file_path: &str, symbol_tabl
         }
     }
 }
-
-// // fn add_param_from_referenced_type(
-// //     &mut self,
-// //     schema_type_name: &str,
-// //     operation: &mut ApiPathOperation,
-// //     file_path: &str,
-// // ) -> () {
-// // let root_declaration = self.symbol_tables.get_root_declaration(file_path, type_ref);
-// // match  root_declaration{
-// //     // Some(Declaration::Import { name, source_file_name }) => find_referenced_type(file_path, name, |declaration: dprint_swc_ext::swc::ast::Decl| {
-// //     //     match declaration {
-// //     //         dprint_swc_ext::swc::ast::Decl::TsInterface(interface_declaration) => {
-// //     //             let name = interface_declaration.id.sym().to_string();
-// //     //             self.add_param_from_referenced_type(operation, &name, source_file_name);
-// //     //         }
-// //     //         dprint_swc_ext::swc::ast::Decl::TsTypeAlias(alias_declaration) => {
-// //     //             let name = alias_declaration.id.sym().to_string();
-// //     //             self.add_param_from_referenced_type(operation, &name, source_file_name);
-// //     //         }
-// //     //         _ => {}
-// //     //     }
-// //     // }),
-// //     Some(Declaration::Type { node }) => self.add_request_params(operation, &node, file_path),
-// //     _ => {}
-// // }
-// // }
 
 fn define_referenced_schema_details(root_schema: &mut ApiSchema, root: Rc<SchemyNode>) -> () {
     match root.kind {
