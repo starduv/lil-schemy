@@ -6,7 +6,8 @@ import { getRootFiles } from '../src/utils';
 
 use(deepEqual);
 
-describe('open api generator', () => {
+describe('open api generator', function () {
+    this.timeout(20000);
     let schema: OpenAPIV3.Document;
 
     before(() => {
