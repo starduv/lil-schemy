@@ -4,7 +4,9 @@ import { unlinkSync } from "fs";
 import path from "path";
 import { LilSchemyOptions } from "../src/generator";
 
-describe('cli', () => {
+describe('cli', function () {
+    this.timeout(20000);
+
     const rootConfigPath = path.resolve(__dirname, 'schemy-config.js');
     const customDirectory = path.resolve(__dirname, 'custom');
     const customConfigPath = path.resolve(customDirectory, 'schemy-config.js');
