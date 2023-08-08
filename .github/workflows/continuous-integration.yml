@@ -17,38 +17,38 @@ jobs:
             fail-fast: true
             matrix:
               build:
-                - BIN: libtypeshift.so
-                  NAME: typeshift-x64-linux.node
+                - BIN: liblil-schemy.so
+                  NAME: lil-schemy-x64-linux.node
                   OS: ubuntu-20.04
                   TOOLCHAIN: stable
                   TARGET: x86_64-unknown-linux-gnu
 
-                - BIN: libtypeshift.so
-                  NAME: typeshift-arm64-linux.node
+                - BIN: liblil-schemy.so
+                  NAME: lil-schemy-arm64-linux.node
                   OS: ubuntu-20.04
                   TOOLCHAIN: stable
                   TARGET: aarch64-unknown-linux-gnu
 
-                - BIN: typeshift.dll
-                  NAME: typeshift-x64-win32.node
+                - BIN: lil_schemy.dll
+                  NAME: lil-schemy-x64-win32.node
                   OS: windows-2022
                   TOOLCHAIN: stable
                   TARGET: x86_64-pc-windows-msvc
 
-                - BIN: typeshift.dll
-                  NAME: typeshift-arm64-win32.node
+                - BIN: lil_schemy.dll
+                  NAME: lil-schemy-arm64-win32.node
                   OS: windows-2022
                   TOOLCHAIN: stable
                   TARGET: aarch64-pc-windows-msvc
 
-                - BIN: libtypeshift.dylib
-                  NAME: typeshift-x64-darwin.node
+                - BIN: liblil-schemy.dylib
+                  NAME: lil-schemy-x64-darwin.node
                   OS: macos-11
                   TOOLCHAIN: stable
                   TARGET: x86_64-apple-darwin
 
-                - BIN: libtypeshift.dylib
-                  NAME: typeshift-arm64-darwin.node
+                - BIN: liblil-schemy.dylib
+                  NAME: lil-schemy-arm64-darwin.node
                   OS: macos-11
                   TOOLCHAIN: stable
                   TARGET: aarch64-apple-darwin
