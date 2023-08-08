@@ -2,7 +2,7 @@ mod deferred;
 mod factory;
 mod schema;
 
-use std::{cell::RefCell, fs::File, io::Write, path::PathBuf, rc::Rc};
+use std::{fs::File, io::Write, path::PathBuf};
 
 use neon::{
     prelude::{Context, *},
@@ -10,7 +10,7 @@ use neon::{
 };
 use serde_json::json;
 
-use crate::typescript::{ModuleCache, ASSERT_CLAUSE, SchemyNode};
+use crate::typescript::ModuleCache;
 
 use self::{factory::OpenApiFactory, schema::OpenApi};
 

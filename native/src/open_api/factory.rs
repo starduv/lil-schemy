@@ -9,7 +9,7 @@ use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, S
 
 use super::{
     deferred::DeferredSchemas,
-    schema::{ApiPath, ApiPathOperation, ApiSchema, OpenApi, PathOptions, ResponseOptions},
+    schema::{ApiPathOperation, ApiSchema, OpenApi, PathOptions, ResponseOptions},
 };
 
 pub struct OpenApiFactory {
