@@ -1,10 +1,10 @@
 {
-  "name": "@starduv/typeshift",
+  "name": "@starduv/lil-schemy",
   "version": "0.0.1",
-  "description": "TypeShift is a cli tool that enables code first schema generation from TypeScript",
+  "description": "Lil' Schemy is a cli tool that enables code first schema generation from TypeScript",
   "main": "lib/index.js",
   "bin": {
-    "typeshift": "bin/typeshift.js"
+    "lil-schemy": "bin/lil-schemy.js"
   },
   "files": [
     "lib/**/*",
@@ -48,9 +48,9 @@
   "author": "Joel Rainear-Wills <starshiprdubb@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/starduv/typeshift/issues"
+    "url": "https://github.com/starduv/lil-schemy/issues"
   },
-  "homepage": "https://github.com/starduv/typeshift#readme",
+  "homepage": "https://github.com/starduv/lil-schemy#readme",
   "dependencies": {
     "commander": "^10.0.0",
     "fast-glob": "^3.2.12",

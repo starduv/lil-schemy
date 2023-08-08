@@ -5,7 +5,8 @@
     "node_modules",
     "tests",
     "lib",
-    "bin"
+    "bin",
+    "native"
   ],
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig to read more about this file */

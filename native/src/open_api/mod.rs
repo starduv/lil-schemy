@@ -1,14 +1,18 @@
-mod generator;
-mod open_api;
+mod deferred;
+mod factory;
+mod schema;
 
 use std::{fs::File, io::Write, path::PathBuf};
 
-use neon::{prelude::*, result::Throw};
+use neon::{
+    prelude::{Context, *},
+    result::Throw,
+};
 use serde_json::json;
 
-use crate::typescript::AstNode;
+use crate::typescript::ModuleCache;
 
-use self::{generator::OpenApiGenerator, open_api::OpenApi};
+use self::{factory::OpenApiFactory, schema::OpenApi};
 
 fn merge_schemas(
     open_api: &OpenApi,
@@ -39,43 +43,28 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
     }
 }
 
-fn generate_schema(
-    open_api_handle: Handle<JsObject>,
-    get_ast: Handle<JsFunction>,
-    cx: &mut FunctionContext,
-) -> Result<String, Throw> {
-    let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "paths")?;
-    let mut generator = OpenApiGenerator::new(|module_ref, source_file_name, cx: &mut FunctionContext| {
-        let mut call = get_ast.call_with(cx);
-        let raw = call
-            .args((cx.string(module_ref), cx.string(source_file_name)))
-            .apply::<JsString, _>(cx)
-            .expect(&format!(
-                "Could not find ast for module {} referenced in file {}",
-                module_ref, source_file_name
-            ));
+fn generate_schema(open_api_handle: Handle<JsObject>, cx: &mut FunctionContext) -> Result<String, Throw> {
+    let mut factory = OpenApiFactory::new();
+    let mut module_cache = ModuleCache::new();
+    let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "entry")?;
 
-        serde_json::from_str::<AstNode>(&raw.value(cx))
-            .expect(&format!("Could not parse raw test for file {}", module_ref))
-    });
-
+    let mut open_api = OpenApi::new();
     for path in paths.to_vec(cx)? {
         let path = path.downcast_or_throw::<JsString, _>(cx)?.value(cx);
-        generator.api_paths_from(path, cx);
+        factory.append_schema(&mut open_api, &path, &mut module_cache);
     }
 
-    merge_schemas(generator.result(), open_api_handle, cx)
+    merge_schemas(&mut open_api, open_api_handle, cx)
 }
 
 pub fn generate_openapi(
     schemas_result: Handle<JsObject>,
     options_handle: Handle<JsObject>,
-    get_ast: Handle<JsFunction>,
     cx: &mut FunctionContext,
 ) -> Result<(), Throw> {
     let schema_result: Handle<JsObject> = cx.empty_object();
     if let Some(open_api_handle) = options_handle.get_opt(cx, "openApi")? as Option<Handle<JsObject>> {
-        let schema: String = generate_schema(open_api_handle, get_ast, cx)?;
+        let schema: String = generate_schema(open_api_handle, cx)?;
 
         if let Some(output_handle) = open_api_handle.get_opt::<JsString, FunctionContext, &str>(cx, "output")? {
             let filepath = match options_handle.get_opt::<JsString, FunctionContext, &str>(cx, "cwd")? {

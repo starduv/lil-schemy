@@ -10,7 +10,7 @@ export interface User {
     name: string;
 }
 
-export default class AdminUser implements User {
+class AdminUser {
     permissions!: string[];
     name!: string;
 }
@@ -19,3 +19,4 @@ export interface GetUserRequest { lat: QueryParam<number, false>, long: QueryPar
 
 export interface UserPatchRequest { id: RouteParam<string, true>; date: QueryParam<string, false, undefined, "date">; }
 
+export default AdminUser

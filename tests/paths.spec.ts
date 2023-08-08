@@ -2,7 +2,7 @@ import { expect, use } from 'chai';
 import deepEqual from 'deep-equal-in-any-order';
 import { OpenAPIV3 } from 'openapi-types';
 import { generateSchemas } from '../src/generator';
-import { getAst, getRootFiles } from '../src/utils';
+import { getRootFiles } from '../src/utils';
 
 use(deepEqual);
 
@@ -11,10 +11,9 @@ describe('open api generator', () => {
 
     before(() => {
         const result = generateSchemas({
-            getAst: getAst(__dirname, { project: './tsconfig.json' }),
             openApi: {
                 base: JSON.stringify({}),
-                paths: getRootFiles(__dirname, ["test-api/routes/*.ts"]),
+                entry: getRootFiles(__dirname, ["test-api/routes/*.ts", "!test-api/routes/router.ts"]),
             }
         });
 
@@ -35,25 +34,19 @@ describe('open api generator', () => {
                         },
                         required: ["name"]
                     },
-                    AdminUser: {
+                    CreateUserRequest: {
                         type: 'object',
                         properties: {
-                            permissions: {
-                                type: 'array',
-                                items: {
-                                    type: 'string'
-                                }
-                            },
                             name: {
                                 type: 'string'
                             }
                         },
-                        required: ['permissions', 'name']
+                        required: ['name']
                     }
                 },
                 required: [
+                    "CreateUserRequest",
                     "User",
-                    "AdminUser"
                 ]
             },
             Account: {
@@ -79,7 +72,7 @@ describe('open api generator', () => {
                     }
                 },
                 required: ['permissions', 'name']
-            }
+            },
         });
     });
 
@@ -217,7 +210,7 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        $ref: "#/components/schemas/v1/properties/AdminUser"
+                                        $ref: "#/components/schemas/AdminUser"
                                     }
                                 }
                             }

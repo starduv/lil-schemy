@@ -48,38 +48,38 @@ jobs:
       fail-fast: false
       matrix:
         build:
-          - BIN: libtypeshift.so
-            NAME: typeshift-x64-linux.node
+          - BIN: liblil_schemy.so
+            NAME: lil-schemy-x64-linux.node
             OS: ubuntu-20.04
             TOOLCHAIN: stable
             TARGET: x86_64-unknown-linux-gnu
 
-          - BIN: libtypeshift.so
-            NAME: typeshift-arm64-linux.node
+          - BIN: liblil_schemy.so
+            NAME: lil-schemy-arm64-linux.node
             OS: ubuntu-20.04
             TOOLCHAIN: stable
             TARGET: aarch64-unknown-linux-gnu
 
-          - BIN: typeshift.dll
-            NAME: typeshift-x64-win32.node
+          - BIN: lil_schemy.dll
+            NAME: lil-schemy-x64-win32.node
             OS: windows-2022
             TOOLCHAIN: stable
             TARGET: x86_64-pc-windows-msvc
 
-          - BIN: typeshift.dll
-            NAME: typeshift-arm64-win32.node
+          - BIN: lil_schemy.dll
+            NAME: lil-schemy-arm64-win32.node
             OS: windows-2022
             TOOLCHAIN: stable
             TARGET: aarch64-pc-windows-msvc
 
-          - BIN: libtypeshift.dylib
-            NAME: typeshift-x64-darwin.node
+          - BIN: liblil_schemy.dylib
+            NAME: lil-schemy-x64-darwin.node
             OS: macos-11
             TOOLCHAIN: stable
             TARGET: x86_64-apple-darwin
 
-          - BIN: libtypeshift.dylib
-            NAME: typeshift-arm64-darwin.node
+          - BIN: liblil_schemy.dylib
+            NAME: lil-schemy-arm64-darwin.node
             OS: macos-11
             TOOLCHAIN: stable
             TARGET: aarch64-apple-darwin
@@ -144,12 +144,12 @@ jobs:
       - name: Move Binaries
         shell: bash
         run: |
-          mv "${{ github.workspace }}/typeshift-x64-linux.node/libtypeshift.so" "${{ github.workspace }}/lib/generator/typeshift-x64-linux.node"
-          mv "${{ github.workspace }}/typeshift-arm64-linux.node/libtypeshift.so" "${{ github.workspace }}/lib/generator/typeshift-arm64-linux.node"
-          mv "${{ github.workspace }}/typeshift-x64-win32.node/typeshift.dll" "${{ github.workspace }}/lib/generator/typeshift-x64-win32.node"
-          mv "${{ github.workspace }}/typeshift-arm64-win32.node/typeshift.dll" "${{ github.workspace }}/lib/generator/typeshift-arm64-win32.node"
-          mv "${{ github.workspace }}/typeshift-x64-darwin.node/libtypeshift.dylib" "${{ github.workspace }}/lib/generator/typeshift-x64-darwin.node"
-          mv "${{ github.workspace }}/typeshift-arm64-darwin.node/libtypeshift.dylib" "${{ github.workspace }}/lib/generator/typeshift-arm64-darwin.node"
+          mv "${{ github.workspace }}/lil-schemy-x64-linux.node/liblil_schemy.so" "${{ github.workspace }}/lib/generator/lil-schemy-x64-linux.node"
+          mv "${{ github.workspace }}/lil-schemy-arm64-linux.node/liblil_schemy.so" "${{ github.workspace }}/lib/generator/lil-schemy-arm64-linux.node"
+          mv "${{ github.workspace }}/lil-schemy-x64-win32.node/lil_schemy.dll" "${{ github.workspace }}/lib/generator/lil-schemy-x64-win32.node"
+          mv "${{ github.workspace }}/lil-schemy-arm64-win32.node/lil_schemy.dll" "${{ github.workspace }}/lib/generator/lil-schemy-arm64-win32.node"
+          mv "${{ github.workspace }}/lil-schemy-x64-darwin.node/liblil_schemy.dylib" "${{ github.workspace }}/lib/generator/lil-schemy-x64-darwin.node"
+          mv "${{ github.workspace }}/lil-schemy-arm64-darwin.node/liblil_schemy.dylib" "${{ github.workspace }}/lib/generator/lil-schemy-arm64-darwin.node"
            
       - name: Publish Package
         shell: bash

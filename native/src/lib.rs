@@ -9,9 +9,8 @@ use open_api::generate_openapi;
 fn generate_schemas(mut cx: FunctionContext) -> Result<Handle<JsObject>, Throw> {
     let schemas_result: Handle<JsObject> = cx.empty_object();
     let options_handle: Handle<JsObject> = cx.argument(0)?;
-    let get_ast = options_handle.get::<JsFunction, _, _>(&mut cx, "getAst")?;
 
-    generate_openapi(schemas_result, options_handle, get_ast, &mut cx)?;
+    generate_openapi(schemas_result, options_handle, &mut cx)?;
 
     Ok(schemas_result)
 }
