@@ -22,32 +22,23 @@ describe('open api generator', () => {
 
     it('generates schemas', () => {
         expect(schema.components?.schemas).to.deep.equalInAnyOrder({
-            v1: {
+            User: {
                 type: "object",
                 properties: {
-                    User: {
-                        type: "object",
-                        properties: {
-                            name: {
-                                type: "string"
-                            }
-                        },
-                        required: ["name"]
-                    },
-                    CreateUserRequest: {
-                        type: 'object',
-                        properties: {
-                            name: {
-                                type: 'string'
-                            }
-                        },
-                        required: ['name']
+                    name: {
+                        type: "string"
                     }
                 },
-                required: [
-                    "CreateUserRequest",
-                    "User",
-                ]
+                required: ["name"]
+            },
+            CreateUserRequest: {
+                type: 'object',
+                properties: {
+                    name: {
+                        type: 'string'
+                    }
+                },
+                required: ['name']
             },
             Account: {
                 type: 'object',
@@ -78,6 +69,39 @@ describe('open api generator', () => {
 
     it('generates api paths', () => {
         expect(schema.paths).to.deep.equal({
+            "/animals": {
+                get: {
+                    tags: ["Animals"],
+                    responses: {
+                        200: {
+                            description: "List animals of a specific kind",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "array",
+                                        items: {
+                                            type: "string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    parameters: [
+                        {
+                            "application/json": {
+                                schema: {
+                                    enum: ["cat", "dog", "bird"],
+                                    type: "string",
+                                }
+                            },
+                            in: "query",
+                            name: "kind",
+                            required: true
+                        }
+                    ]
+                }
+            },
             "/account": {
                 get: {
                     parameters: [
@@ -117,10 +141,10 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        $ref: "#/components/schemas/v1/properties/User",
+                                        $ref: "#/components/schemas/User",
                                     },
                                     example: {
-                                        $ref: "#/components/examples/v1.User"
+                                        $ref: "#/components/examples/User"
                                     }
                                 }
                             }
@@ -157,7 +181,7 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        "$ref": "#/components/schemas/v1/properties/User"
+                                        "$ref": "#/components/schemas/User"
                                     }
                                 }
                             },
@@ -173,7 +197,7 @@ describe('open api generator', () => {
                         content: {
                             "application/json": {
                                 schema: {
-                                    $ref: "#/components/schemas/v1/properties/CreateUserRequest"
+                                    $ref: "#/components/schemas/CreateUserRequest"
                                 }
                             }
                         },
@@ -185,7 +209,7 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        $ref: "#/components/schemas/v1/properties/User"
+                                        $ref: "#/components/schemas/User"
                                     }
                                 }
                             }
@@ -198,7 +222,7 @@ describe('open api generator', () => {
                         content: {
                             "application/json": {
                                 schema: {
-                                    $ref: "#/components/schemas/v1/properties/UserPatch"
+                                    $ref: "#/components/schemas/UserPatch"
                                 }
                             }
                         },
@@ -310,7 +334,7 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     example: {
-                                        $ref: "#/components/examples/v1.NoContent"
+                                        $ref: "#/components/examples/NoContent"
                                     }
                                 }
                             }

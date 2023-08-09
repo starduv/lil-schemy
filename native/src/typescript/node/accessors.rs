@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc, vec};
 
-use swc_ecma_ast::TsTypeElement;
+use swc_ecma_ast::{Expr, ExprOrSpread, TsTypeElement};
 
 use super::{Context, NodeKind, SchemyNode};
 
@@ -221,24 +221,21 @@ impl<'m> SchemyNode<'m> {
                     vec![]
                 }
             }
-            NodeKind::ExprOrSpread(raw) => match &*raw.expr {
-                swc_ecma_ast::Expr::Arrow(expr) => expr
-                    .params
-                    .iter()
-                    .map(|param| {
-                        let mut borrow = self.context.borrow_mut();
-                        let params_index = borrow.nodes.len();
-                        borrow.nodes.push(Rc::new(SchemyNode {
-                            index: params_index,
-                            parent_index: Some(self.index),
-                            kind: NodeKind::Pat(param),
-                            context: self.context.clone(),
-                        }));
-                        borrow.nodes.get(params_index).map(|n| n.clone()).unwrap()
-                    })
-                    .collect(),
-                _ => vec![],
-            },
+            NodeKind::ArrowExpr(expr) => expr
+                .params
+                .iter()
+                .map(|param| {
+                    let mut borrow = self.context.borrow_mut();
+                    let params_index = borrow.nodes.len();
+                    borrow.nodes.push(Rc::new(SchemyNode {
+                        index: params_index,
+                        parent_index: Some(self.index),
+                        kind: NodeKind::Pat(param),
+                        context: self.context.clone(),
+                    }));
+                    borrow.nodes.get(params_index).map(|n| n.clone()).unwrap()
+                })
+                .collect(),
             _ => vec![],
         }
     }
@@ -306,7 +303,7 @@ impl<'m> SchemyNode<'m> {
                     context: self.context.clone(),
                 }));
                 borrow.nodes.get(class_index).map(|n| n.clone())
-            },
+            }
             NodeKind::TsTypeElement(TsTypeElement::TsPropertySignature(raw_prop)) => match &raw_prop.type_ann {
                 Some(type_ann) => {
                     let mut borrow = self.context.borrow_mut();
@@ -339,30 +336,24 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn type_params(&self) -> Vec<Rc<SchemyNode<'m>>> {
+    pub fn as_arrow_expr(&self) -> Option<Rc<SchemyNode<'m>>> {
         match self.kind {
-            NodeKind::TsTypeRef(type_ref) => {
-                if let Some(type_params) = &type_ref.type_params {
+            NodeKind::ExprOrSpread(raw) => match &*raw.expr {
+                Expr::Arrow(raw_arrow) => {
                     let mut borrow = self.context.borrow_mut();
-                    type_params
-                        .params
-                        .iter()
-                        .map(|param| {
-                            let params_index = borrow.nodes.len();
-                            borrow.nodes.push(Rc::new(SchemyNode {
-                                index: params_index,
-                                parent_index: Some(self.index),
-                                kind: NodeKind::TsType(param),
-                                context: self.context.clone(),
-                            }));
-                            borrow.nodes.get(params_index).map(|n| n.clone()).unwrap()
-                        })
-                        .collect()
-                } else {
-                    vec![]
+                    let child_index = borrow.nodes.len();
+                    let child_node = SchemyNode {
+                        kind: NodeKind::ArrowExpr(&*raw_arrow),
+                        index: child_index,
+                        parent_index: Some(self.index),
+                        context: self.context.clone(),
+                    };
+                    borrow.nodes.push(Rc::new(child_node));
+                    borrow.nodes.get(child_index).map(|n| n.clone())
                 }
-            }
-            _ => vec![],
+                _ => None,
+            },
+            _ => None,
         }
     }
 }

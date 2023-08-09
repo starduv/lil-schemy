@@ -3,6 +3,7 @@ use swc_ecma_ast::*;
 
 // #[derive(Debug)]
 pub enum NodeKind<'m> {
+    TsEntityName(&'m TsEntityName),
     TsTypeParamDecl(&'m TsTypeParamDecl),
     MemberProp(&'m MemberProp),
     TsModuleBlock(&'m TsModuleBlock),
@@ -123,6 +124,13 @@ pub enum NodeKind<'m> {
     VarDeclarator(&'m VarDeclarator),
     WhileStmt(&'m WhileStmt),
     WithStmt(&'m WithStmt),
+    TsQualifiedName(&'m TsQualifiedName),
+    Str(&'m Str),
+    Bool(&'m Bool),
+    Null(&'m Null),
+    Num(&'m Number),
+    BigInt(&'m BigInt),
+    Regex(&'m Regex),
 }
 
 impl<'n> Clone for NodeKind<'n> {
@@ -248,6 +256,14 @@ impl<'n> Clone for NodeKind<'n> {
             NodeKind::TsNamespaceDecl(raw) => NodeKind::TsNamespaceDecl(raw),
             NodeKind::MemberProp(raw) => NodeKind::MemberProp(raw),
             NodeKind::TsTypeParamDecl(raw) => NodeKind::TsTypeParamDecl(raw),
+            NodeKind::TsEntityName(raw) => NodeKind::TsEntityName(raw),
+            NodeKind::TsQualifiedName(raw) => NodeKind::TsQualifiedName(raw),
+            NodeKind::Str(raw) => NodeKind::Str(raw),
+            NodeKind::Bool(raw) => NodeKind::Bool(raw),
+            NodeKind::Null(raw) => NodeKind::Null(raw),
+            NodeKind::Num(raw) => NodeKind::Num(raw),
+            NodeKind::BigInt(raw) => NodeKind::BigInt(raw),
+            NodeKind::Regex(raw) => NodeKind::Regex(raw),
         }
     }
 }
@@ -375,6 +391,14 @@ impl<'m> Debug for NodeKind<'m> {
             NodeKind::TsNamespaceDecl(_) => f.debug_tuple("TsNamespaceDecl").finish(),
             NodeKind::MemberProp(_) => f.debug_tuple("MemberProp").finish(),
             NodeKind::TsTypeParamDecl(_) => f.debug_tuple("TsTypeParamDecl").finish(),
+            NodeKind::TsEntityName(_) => f.debug_tuple("TsEntityName").finish(),
+            NodeKind::TsQualifiedName(_) => f.debug_tuple("TsQualifiedName").finish(),
+            NodeKind::Str(_) => f.debug_tuple("Str").finish(),
+            NodeKind::Bool(_) => f.debug_tuple("Bool").finish(),
+            NodeKind::Null(_) => f.debug_tuple("Null").finish(),
+            NodeKind::Num(_) => f.debug_tuple("Num").finish(),
+            NodeKind::BigInt(_) => f.debug_tuple("BigInt").finish(),
+            NodeKind::Regex(_) => f.debug_tuple("Regex").finish(),
         }
     }
 }

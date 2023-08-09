@@ -1,6 +1,5 @@
-use std::{path::PathBuf, rc::Rc};
+use std::{option, rc::Rc};
 
-use es_resolve::{EsResolver, TargetEnv};
 use lazy_static::__Deref;
 
 use swc_ecma_ast::*;
@@ -8,8 +7,9 @@ use swc_ecma_ast::*;
 use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode};
 
 use super::{
+    caching::store_declaration_maybe,
     deferred::DeferredSchemas,
-    schema::{ApiPathOperation, ApiSchema, OpenApi, PathOptions, ResponseOptions},
+    schema::{ApiConent, ApiPathOperation, ApiSchema, OpenApi, PathOptions, ResponseOptions},
 };
 
 pub struct OpenApiFactory {
@@ -44,22 +44,11 @@ impl OpenApiFactory {
         for child_index in root.children() {
             let child = root.get(child_index).unwrap();
             match &child.kind {
-                NodeKind::CallExpr(_) => {
-                    if let Some(callee) = child.callee() {
-                        if let NodeKind::Callee(raw) = callee.kind {
-                            match raw {
-                                Callee::Expr(raw_expr) => match &**raw_expr {
-                                    Expr::Ident(raw_ident) if raw_ident.sym.eq("Path") => {
-                                        self.symbol_tables.add_child_scope(file_path);
-                                        self.add_path(open_api, child, file_path);
-                                        self.symbol_tables.parent_scope(file_path);
-                                    }
-                                    _ => self.find_paths(open_api, child, file_path),
-                                },
-                                _ => {}
-                            }
-                        }
-                    }
+                NodeKind::Ident(raw_ident) if raw_ident.sym.eq("Path") => {
+                    let parent = child.parent().unwrap().parent().unwrap();
+                    self.symbol_tables.add_child_scope(file_path);
+                    self.add_path(open_api, parent, file_path);
+                    self.symbol_tables.parent_scope(file_path);
                 }
                 _ => self.find_paths(open_api, child, file_path),
             }
@@ -68,9 +57,9 @@ impl OpenApiFactory {
 
     fn add_path(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode>, file_path: &str) -> () {
         let args = root.args();
-        let route_handler = args.first();
-        let route_options = args.last();
-        let options = get_path_options(route_options.map(|n| n.clone()));
+        let route_handler = args.first().unwrap().as_arrow_expr().unwrap();
+        let route_options = args.last().unwrap();
+        let options = get_path_options(route_options.clone());
 
         let operation = open_api
             .path(&options.path.unwrap())
@@ -81,9 +70,7 @@ impl OpenApiFactory {
             operation.tags(options.tags.clone());
         }
 
-        let route_handler = route_handler.map(|n| n.clone()).unwrap();
-
-        self.add_request_details(open_api, operation, route_handler, file_path);
+        self.add_request_details(open_api, operation, route_handler.clone(), file_path);
     }
 
     fn add_request_details(
@@ -111,36 +98,46 @@ impl OpenApiFactory {
         root: Rc<SchemyNode>,
         file_path: &str,
     ) {
-        for child_index in root.children() {
-            let child = root.get(child_index).unwrap();
-            match child.kind {
-                NodeKind::TsTypeRef(raw) => match &raw.type_name {
-                    TsEntityName::Ident(identifier) if identifier.sym.eq("BodyParam") => {
-                        self.add_body_param_details(open_api, operation, child, file_path);
-                    }
-                    TsEntityName::Ident(identifier) if identifier.sym.eq("Header") => {
-                        self.add_param_details(open_api, operation, "header", child, file_path);
-                    }
-                    TsEntityName::Ident(identifier) if identifier.sym.eq("QueryParam") => {
-                        self.add_param_details(open_api, operation, "query", child, file_path);
-                    }
-                    TsEntityName::Ident(identifier) if identifier.sym.eq("RouteParam") => {
-                        self.add_param_details(open_api, operation, "path", child, file_path);
-                    }
-                    TsEntityName::Ident(identifier) => {
-                        match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
-                            Some(Declaration::Import { name, source_file_name }) => self
-                                .deferred_schemas
-                                .add_deferred_operation_type(&source_file_name, operation, &name),
-                            _ => {}
-                        }
-                    }
-                    _ => {
-                        self.add_request_params(open_api, operation, child, file_path);
-                    }
-                },
-                _ => {
-                    self.add_request_params(open_api, operation, child, file_path);
+        match root.kind {
+            NodeKind::Ident(identifier) if identifier.sym.eq("BodyParam") => {
+                self.add_body_param_details(open_api, operation, root.parent().unwrap().parent().unwrap(), file_path);
+            }
+            NodeKind::Ident(identifier) if identifier.sym.eq("Header") => {
+                self.add_param_details(
+                    open_api,
+                    operation,
+                    "header",
+                    root.parent().unwrap().parent().unwrap(),
+                    file_path,
+                );
+            }
+            NodeKind::Ident(identifier) if identifier.sym.eq("QueryParam") => {
+                self.add_param_details(
+                    open_api,
+                    operation,
+                    "query",
+                    root.parent().unwrap().parent().unwrap(),
+                    file_path,
+                );
+            }
+            NodeKind::Ident(identifier) if identifier.sym.eq("RouteParam") => {
+                self.add_param_details(
+                    open_api,
+                    operation,
+                    "path",
+                    root.parent().unwrap().parent().unwrap(),
+                    file_path,
+                );
+            }
+            NodeKind::Ident(identifier) => match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
+                Some(Declaration::Import { name, source_file_name }) => self
+                    .deferred_schemas
+                    .add_deferred_operation_type(&source_file_name, operation, &name),
+                _ => {}
+            },
+            _ => {
+                for child_index in root.children() {
+                    self.add_request_params(open_api, operation, root.get(child_index).unwrap(), file_path);
                 }
             }
         }
@@ -174,49 +171,8 @@ impl OpenApiFactory {
                 _ => None,
             };
 
-            match type_params.get(0) {
-                Some(param) => match param.kind {
-                    NodeKind::TsType(raw_type) => match raw_type {
-                        TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
-                            TsKeywordTypeKind::TsNumberKeyword => {
-                                operation_param.content().schema().data_type("number");
-                            }
-                            TsKeywordTypeKind::TsBooleanKeyword => {
-                                operation_param.content().schema().data_type("boolean");
-                            }
-                            TsKeywordTypeKind::TsStringKeyword => {
-                                operation_param.content().schema().data_type("string");
-                            }
-                            _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
-                        },
-                        TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
-                            TsEntityName::Ident(identifier) => {
-                                let root_name = self
-                                    .symbol_tables
-                                    .get_root_declaration_name(file_path, identifier.sym.to_string());
-
-                                self.define_referenced_schema(
-                                    param.clone(),
-                                    &root_name,
-                                    &root_name,
-                                    open_api,
-                                    file_path,
-                                    namespace.clone(),
-                                );
-
-                                operation_param
-                                    .content()
-                                    .schema()
-                                    .reference(root_name.into(), false)
-                                    .namespace(namespace);
-                            }
-                            _ => println!("found some strang type ref"),
-                        },
-                        _ => {}
-                    },
-                    _ => println!("found some abstraction around your type ref {:?}", param.kind),
-                },
-                None => {}
+            if let Some(type_param) = type_params.get(0) {
+                self.add_type_content(open_api, type_param, operation_param.content(), file_path, &namespace);
             }
 
             match type_params.get(1) {
@@ -252,6 +208,57 @@ impl OpenApiFactory {
                     _ => println!("found this while looking for format: {:?}", param.kind),
                 },
                 None => {}
+            }
+        }
+    }
+
+    fn add_type_content(
+        &mut self,
+        open_api: &mut OpenApi,
+        root: &Rc<SchemyNode>,
+        content: &mut ApiConent,
+        file_path: &str,
+        namespace: &Option<String>,
+    ) {
+        match root.kind {
+            NodeKind::TsKeywordType(raw_keyword) => match raw_keyword.kind {
+                TsKeywordTypeKind::TsNumberKeyword => {
+                    content.schema().data_type("number");
+                }
+                TsKeywordTypeKind::TsBooleanKeyword => {
+                    content.schema().data_type("boolean");
+                }
+                TsKeywordTypeKind::TsStringKeyword => {
+                    content.schema().data_type("string");
+                }
+                _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
+            },
+            NodeKind::TsTypeRef(raw_type) => match &raw_type.type_name {
+                TsEntityName::Ident(identifier) => {
+                    let root_name = self
+                        .symbol_tables
+                        .get_root_declaration_name(file_path, identifier.sym.to_string());
+
+                    self.define_referenced_schema(
+                        root.clone(),
+                        &root_name,
+                        &root_name,
+                        open_api,
+                        file_path,
+                        namespace.clone(),
+                    );
+
+                    content
+                        .schema()
+                        .reference(root_name.into(), false)
+                        .namespace(namespace.clone());
+                }
+                _ => println!("found some strang type ref"),
+            },
+            _ => {
+                for child in root.children() {
+                    self.add_type_content(open_api, &root.get(child).unwrap(), content, file_path, namespace)
+                }
             }
         }
     }
@@ -294,69 +301,137 @@ impl OpenApiFactory {
             None => None,
         };
 
-        let namespace = match &options {
-            Some(options) => options.namespace.clone(),
-            None => None,
-        };
-
-        let response_type_name = match args.get(0) {
-            Some(arg) => match &arg.kind {
-                NodeKind::ExprOrSpread(raw) => match &*raw.expr {
-                    Expr::New(new_expression) => match &*new_expression.callee {
-                        Expr::Ident(identifier) => Some(
-                            self.symbol_tables
-                                .get_root_declaration_name(file_path, identifier.sym.to_string()),
-                        ),
-                        _ => None,
-                    },
-                    Expr::Ident(response_type) => Some(
-                        self.symbol_tables
-                            .get_root_declaration_name(file_path, response_type.sym.to_string()),
-                    ),
-                    Expr::TsAs(ts_as) => match &*ts_as.type_ann {
-                        TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
-                            TsEntityName::Ident(identifier) => Some(
-                                self.symbol_tables
-                                    .get_root_declaration_name(file_path, identifier.sym.to_string()),
-                            ),
-                            _ => None,
-                        },
-                        _ => None,
-                    },
-                    Expr::TsTypeAssertion(type_assertion) => match &*type_assertion.type_ann {
-                        TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
-                            TsEntityName::Ident(identifier) => Some(
-                                self.symbol_tables
-                                    .get_root_declaration_name(file_path, identifier.sym.to_string()),
-                            ),
-                            _ => None,
-                        },
-                        _ => None,
-                    },
-                    _ => None,
-                },
-                _ => None,
-            },
-            None => None,
-        };
-
-        if let Some(response_type_name) = &response_type_name {
-            self.define_referenced_schema(
-                root,
-                &response_type_name,
-                &response_type_name,
-                open_api,
-                file_path,
-                namespace,
-            );
-        }
-
-        if let Some(response_options) = options {
-            unsafe {
-                let operation: &mut ApiPathOperation = &mut *operation;
-                operation.response(&response_type_name, response_options);
+        match args.get(0) {
+            Some(response_type) if options.is_some() => {
+                self.add_response_details(
+                    &response_type,
+                    &options.unwrap(),
+                    file_path,
+                    operation,
+                    open_api,
+                    &mut "".into(),
+                );
             }
-        }
+            _ => {}
+        };
+    }
+
+    fn add_response_details(
+        &mut self,
+        root: &Rc<SchemyNode>,
+        options: &ResponseOptions,
+        file_path: &str,
+        operation: *mut ApiPathOperation,
+        open_api: &mut OpenApi,
+        depth: &mut String,
+    ) {
+        depth.push_str("-");
+        println!("{} {:?}", depth, root.kind);
+        match root.kind {
+            NodeKind::Ident(identifier) => {
+                let name = self
+                    .symbol_tables
+                    .get_root_declaration_name(file_path, identifier.sym.to_string());
+
+                let status_code = options.status_code.as_ref().unwrap();
+                let description = options.description.as_ref().unwrap();
+
+                unsafe {
+                    let operation: &mut ApiPathOperation = &mut *operation;
+                    let response = operation.response(&status_code, &description);
+                    let content = response.content();
+                    content.schema().reference(Some(name.clone()), false);
+                    content.example(options.example.clone(), options.namespace.clone());
+                }
+
+                self.define_referenced_schema(
+                    root.clone(),
+                    &name,
+                    &name,
+                    open_api,
+                    file_path,
+                    options.namespace.clone(),
+                );
+            }
+            NodeKind::Str(_) => {
+                let status_code = options.status_code.as_ref().unwrap();
+                let description = options.description.as_ref().unwrap();
+
+                unsafe {
+                    let operation: &mut ApiPathOperation = &mut *operation;
+                    let response = operation.response(&status_code, &description);
+                    let content = response.content();
+                    content.schema().data_type("string");
+                    content.example(options.example.clone(), options.namespace.clone());
+                }
+            }
+            NodeKind::Bool(_) => {
+                let status_code = options.status_code.as_ref().unwrap();
+                let description = options.description.as_ref().unwrap();
+
+                unsafe {
+                    let operation: &mut ApiPathOperation = &mut *operation;
+                    let response = operation.response(&status_code, &description);
+                    let content = response.content();
+                    content.schema().data_type("boolean");
+                    content.example(options.example.clone(), options.namespace.clone());
+                }
+            }
+            NodeKind::Null(_) => {
+                let status_code = options.status_code.as_ref().unwrap();
+                let description = options.description.as_ref().unwrap();
+
+                unsafe {
+                    let operation: &mut ApiPathOperation = &mut *operation;
+                    let response = operation.response(&status_code, &description);
+                    let content = response.content();
+                    content.example(options.example.clone(), options.namespace.clone());
+                }
+            }
+            NodeKind::Num(_) => {
+                let status_code = options.status_code.as_ref().unwrap();
+                let description = options.description.as_ref().unwrap();
+
+                unsafe {
+                    let operation: &mut ApiPathOperation = &mut *operation;
+                    let response = operation.response(&status_code, &description);
+                    let content = response.content();
+                    content.schema().data_type("number");
+                    content.example(options.example.clone(), options.namespace.clone());
+                }
+            }
+            NodeKind::BigInt(_) => {
+                let status_code = options.status_code.as_ref().unwrap();
+                let description = options.description.as_ref().unwrap();
+
+                unsafe {
+                    let operation: &mut ApiPathOperation = &mut *operation;
+                    let response = operation.response(&status_code, &description);
+                    let content = response.content();
+                    content.schema().data_type("number");
+                    content.example(options.example.clone(), options.namespace.clone());
+                }
+            }
+            NodeKind::Regex(_) => {
+                let status_code = options.status_code.as_ref().unwrap();
+                let description = options.description.as_ref().unwrap();
+
+                unsafe {
+                    let operation: &mut ApiPathOperation = &mut *operation;
+                    let response = operation.response(&status_code, &description);
+                    let content = response.content();
+                    content.schema().data_type("string");
+                    content.example(options.example.clone(), options.namespace.clone());
+                }
+            }
+
+            _ => {
+                for child_index in root.children() {
+                    let child = root.get(child_index).unwrap();
+                    self.add_response_details(&child, options, file_path, operation, open_api, &mut depth.clone());
+                }
+            }
+        };
     }
 
     fn add_body_param_details(
@@ -538,10 +613,6 @@ impl OpenApiFactory {
         type_name: &str,
         source_file_name: &str,
     ) -> () {
-        if type_name.eq("GetAccountRequest") {
-            self.symbol_tables.debug(source_file_name, type_name);
-        }
-
         if let Some(deferred_operation_type) = self
             .deferred_schemas
             .get_deferred_operation_type(type_name, source_file_name)
@@ -595,337 +666,6 @@ impl OpenApiFactory {
                 }
                 _ => {}
             }
-        }
-    }
-}
-
-fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
-    match root.kind {
-        NodeKind::ModuleItem(_) => {
-            for child_item in root.children() {
-                store_declaration_maybe(root.get(child_item).unwrap(), file_path, symbol_tables)
-            }
-        }
-        NodeKind::ExportDecl(_) => {
-            for child_index in root.children() {
-                let child = root.get(child_index).unwrap();
-                store_declaration_maybe(child, file_path, symbol_tables)
-            }
-        }
-        NodeKind::ExportDefaultExpr(_) => {
-            for child_index in root.children() {
-                let child = root.get(child_index).unwrap();
-                store_default_declaration(child, file_path, symbol_tables)
-            }
-        }
-        NodeKind::Decl(_) => {
-            for child_index in root.children() {
-                let child = root.get(child_index).unwrap();
-                store_declaration_maybe(child, file_path, symbol_tables)
-            }
-        }
-        NodeKind::ClassDecl(raw) => {
-            let name = raw.ident.sym.to_string();
-            symbol_tables.insert(
-                file_path,
-                name.to_string(),
-                Declaration::Type {
-                    node: root.index.clone(),
-                },
-            )
-        }
-        NodeKind::TsInterfaceDecl(raw) => {
-            let name = raw.id.sym.to_string();
-            symbol_tables.insert(
-                file_path,
-                name,
-                Declaration::Type {
-                    node: root.index.clone(),
-                },
-            )
-        }
-        NodeKind::TsTypeAliasDecl(raw) => {
-            let name = raw.id.sym.to_string();
-            symbol_tables.insert(
-                file_path,
-                name,
-                Declaration::Type {
-                    node: root.index.clone(),
-                },
-            )
-        }
-        NodeKind::TsEnumDecl(raw) => {
-            let name = raw.id.sym.to_string();
-            symbol_tables.insert(
-                file_path,
-                name,
-                Declaration::Type {
-                    node: root.index.clone(),
-                },
-            )
-        }
-
-        NodeKind::Ident(raw) => {
-            let target_name = raw.sym.to_string();
-            symbol_tables.insert(
-                file_path,
-                "default".into(),
-                Declaration::Alias {
-                    from: "default".into(),
-                    to: target_name,
-                },
-            )
-        }
-        NodeKind::ClassExpr(_) => symbol_tables.insert(
-            file_path,
-            "default".into(),
-            Declaration::Type {
-                node: root.index.clone(),
-            },
-        ),
-        NodeKind::ImportDecl(raw) => {
-            for child_index in root.children() {
-                let child = root.get(child_index).unwrap();
-                match child.kind {
-                    NodeKind::ImportSpecifier(ImportSpecifier::Default(raw_specifier)) => {
-                        let src = raw.src.value.to_string();
-                        match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
-                            Ok(module_path) => {
-                                let name = raw_specifier.local.sym.to_string();
-                                symbol_tables.insert(
-                                    file_path,
-                                    name,
-                                    Declaration::Import {
-                                        name: String::from("default"),
-                                        source_file_name: module_path,
-                                    },
-                                )
-                            }
-                            Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
-                        }
-                    }
-                    NodeKind::ImportSpecifier(ImportSpecifier::Named(raw_specifier)) => {
-                        let src = raw.src.value.to_string();
-                        match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
-                            Ok(module_path) => {
-                                let name = &raw_specifier.local.sym;
-                                symbol_tables.insert(
-                                    file_path,
-                                    name.to_string(),
-                                    Declaration::Import {
-                                        name: name.to_string(),
-                                        source_file_name: module_path,
-                                    },
-                                )
-                            }
-                            Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-        NodeKind::NamedExport(raw) => {
-            let src = &raw.src.as_ref().unwrap().value;
-            match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
-                Ok(module_file_name) => {
-                    for specifier in &raw.specifiers {
-                        match specifier {
-                            ExportSpecifier::Named(named_specifier) => {
-                                let type_name = match &named_specifier.orig {
-                                    ModuleExportName::Ident(identifier) => &identifier.sym,
-                                    ModuleExportName::Str(identifier) => &identifier.value,
-                                };
-
-                                if let Some(exported_name) = &named_specifier.exported {
-                                    let exported_name = match exported_name {
-                                        ModuleExportName::Ident(id) => &id.sym,
-                                        ModuleExportName::Str(id) => &id.value,
-                                    };
-
-                                    symbol_tables.insert(
-                                        file_path,
-                                        exported_name.to_string(),
-                                        Declaration::Import {
-                                            name: type_name.to_string(),
-                                            source_file_name: module_file_name.to_string(),
-                                        },
-                                    )
-                                } else {
-                                    symbol_tables.insert(
-                                        file_path,
-                                        type_name.to_string(),
-                                        Declaration::Import {
-                                            name: type_name.to_string(),
-                                            source_file_name: module_file_name.to_string(),
-                                        },
-                                    )
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
-            }
-        }
-        NodeKind::VarDeclarator(raw) => {
-            match &raw.name {
-                Pat::Ident(identifier) => {
-                    let name = identifier.id.sym.to_string();
-                    match &identifier.type_ann {
-                        Some(type_annotation) => match &*type_annotation.type_ann {
-                            TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
-                                TsEntityName::Ident(identifier) => symbol_tables.insert(
-                                    file_path,
-                                    name.to_string(),
-                                    Declaration::Alias {
-                                        from: name,
-                                        to: identifier.sym.to_string(),
-                                    },
-                                ),
-                                _ => {}
-                            },
-                            _ => {}
-                        },
-                        None => match &raw.init {
-                            Some(initializer) => {
-                                let node = root.to_child(NodeKind::Expr(initializer));
-                                store_variable(&name, node, file_path, symbol_tables);
-                            }
-                            None => {}
-                        },
-                    }
-                }
-                _ => println!("yeah there's a pat"),
-            };
-        }
-        _ => {}
-    }
-}
-
-fn store_default_declaration(root: Rc<SchemyNode>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
-    match root.kind {
-        NodeKind::CallExpr(raw_call) => match &raw_call.callee {
-            Callee::Expr(raw_callee) => match &**raw_callee {
-                Expr::Ident(raw_ident) => symbol_tables.insert(
-                    file_path,
-                    "default".into(),
-                    Declaration::Alias {
-                        from: "default".into(),
-                        to: raw_ident.sym.to_string(),
-                    },
-                ),
-                _ => {}
-            },
-            _ => {}
-        },
-        NodeKind::ArrayLit(_) => symbol_tables.insert(
-            file_path,
-            "default".into(),
-            Declaration::Type {
-                node: root.index.clone(),
-            },
-        ),
-        NodeKind::ObjectLit(_) => symbol_tables.insert(
-            file_path,
-            "default".into(),
-            Declaration::Type {
-                node: root.index.clone(),
-            },
-        ),
-        NodeKind::NewExpr(expr) => match &*expr.callee {
-            Expr::Ident(raw_ident) => symbol_tables.insert(
-                file_path,
-                "default".into(),
-                Declaration::Alias {
-                    from: "default".into(),
-                    to: raw_ident.sym.to_string(),
-                },
-            ),
-            _ => {}
-        },
-        NodeKind::Ident(raw_ident) => symbol_tables.insert(
-            file_path,
-            "default".into(),
-            Declaration::Alias {
-                from: "default".into(),
-                to: raw_ident.sym.to_string(),
-            },
-        ),
-        NodeKind::ArrowExpr(_) => {
-            symbol_tables.insert(file_path, "default".into(), Declaration::Type { node: root.index })
-        }
-        NodeKind::ClassExpr(expr) => match &expr.ident {
-            Some(raw_ident) => symbol_tables.insert(
-                file_path,
-                "default".into(),
-                Declaration::Alias {
-                    from: "default".into(),
-                    to: raw_ident.sym.to_string(),
-                },
-            ),
-            None => {}
-        },
-        NodeKind::TsAsExpr(raw_expr) => match &*raw_expr.type_ann {
-            TsType::TsTypeRef(raw_ref) => match &raw_ref.type_name {
-                TsEntityName::Ident(raw_ident) => symbol_tables.insert(
-                    file_path,
-                    "default".into(),
-                    Declaration::Alias {
-                        from: "default".into(),
-                        to: raw_ident.sym.to_string(),
-                    },
-                ),
-                _ => {}
-            },
-            _ => {}
-        },
-        NodeKind::TsInstantiationExpr(raw_expr) => match &*raw_expr.expr {
-            Expr::Ident(raw_ident) => symbol_tables.insert(
-                file_path,
-                "default".into(),
-                Declaration::Alias {
-                    from: "default".into(),
-                    to: raw_ident.sym.to_string(),
-                },
-            ),
-            _ => {}
-        },
-        _ => {}
-    }
-}
-
-fn store_variable(name: &str, root: Rc<SchemyNode>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
-    for child_index in root.children() {
-        let child = root.get(child_index).unwrap();
-        match child.kind {
-            NodeKind::Ident(raw) => {
-                let type_name = raw.sym.to_string();
-                symbol_tables.insert(
-                    file_path,
-                    name.to_string(),
-                    Declaration::Alias {
-                        from: name.to_string(),
-                        to: type_name,
-                    },
-                )
-            }
-            NodeKind::TsTypeRef(raw) => match &raw.type_name {
-                TsEntityName::Ident(identifier) => {
-                    let type_name = identifier.sym.to_string();
-                    symbol_tables.insert(
-                        file_path,
-                        name.to_string(),
-                        Declaration::Alias {
-                            from: name.to_string(),
-                            to: type_name,
-                        },
-                    )
-                }
-                _ => {}
-            },
-            _ => store_variable(name, child, file_path, symbol_tables),
         }
     }
 }
@@ -1133,11 +873,9 @@ fn define_referenced_schema_details(root_schema: &mut ApiSchema, root: Rc<Schemy
     }
 }
 
-fn get_path_options(options: Option<Rc<SchemyNode>>) -> PathOptions {
+fn get_path_options(options: Rc<SchemyNode>) -> PathOptions {
     let mut path_options = PathOptions::new();
-    if let Some(options) = options {
-        load_options(&mut path_options, options);
-    }
+    load_options(&mut path_options, options);
     path_options
 }
 

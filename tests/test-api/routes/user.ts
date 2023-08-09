@@ -3,12 +3,11 @@ import AdminUser, { Account, CreateUserRequest, User, UserPatch } from '../dtos'
 import { GetAccountRequest } from './requests'
 import { Router } from './router';
 
-export default Router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: QueryParam<number, false>; headers: { user: Header<User, true, "v1">; }; }, reply: any): Promise<void> => {
+export default Router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: QueryParam<number, false>; headers: { user: Header<User, true>; }; }, reply: any): Promise<void> => {
     let success = {} as User;
 
     let response = Response(success, {
         statusCode: 200,
-        namespace: "v1",
         description: "Who am I",
         example: "User"
     });
@@ -50,7 +49,6 @@ Router.delete("", {}, Path(async (request: { id: RouteParam<string, true>; }, re
     let response = Response(null, {
         statusCode: 204,
         description: "no content",
-        namespace: "v1",
         example: "NoContent"
     });
 
@@ -61,11 +59,10 @@ Router.delete("", {}, Path(async (request: { id: RouteParam<string, true>; }, re
     tags: ["Admin", "Users"],
 }));
 
-Router.post("", {}, Path(async (request: { user: BodyParam<CreateUserRequest, true, "v1">; }, reply: any): Promise<void> => {
+Router.post("", {}, Path(async (request: { user: BodyParam<CreateUserRequest, true>; }, reply: any): Promise<void> => {
     let response = Response(<User>{}, {
         statusCode: 201,
         description: "Create a new user",
-        namespace: "v1"
     });
 
     reply.send(response);
@@ -75,7 +72,7 @@ Router.post("", {}, Path(async (request: { user: BodyParam<CreateUserRequest, tr
     tags: ["Admin"]
 }));
 
-Router.put("", {}, Path(async (request: { tomato: BodyParam<UserPatch, false, "v1">; }, reply: any): Promise<void> => {
+Router.put("", {}, Path(async (request: { tomato: BodyParam<UserPatch, false>; }, reply: any): Promise<void> => {
     let response = Response({} as AdminUser, {
         statusCode: 202,
         description: "Updated User",

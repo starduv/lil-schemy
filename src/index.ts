@@ -55,7 +55,7 @@ type OptionalArray<T> = T[] | undefined;
 
 export type Path<Func extends (...args: unknown[]) => unknown | Promise<unknown>, Method extends OperationMethod, Path extends string, Tags extends OptionalArray<string> = undefined> = Func;
 export type Response<ResponseType, StatusCode extends number, Description extends OptionalString, Example extends OptionalString, Namespace extends OptionalString = undefined> = ResponseType;
-export type BodyParam<Param, Required extends boolean, Namespace extends OptionalString = undefined> = Param;
-export type Header<Param, Required extends boolean, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
-export type QueryParam<Param, Required extends boolean, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
-export type RouteParam<Param, Required extends true, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
+export type BodyParam<Param, Required extends boolean = true, Namespace extends OptionalString = undefined> = Param;
+export type Header<Param, Required extends boolean = true, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
+export type QueryParam<Param, Required extends boolean = false, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
+export type RouteParam<Param, Required extends true = true, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;

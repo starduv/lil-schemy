@@ -1,3 +1,4 @@
+mod caching;
 mod deferred;
 mod factory;
 mod schema;

@@ -136,34 +136,39 @@ impl ApiPathOperation {
         self
     }
 
-    pub(crate) fn response(
-        &mut self,
-        response_type: &Option<String>,
-        response_args: ResponseOptions,
-    ) -> &mut ApiResponse {
-        let status_code = response_args
-            .status_code
-            .expect("An ApiResponse must have a status code");
-
-        let description = response_args
-            .description
-            .expect("An ApiResponse must have a description");
-
+    pub(crate) fn response(&mut self, status_code: &str, description: &str) -> &mut ApiResponse {
         let mut response = ApiResponse::new(description);
-
-        let content = response
-            .content()
-            .example(response_args.example, response_args.namespace.clone());
-
-        if response_type.is_some() {
-            content
-                .schema()
-                .reference(response_type.to_owned(), false)
-                .namespace(response_args.namespace);
-        }
-
-        self.responses.entry(status_code).or_insert(response)
+        self.responses.entry(status_code.into()).or_insert(response)
     }
+
+    // pub(crate) fn response(
+    //     &mut self,
+    //     response_type: &Option<String>,
+    //     response_args: ResponseOptions,
+    // ) -> &mut ApiResponse {
+    //     let status_code = response_args
+    //         .status_code
+    //         .expect("An ApiResponse must have a status code");
+
+    //     let description = response_args
+    //         .description
+    //         .expect("An ApiResponse must have a description");
+
+    //     let mut response = ApiResponse::new(description);
+
+    //     let content = response
+    //         .content()
+    //         .example(response_args.example, response_args.namespace.clone());
+
+    //     if response_type.is_some() {
+    //         content
+    //             .schema()
+    //             .reference(response_type.to_owned(), false)
+    //             .namespace(response_args.namespace);
+    //     }
+
+    //     self.responses.entry(status_code).or_insert(response)
+    // }
 
     pub(crate) fn param(&mut self, name: &str, location: &str) -> &mut ApiParam {
         let param = ApiParam::new(Some(name), Some(location));
@@ -196,10 +201,10 @@ pub struct ApiResponse {
 }
 
 impl ApiResponse {
-    fn new(description: String) -> Self {
+    fn new(description: &str) -> Self {
         ApiResponse {
             content: None,
-            description,
+            description: description.to_string(),
             examples: None,
             headers: None,
             links: None,
@@ -330,7 +335,7 @@ impl ApiSchema {
 
     pub fn reference(&mut self, reference: Option<String>, is_example: bool) -> &mut ApiSchema {
         self.is_example = is_example;
-        self.reference = reference;
+        self.reference = reference.clone();
         self
     }
 
