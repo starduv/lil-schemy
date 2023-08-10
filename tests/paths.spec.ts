@@ -10,6 +10,9 @@ use(deepEqual);
 describe('open api generator', () => {
     let schema: OpenAPIV3.Document;
 
+    const files = getRootFiles(__dirname, ["test-api/routes/*.ts", "!test-api/routes/router.ts"]);
+    console.log(files);
+
     before(() => {
         const result = generateSchemas({
             openApi: {
