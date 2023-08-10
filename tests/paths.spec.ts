@@ -3,6 +3,7 @@ import deepEqual from 'deep-equal-in-any-order';
 import { OpenAPIV3 } from 'openapi-types';
 import { generateSchemas } from '../src/generator';
 import { getRootFiles } from '../src/utils';
+import { writeFile, writeFileSync } from 'fs';
 
 use(deepEqual);
 
@@ -18,10 +19,16 @@ describe('open api generator', () => {
         });
 
         schema = JSON.parse(result.openApi.schema || "");
+
+        // writeFileSync("./result.json", result.openApi.schema as string);
     });
 
     it('generates schemas', () => {
         expect(schema.components?.schemas).to.deep.equalInAnyOrder({
+            AnimalKind: {
+                enum: ["cat", "dog", "bird"],
+                type: "string",
+            },
             User: {
                 type: "object",
                 properties: {
@@ -89,15 +96,16 @@ describe('open api generator', () => {
                     },
                     parameters: [
                         {
-                            "application/json": {
-                                schema: {
-                                    enum: ["cat", "dog", "bird"],
-                                    type: "string",
-                                }
-                            },
                             in: "query",
                             name: "kind",
-                            required: true
+                            required: true,
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/AnimalKind"
+                                    }
+                                },
+                            }
                         }
                     ]
                 }

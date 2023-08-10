@@ -115,11 +115,14 @@ impl DeclarationTable {
                 match scope.symbols.get(&last_reference){
                     Some(decl) => declaration = Some(decl.clone()),
                     None => if let Some(parent) = &scope.parent {
+                        references.push(last_reference.clone());
                         queue.push_back(Rc::clone(&parent));
                     },
                 }
             }
         }
+
+        declaration.iter().for_each(|d| println!("{} has the declaration: {:?}", reference, d));
     }
 
     fn insert(&mut self, name: String, value: Declaration) -> () {
@@ -181,6 +184,7 @@ impl DeclarationTable {
                 match scope.symbols.get(&last_reference){
                     Some(decl) => declaration = Some(decl.clone()),
                     None => if let Some(parent) = &scope.parent {
+                        references.push(last_reference.clone());
                         queue.push_back(Rc::clone(&parent));
                     },
                 }

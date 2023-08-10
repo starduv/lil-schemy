@@ -198,6 +198,23 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
+    pub fn type_params(&self) -> Option<Rc<SchemyNode<'m>>> {
+        match self.kind {
+            NodeKind::TsTypeRef(raw) => raw.type_params.as_ref().map(|type_params| {
+                let mut borrow = self.context.borrow_mut();
+                let params_index = borrow.nodes.len();
+                borrow.nodes.push(Rc::new(SchemyNode {
+                    index: params_index,
+                    parent_index: Some(self.index),
+                    kind: NodeKind::TsTypeParamInstantiation(&*type_params),
+                    context: self.context.clone(),
+                }));
+                borrow.nodes.get(params_index).map(|n| n.clone()).unwrap()
+            }),
+            _ => None,
+        }
+    }
+
     pub fn params(&self) -> Vec<Rc<SchemyNode<'m>>> {
         match self.kind {
             NodeKind::TsTypeRef(raw_ref) => {

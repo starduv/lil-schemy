@@ -1,11 +1,18 @@
-use std::{rc::Rc, path::PathBuf};
+use std::{path::PathBuf, rc::Rc};
 
 use es_resolve::{EsResolver, TargetEnv};
-use swc_ecma_ast::{ImportSpecifier, ModuleExportName, ExportSpecifier, TsEntityName, TsType, Pat, Callee, Expr};
+use swc_ecma_ast::{Callee, ExportSpecifier, Expr, ImportSpecifier, ModuleExportName, Pat, TsEntityName, TsType};
 
-use crate::typescript::{SchemyNode, DeclarationTables, NodeKind, Declaration};
+use crate::typescript::{Declaration, DeclarationTables, NodeKind, SchemyNode};
 
-pub(in crate::open_api) fn store_declaration_maybe(root: Rc<SchemyNode>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
+pub(in crate::open_api) fn store_declaration_maybe(
+    root: Rc<SchemyNode>,
+    file_path: &str,
+    symbol_tables: &mut DeclarationTables,
+) -> () {
+    // if file_path.contains("routes/requests") {
+    //     println!("I may cache {:?}", root.kind);
+    // }
     match root.kind {
         NodeKind::ModuleItem(_) => {
             for child_item in root.children() {
@@ -70,25 +77,30 @@ pub(in crate::open_api) fn store_declaration_maybe(root: Rc<SchemyNode>, file_pa
                 },
             )
         }
+        NodeKind::ExportDefaultDecl(raw_decl) => {
+            match &raw_decl.decl {
+                swc_ecma_ast::DefaultDecl::Class(raw_class) => {
+                    let class = root.to_child(NodeKind::Class(&*raw_class.class));
 
-        NodeKind::Ident(raw) => {
-            let target_name = raw.sym.to_string();
-            symbol_tables.insert(
-                file_path,
-                "default".into(),
-                Declaration::Alias {
-                    from: "default".into(),
-                    to: target_name,
-                },
-            )
+                    symbol_tables.insert(
+                        file_path,
+                        "default".into(),
+                        Declaration::Type {
+                            node: class.index.clone(),
+                        },
+                    )
+                }
+                swc_ecma_ast::DefaultDecl::TsInterfaceDecl(raw_int) => symbol_tables.insert(
+                    file_path,
+                    "default".into(),
+                    Declaration::Alias {
+                        from: "default".into(),
+                        to: raw_int.id.sym.to_string(),
+                    },
+                ),
+                _ => {}
+            };
         }
-        NodeKind::ClassExpr(_) => symbol_tables.insert(
-            file_path,
-            "default".into(),
-            Declaration::Type {
-                node: root.index.clone(),
-            },
-        ),
         NodeKind::ImportDecl(raw) => {
             for child_index in root.children() {
                 let child = root.get(child_index).unwrap();

@@ -39,13 +39,31 @@ impl<'n> SchemyNode<'n> {
             NodeKind::TsTypeAliasDecl(raw) => self.get_ts_type_alias_declaration(raw, &mut children),
             NodeKind::VarDecl(raw) => self.get_var_decl_children(raw, &mut children),
             NodeKind::TsType(raw) => self.get_ts_type_children(raw, &mut children),
+            NodeKind::TsTypeParam(raw) => self.get_ts_type_param(raw, &mut children),
             NodeKind::TsTypeRef(raw) => self.get_ts_type_ref_children(raw, &mut children),
             NodeKind::VarDeclarator(raw) => self.get_var_declarator_children(raw, &mut children),
             NodeKind::TsEntityName(raw) => self.get_ts_entity_name_children(raw, &mut children),
             NodeKind::Lit(raw) => self.get_lit_children(raw, &mut children),
+            NodeKind::TsTypeParamInstantiation(raw) => self.get_ts_type_param_instantiation_children(raw, &mut children),
             _ => {}
         }
         children
+    }
+
+    fn get_ts_type_param_instantiation_children(&self, type_params: &'n TsTypeParamInstantiation, children: &mut Vec<usize>) {
+        for param in &type_params.params {
+            self.get_ts_type_children(param, children);
+        }
+    }
+
+    fn get_ts_type_param(&self, type_param: &'n TsTypeParam, children: &mut Vec<usize>){
+        if let Some(constraint) = &type_param.constraint {
+            self.get_ts_type_children(constraint, children);
+        }
+
+        if let Some(default) = &type_param.default {
+            self.get_ts_type_children(default, children);
+        }
     }
 
     fn get_lit_children(&self, lit: &'n Lit, children: &mut Vec<usize>) {
@@ -910,6 +928,20 @@ impl<'n> SchemyNode<'n> {
     }
     fn get_ts_interface_decl_children(&self, decl: &'n TsInterfaceDecl, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
+        if let Some(type_params) = &decl.type_params {
+            for param in &type_params.params {
+                let child_index = borrow.nodes.len();
+                let child_node = SchemyNode {
+                    index: child_index,
+                    parent_index: Some(self.index.clone()),
+                    kind: NodeKind::TsTypeParam(&param),
+                    context: self.context.clone(),
+                };
+                borrow.nodes.push(Rc::new(child_node));
+                children.push(child_index);
+            }
+        }
+
         decl.body.body.iter().for_each(|member| {
             let child_index = borrow.nodes.len();
             let child_node = SchemyNode {

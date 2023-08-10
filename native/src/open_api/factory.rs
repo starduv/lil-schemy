@@ -1,4 +1,4 @@
-use std::{option, rc::Rc};
+use std::rc::Rc;
 
 use lazy_static::__Deref;
 
@@ -9,7 +9,7 @@ use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, S
 use super::{
     caching::store_declaration_maybe,
     deferred::DeferredSchemas,
-    schema::{ApiConent, ApiPathOperation, ApiSchema, OpenApi, PathOptions, ResponseOptions},
+    schema::{ApiPathOperation, ApiSchema, OpenApi, PathOptions, ResponseOptions},
 };
 
 pub struct OpenApiFactory {
@@ -28,6 +28,17 @@ impl OpenApiFactory {
     pub fn append_schema(&mut self, open_api: &mut OpenApi, file_path: &str, module_cache: &mut ModuleCache) -> () {
         let root = module_cache.parse(&file_path);
         self.find_paths(open_api, root.clone(), file_path);
+
+        for immediate in self.deferred_schemas.take_immediate_types(file_path) {
+            let root = root.get(immediate.index).unwrap();
+            self.define_referenced_schema(
+                root,
+                &immediate.schema_name,
+                &immediate.schema_name,
+                open_api,
+                file_path,
+            )
+        }
 
         while let Some(source_file_name) = self.deferred_schemas.next_module() {
             let deferred_root = module_cache.parse(&source_file_name);
@@ -103,36 +114,19 @@ impl OpenApiFactory {
                 self.add_body_param_details(open_api, operation, root.parent().unwrap().parent().unwrap(), file_path);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("Header") => {
-                self.add_param_details(
-                    open_api,
-                    operation,
-                    "header",
-                    root.parent().unwrap().parent().unwrap(),
-                    file_path,
-                );
+                self.add_param_details(operation, "header", root.parent().unwrap().parent().unwrap(), file_path);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("QueryParam") => {
-                self.add_param_details(
-                    open_api,
-                    operation,
-                    "query",
-                    root.parent().unwrap().parent().unwrap(),
-                    file_path,
-                );
+                self.add_param_details(operation, "query", root.parent().unwrap().parent().unwrap(), file_path);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("RouteParam") => {
-                self.add_param_details(
-                    open_api,
-                    operation,
-                    "path",
-                    root.parent().unwrap().parent().unwrap(),
-                    file_path,
-                );
+                self.add_param_details(operation, "path", root.parent().unwrap().parent().unwrap(), file_path);
             }
             NodeKind::Ident(identifier) => match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
-                Some(Declaration::Import { name, source_file_name }) => self
-                    .deferred_schemas
-                    .add_deferred_operation_type(&source_file_name, operation, &name),
+                Some(Declaration::Import { name, source_file_name }) => {
+                    self.deferred_schemas
+                        .add_deferred_operation_type(&source_file_name, operation, &name);
+                }
                 _ => {}
             },
             _ => {
@@ -145,7 +139,6 @@ impl OpenApiFactory {
 
     fn add_param_details(
         &mut self,
-        open_api: &mut OpenApi,
         operation: *mut ApiPathOperation,
         location: &str,
         root: Rc<SchemyNode>,
@@ -157,22 +150,9 @@ impl OpenApiFactory {
             let operation_param = operation.param(&parameter_name, location);
 
             let type_params = root.params();
-            let namespace = match type_params.get(2) {
-                Some(namespace) => match namespace.kind {
-                    NodeKind::TsType(raw_type) => match raw_type {
-                        TsType::TsLitType(raw_lit) => match &raw_lit.lit {
-                            TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
-                            _ => None,
-                        },
-                        _ => None,
-                    },
-                    _ => None,
-                },
-                _ => None,
-            };
 
             if let Some(type_param) = type_params.get(0) {
-                self.add_type_content(open_api, type_param, operation_param.content(), file_path, &namespace);
+                self.define_schema_details(operation_param.content().schema(), type_param.clone(), file_path);
             }
 
             match type_params.get(1) {
@@ -208,57 +188,6 @@ impl OpenApiFactory {
                     _ => println!("found this while looking for format: {:?}", param.kind),
                 },
                 None => {}
-            }
-        }
-    }
-
-    fn add_type_content(
-        &mut self,
-        open_api: &mut OpenApi,
-        root: &Rc<SchemyNode>,
-        content: &mut ApiConent,
-        file_path: &str,
-        namespace: &Option<String>,
-    ) {
-        match root.kind {
-            NodeKind::TsKeywordType(raw_keyword) => match raw_keyword.kind {
-                TsKeywordTypeKind::TsNumberKeyword => {
-                    content.schema().data_type("number");
-                }
-                TsKeywordTypeKind::TsBooleanKeyword => {
-                    content.schema().data_type("boolean");
-                }
-                TsKeywordTypeKind::TsStringKeyword => {
-                    content.schema().data_type("string");
-                }
-                _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
-            },
-            NodeKind::TsTypeRef(raw_type) => match &raw_type.type_name {
-                TsEntityName::Ident(identifier) => {
-                    let root_name = self
-                        .symbol_tables
-                        .get_root_declaration_name(file_path, identifier.sym.to_string());
-
-                    self.define_referenced_schema(
-                        root.clone(),
-                        &root_name,
-                        &root_name,
-                        open_api,
-                        file_path,
-                        namespace.clone(),
-                    );
-
-                    content
-                        .schema()
-                        .reference(root_name.into(), false)
-                        .namespace(namespace.clone());
-                }
-                _ => println!("found some strang type ref"),
-            },
-            _ => {
-                for child in root.children() {
-                    self.add_type_content(open_api, &root.get(child).unwrap(), content, file_path, namespace)
-                }
             }
         }
     }
@@ -303,14 +232,7 @@ impl OpenApiFactory {
 
         match args.get(0) {
             Some(response_type) if options.is_some() => {
-                self.add_response_details(
-                    &response_type,
-                    &options.unwrap(),
-                    file_path,
-                    operation,
-                    open_api,
-                    &mut "".into(),
-                );
+                self.add_response_details(&response_type, &options.unwrap(), file_path, operation, open_api);
             }
             _ => {}
         };
@@ -323,35 +245,51 @@ impl OpenApiFactory {
         file_path: &str,
         operation: *mut ApiPathOperation,
         open_api: &mut OpenApi,
-        depth: &mut String,
     ) {
-        depth.push_str("-");
-        println!("{} {:?}", depth, root.kind);
         match root.kind {
-            NodeKind::Ident(identifier) => {
-                let name = self
-                    .symbol_tables
-                    .get_root_declaration_name(file_path, identifier.sym.to_string());
+            NodeKind::Ident(raw_ident) => {
+                if raw_ident.sym.eq("Array") {
+                    let status_code = options.status_code.as_ref().unwrap();
+                    let description = options.description.as_ref().unwrap();
 
-                let status_code = options.status_code.as_ref().unwrap();
-                let description = options.description.as_ref().unwrap();
+                    unsafe {
+                        let operation: &mut ApiPathOperation = &mut *operation;
+                        let response = operation.response(&status_code, &description);
+                        let content = response.content();
+                        let items_schema = content.schema().data_type("array").items();
 
-                unsafe {
-                    let operation: &mut ApiPathOperation = &mut *operation;
-                    let response = operation.response(&status_code, &description);
-                    let content = response.content();
-                    content.schema().reference(Some(name.clone()), false);
-                    content.example(options.example.clone(), options.namespace.clone());
+                        if let Some(type_params) = root.parent().unwrap().parent().unwrap().type_params() {
+                            match type_params.kind {
+                                NodeKind::TsTypeParamInstantiation(raw) => {
+                                    if let Some(type_param) = raw.params.get(0) {
+                                        let type_param = type_params.to_child(NodeKind::TsType(type_param));
+                                        self.define_schema_details(items_schema, type_param, file_path);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        content.example(options.example.clone(), options.namespace.clone());
+                    }
+                } else {
+                    let name = self
+                        .symbol_tables
+                        .get_root_declaration_name(file_path, raw_ident.sym.to_string());
+
+                    let status_code = options.status_code.as_ref().unwrap();
+                    let description = options.description.as_ref().unwrap();
+
+                    unsafe {
+                        let operation: &mut ApiPathOperation = &mut *operation;
+                        let response = operation.response(&status_code, &description);
+                        let content = response.content();
+                        content.schema().reference(Some(name.clone()), false);
+                        content.example(options.example.clone(), options.namespace.clone());
+                    }
+
+                    self.define_referenced_schema(root.clone(), &name, &name, open_api, file_path);
                 }
-
-                self.define_referenced_schema(
-                    root.clone(),
-                    &name,
-                    &name,
-                    open_api,
-                    file_path,
-                    options.namespace.clone(),
-                );
             }
             NodeKind::Str(_) => {
                 let status_code = options.status_code.as_ref().unwrap();
@@ -428,7 +366,7 @@ impl OpenApiFactory {
             _ => {
                 for child_index in root.children() {
                     let child = root.get(child_index).unwrap();
-                    self.add_response_details(&child, options, file_path, operation, open_api, &mut depth.clone());
+                    self.add_response_details(&child, options, file_path, operation, open_api);
                 }
             }
         };
@@ -486,7 +424,6 @@ impl OpenApiFactory {
                                     &root_name,
                                     open_api,
                                     file_path,
-                                    namespace.clone(),
                                 );
 
                                 operation_param
@@ -529,7 +466,6 @@ impl OpenApiFactory {
         schema_name: &str,
         open_api: &mut OpenApi,
         file_path: &str,
-        namespace: Option<String>,
     ) -> () {
         match self.symbol_tables.get_root_declaration(file_path, type_name) {
             Some(Declaration::Export {
@@ -537,22 +473,25 @@ impl OpenApiFactory {
                 source_file_name,
             }) => {
                 self.deferred_schemas
-                    .add_deferred_type(source_file_name, schema_name.into(), type_name, namespace);
+                    .add_deferred_type(&source_file_name, schema_name.into(), &type_name);
             }
             Some(Declaration::Import {
                 name: type_name,
                 source_file_name,
             }) => {
                 self.deferred_schemas
-                    .add_deferred_type(source_file_name, schema_name.into(), type_name, namespace);
+                    .add_deferred_type(&source_file_name, schema_name.into(), &type_name);
             }
             Some(Declaration::Type { node: node_index }) => {
-                let schema = match namespace {
-                    Some(ns) => open_api.components.schema(&ns).property(schema_name.into()),
-                    None => open_api.components.schema(schema_name),
-                };
-                let node = type_node.get(node_index).unwrap();
-                define_referenced_schema_details(schema, node);
+                let schema = open_api.components.schema(schema_name);
+
+                if let Some(node) = type_node.get(node_index) {
+                    self.define_schema_details(schema, node, file_path);
+                } else {
+                    // we may not have found this type yet as we traverse the module
+                    // self.deferred_schemas.add_deferred_type(file_path, schema_name, type_name, namespace);
+                    panic!("we didn't find the type node for {}", type_name);
+                }
             }
             _ => {}
         };
@@ -563,18 +502,22 @@ impl OpenApiFactory {
         match &root.kind {
             NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(raw_expr))) => {
                 let root = root.to_child(NodeKind::ExportDefaultExpr(raw_expr));
+                println!("- found a default export");
                 self.define_deferred_type_maybe(root, open_api, "default", source_file_name)
             }
             NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(raw_decl))) => match &raw_decl.decl {
                 Decl::Class(ref raw_class) => {
+                    println!("- found a class export");
                     let root = root.to_child(NodeKind::ClassDecl(raw_class));
                     self.define_deferred_type_maybe(root, open_api, &raw_class.ident.sym, source_file_name)
                 }
                 Decl::TsInterface(ref raw_interface) => {
+                    println!("- found a interface export");
                     let root = root.to_child(NodeKind::TsInterfaceDecl(raw_interface));
                     self.define_deferred_type_maybe(root, open_api, &raw_interface.id.sym, source_file_name)
                 }
                 Decl::TsTypeAlias(ref raw_alias) => {
+                    println!("- found a type alias export");
                     let root = root.to_child(NodeKind::TsTypeAliasDecl(raw_alias));
                     self.define_deferred_type_maybe(root, open_api, &raw_alias.id.sym, source_file_name)
                 }
@@ -595,6 +538,8 @@ impl OpenApiFactory {
                                     ModuleExportName::Str(id) => id.value.to_string(),
                                 },
                             };
+
+                            println!("- found named export");
 
                             self.define_deferred_type_maybe(specifier, open_api, &name, source_file_name);
                         }
@@ -640,236 +585,202 @@ impl OpenApiFactory {
         if let Some(deferred_type) = self.deferred_schemas.get_deferred_type(type_name, source_file_name) {
             match self.symbol_tables.get_root_declaration(source_file_name, &type_name) {
                 Some(Declaration::Type { node }) => {
-                    let schema = match &deferred_type.namespace {
-                        Some(ns) => open_api
-                            .components
-                            .schema(&ns)
-                            .data_type("object")
-                            .property(&deferred_type.schema_name),
-                        None => open_api.components.schema(&deferred_type.schema_name),
-                    };
+                    let schema = open_api.components.schema(&deferred_type.schema_name);
 
                     let node = root.get(node).unwrap();
 
-                    define_referenced_schema_details(schema, node);
+                    self.define_schema_details(schema, node, source_file_name);
                 }
                 Some(Declaration::Import {
                     name: imported_name,
                     source_file_name: module_file_name,
                 }) => {
-                    self.deferred_schemas.add_deferred_type(
-                        module_file_name,
-                        type_name.to_string(),
-                        imported_name,
-                        deferred_type.namespace.clone(),
-                    );
+                    self.deferred_schemas
+                        .add_deferred_type(&module_file_name, type_name, &imported_name);
                 }
                 _ => {}
             }
         }
     }
-}
 
-fn define_referenced_schema_details(root_schema: &mut ApiSchema, root: Rc<SchemyNode>) -> () {
-    match root.kind {
-        NodeKind::TsTypeAnnotation(_) => {
-            for child_index in root.children() {
-                let child = root.get(child_index).unwrap();
-                define_referenced_schema_details(root_schema, child)
+    fn define_schema_details(&mut self, root_schema: &mut ApiSchema, root: Rc<SchemyNode>, file_path: &str) -> () {
+        match root.kind {
+            NodeKind::TsTypeRef(raw_type) => match &raw_type.type_name {
+                TsEntityName::Ident(identifier) => {
+                    if identifier.sym.eq("Array") {
+                        let items_schema = root_schema.data_type("array").items();
+                        if let Some(type_params) = root.type_params() {
+                            match type_params.kind {
+                                NodeKind::TsTypeParamInstantiation(raw) => {
+                                    if let Some(type_param) = raw.params.get(0) {
+                                        let type_param = type_params.to_child(NodeKind::TsType(type_param));
+                                        self.define_schema_details(items_schema, type_param, file_path);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    } else {
+                        let root_name = self
+                            .symbol_tables
+                            .get_root_declaration_name(file_path, identifier.sym.to_string());
+
+                        root_schema.reference(Some(root_name.clone()), false);
+
+                        self.deferred_schemas
+                            .add_deferred_immediate(file_path, &root_name, root.index);
+                    }
+                }
+                _ => println!("found some strang type ref"),
+            },
+            NodeKind::TsTypeAnnotation(_) => {
+                for child_index in root.children() {
+                    let child = root.get(child_index).unwrap();
+                    self.define_schema_details(root_schema, child, file_path);
+                }
             }
-        }
-        NodeKind::TsKeywordType(raw) => match raw.kind {
-            TsKeywordTypeKind::TsNumberKeyword => {
-                root_schema.data_type("number".into());
+            NodeKind::TsKeywordType(raw) => match raw.kind {
+                TsKeywordTypeKind::TsNumberKeyword => {
+                    root_schema.data_type("number".into());
+                }
+                TsKeywordTypeKind::TsBooleanKeyword => {
+                    root_schema.data_type("boolean".into());
+                }
+                TsKeywordTypeKind::TsBigIntKeyword => {
+                    root_schema.data_type("number".into());
+                }
+                TsKeywordTypeKind::TsStringKeyword => {
+                    root_schema.data_type("string".into());
+                }
+                TsKeywordTypeKind::TsSymbolKeyword => {
+                    root_schema.data_type("string".into());
+                }
+                _ => {}
+            },
+            NodeKind::ClassDecl(_) => {
+                root_schema.data_type("object".into());
+                if let Some(class_node) = root.class() {
+                    for property in class_node.body() {
+                        match property.kind {
+                            NodeKind::ClassMember(_) => {
+                                let class_prop = property.class_prop().unwrap();
+                                if let NodeKind::ClassProp(raw_prop) = class_prop.kind {
+                                    let name = match &raw_prop.key {
+                                        PropName::Ident(identifier) => Some(identifier.sym.to_string()),
+                                        _ => None,
+                                    };
+
+                                    if let Some(name) = name {
+                                        if let Some(annotation) = class_prop.type_ann() {
+                                            self.define_schema_details(
+                                                root_schema.property(&name),
+                                                annotation.clone(),
+                                                file_path,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             }
-            TsKeywordTypeKind::TsBooleanKeyword => {
-                root_schema.data_type("boolean".into());
-            }
-            TsKeywordTypeKind::TsBigIntKeyword => {
-                root_schema.data_type("number".into());
-            }
-            TsKeywordTypeKind::TsStringKeyword => {
-                root_schema.data_type("string".into());
-            }
-            TsKeywordTypeKind::TsSymbolKeyword => {
-                root_schema.data_type("string".into());
-            }
-            _ => {}
-        },
-        NodeKind::ClassDecl(_) => {
-            root_schema.data_type("object".into());
-            if let Some(class_node) = root.class() {
-                for property in class_node.body() {
-                    match property.kind {
-                        NodeKind::ClassMember(_) => {
-                            let class_prop = property.class_prop().unwrap();
-                            if let NodeKind::ClassProp(raw_prop) = class_prop.kind {
-                                let name = match &raw_prop.key {
+            NodeKind::ClassExpr(_) => {
+                root_schema.data_type("object".into());
+                if let Some(class_node) = root.class() {
+                    for class_member in class_node.body() {
+                        match class_member.kind {
+                            NodeKind::ClassProp(raw) => {
+                                let name = match &raw.key {
                                     PropName::Ident(identifier) => Some(identifier.sym.to_string()),
                                     _ => None,
                                 };
 
                                 if let Some(name) = name {
-                                    if let Some(annotation) = class_prop.type_ann() {
-                                        define_referenced_schema_details(
+                                    if let Some(annotation) = class_member.type_ann() {
+                                        self.define_schema_details(
                                             root_schema.property(&name),
                                             annotation.clone(),
+                                            file_path,
                                         );
                                     }
                                 }
                             }
+                            _ => {}
                         }
+                    }
+                }
+            }
+            NodeKind::TsArrayType(_) => {
+                root_schema.data_type("array".into());
+                let elem_type = root.elem_type().unwrap();
+                self.define_schema_details(root_schema.items(), elem_type.clone(), file_path);
+            }
+            NodeKind::TsInterfaceDecl(_) => {
+                root_schema.data_type("object".into());
+                if let Some(interface_body) = root.interface_body() {
+                    for interface_member in interface_body.body() {
+                        match interface_member.kind {
+                            NodeKind::TsTypeElement(TsTypeElement::TsPropertySignature(raw_prop)) => {
+                                let property_schema = match &*raw_prop.key {
+                                    Expr::Ident(identifier) => {
+                                        let name = identifier.sym.to_string();
+                                        Some(root_schema.property(&name))
+                                    }
+                                    _ => None,
+                                };
+
+                                if let Some(property_schema) = property_schema {
+                                    if let Some(annotation) = interface_member.type_ann() {
+                                        self.define_schema_details(property_schema, annotation.clone(), file_path);
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            NodeKind::TsTypeLit(_) => {
+                root_schema.data_type("object".into());
+                for member in root.members() {
+                    match member.kind {
+                        NodeKind::TsTypeElement(raw_element) => match raw_element {
+                            TsTypeElement::TsPropertySignature(raw_prop) => {
+                                let property_schema = match &*raw_prop.key {
+                                    Expr::Ident(identifier) => {
+                                        let name = identifier.sym.to_string();
+                                        Some(root_schema.property(&name))
+                                    }
+                                    _ => None,
+                                };
+
+                                if let Some(property_schema) = property_schema {
+                                    if let Some(annotation) = member.type_ann() {
+                                        self.define_schema_details(property_schema, annotation.clone(), file_path);
+                                    }
+                                }
+                            }
+                            _ => {}
+                        },
                         _ => {}
                     }
                 }
             }
-        }
-        NodeKind::ClassExpr(_) => {
-            root_schema.data_type("object".into());
-            if let Some(class_node) = root.class() {
-                for class_member in class_node.body() {
-                    match class_member.kind {
-                        NodeKind::ClassProp(raw) => {
-                            let name = match &raw.key {
-                                PropName::Ident(identifier) => Some(identifier.sym.to_string()),
-                                _ => None,
-                            };
-
-                            if let Some(name) = name {
-                                if let Some(annotation) = class_member.type_ann() {
-                                    define_referenced_schema_details(root_schema.property(&name), annotation.clone());
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
+            NodeKind::TsTypeAliasDecl(_) => {
+                if let Some(annotation) = root.type_ann() {
+                    self.define_schema_details(root_schema, annotation.clone(), file_path);
                 }
             }
-        }
-        NodeKind::TsArrayType(_) => {
-            root_schema.data_type("array".into());
-            let elem_type = root.elem_type().unwrap();
-            define_referenced_schema_details(root_schema.items(), elem_type.clone());
-        }
-        NodeKind::TsInterfaceDecl(_) => {
-            root_schema.data_type("object".into());
-            if let Some(interface_body) = root.interface_body() {
-                for interface_member in interface_body.body() {
-                    match interface_member.kind {
-                        NodeKind::TsTypeElement(TsTypeElement::TsPropertySignature(raw_prop)) => {
-                            let property_schema = match &*raw_prop.key {
-                                Expr::Ident(identifier) => {
-                                    let name = identifier.sym.to_string();
-                                    Some(root_schema.property(&name))
-                                }
-                                _ => None,
-                            };
-
-                            if let Some(property_schema) = property_schema {
-                                if let Some(annotation) = interface_member.type_ann() {
-                                    define_referenced_schema_details(property_schema, annotation.clone());
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
+            NodeKind::TsType(_) => {
+                for child_index in root.children() {
+                    let child = root.get(child_index).unwrap();
+                    self.define_schema_details(root_schema, child, file_path);
                 }
             }
+            _ => {}
         }
-        NodeKind::TsTypeLit(_) => {
-            root_schema.data_type("object".into());
-            for member in root.members() {
-                match member.kind {
-                    NodeKind::TsTypeElement(raw_element) => match raw_element {
-                        TsTypeElement::TsPropertySignature(raw_prop) => {
-                            let property_schema = match &*raw_prop.key {
-                                Expr::Ident(identifier) => {
-                                    let name = identifier.sym.to_string();
-                                    Some(root_schema.property(&name))
-                                }
-                                _ => None,
-                            };
-
-                            if let Some(property_schema) = property_schema {
-                                if let Some(annotation) = member.type_ann() {
-                                    define_referenced_schema_details(property_schema, annotation.clone());
-                                }
-                            }
-                        }
-                        _ => {}
-                    },
-                    _ => {}
-                }
-            }
-        }
-        NodeKind::TsTypeAliasDecl(_) => {
-            if let Some(annotation) = root.type_ann() {
-                define_referenced_schema_details(root_schema, annotation.clone())
-            }
-        }
-        NodeKind::TsType(raw_type) => match raw_type {
-            TsType::TsKeywordType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsKeywordType(raw)))
-            }
-            TsType::TsThisType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsThisType(raw)))
-            }
-            TsType::TsFnOrConstructorType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsFnOrConstructorType(raw)))
-            }
-            TsType::TsTypeRef(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTypeRef(raw)))
-            }
-            TsType::TsTypeQuery(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTypeQuery(raw)))
-            }
-            TsType::TsTypeLit(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTypeLit(raw)))
-            }
-            TsType::TsArrayType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsArrayType(raw)))
-            }
-            TsType::TsTupleType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTupleType(raw)))
-            }
-            TsType::TsOptionalType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsOptionalType(raw)))
-            }
-            TsType::TsRestType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsRestType(raw)))
-            }
-            TsType::TsUnionOrIntersectionType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsUnionOrIntersectionType(raw)))
-            }
-            TsType::TsConditionalType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsConditionalType(raw)))
-            }
-            TsType::TsInferType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsInferType(raw)))
-            }
-            TsType::TsParenthesizedType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsParenthesizedType(raw)))
-            }
-            TsType::TsTypeOperator(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTypeOperator(raw)))
-            }
-            TsType::TsIndexedAccessType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsIndexedAccessType(raw)))
-            }
-            TsType::TsMappedType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsMappedType(raw)))
-            }
-            TsType::TsLitType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsLitType(raw)))
-            }
-            TsType::TsTypePredicate(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsTypePredicate(raw)))
-            }
-            TsType::TsImportType(raw) => {
-                define_referenced_schema_details(root_schema, root.to_child(NodeKind::TsImportType(raw)))
-            }
-        },
-        _ => {}
     }
 }
 
