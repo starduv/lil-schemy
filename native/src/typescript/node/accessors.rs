@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc, vec};
 
-use swc_ecma_ast::{Expr, ExprOrSpread, TsTypeElement};
+use swc_ecma_ast::{Expr, TsTypeElement};
 
 use super::{Context, NodeKind, SchemyNode};
 
