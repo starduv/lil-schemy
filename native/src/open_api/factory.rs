@@ -477,22 +477,30 @@ impl OpenApiFactory {
     fn define_deferred_schemas(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode>, source_file_name: &str) -> () {
         store_declaration_maybe(root.clone(), source_file_name, &mut self.symbol_tables);
         match &root.kind {
-            NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(raw_expr))) => {
-                let root = root.to_child(NodeKind::ExportDefaultExpr(raw_expr));
-                self.define_deferred_type_maybe(root, open_api, "default", source_file_name)
+            NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(_))) => {
+                self.define_deferred_type_maybe(&root, open_api, "default", source_file_name)
+            }
+            NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(raw_decl))) => {
+                let root = root.to_child(NodeKind::DefaultDecl(&raw_decl.decl));
+                self.define_deferred_type_maybe(&root, open_api, "default", source_file_name)
             }
             NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(raw_decl))) => match &raw_decl.decl {
                 Decl::Class(ref raw_class) => {
                     let root = root.to_child(NodeKind::ClassDecl(raw_class));
-                    self.define_deferred_type_maybe(root, open_api, &raw_class.ident.sym, source_file_name)
+                    self.define_deferred_type_maybe(&root, open_api, &raw_class.ident.sym, source_file_name)
                 }
                 Decl::TsInterface(ref raw_interface) => {
                     let root = root.to_child(NodeKind::TsInterfaceDecl(raw_interface));
-                    self.define_deferred_type_maybe(root, open_api, &raw_interface.id.sym, source_file_name)
+                    self.define_deferred_type_maybe(&root, open_api, &raw_interface.id.sym, source_file_name)
                 }
                 Decl::TsTypeAlias(ref raw_alias) => {
                     let root = root.to_child(NodeKind::TsTypeAliasDecl(raw_alias));
-                    self.define_deferred_type_maybe(root, open_api, &raw_alias.id.sym, source_file_name)
+                    self.define_deferred_type_maybe(&root, open_api, &raw_alias.id.sym, source_file_name)
+                }
+                Decl::TsEnum(ref raw_alias) => {
+                    let root = root.to_child(NodeKind::TsEnumDecl(raw_alias));
+                    println!("found an enum: {}", raw_alias.id.sym);
+                    self.define_deferred_type_maybe(&root, open_api, &raw_alias.id.sym, source_file_name)
                 }
                 _ => {}
             },
@@ -512,26 +520,42 @@ impl OpenApiFactory {
                                 },
                             };
 
-                            self.define_deferred_type_maybe(specifier, open_api, &name, source_file_name);
+                            self.define_deferred_type_maybe(&specifier, open_api, &name, source_file_name);
                         }
                         _ => {}
                     }
                 }
             }
-            _ => {}
+            NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::TsEnum(raw_enum)))) => {
+                let root = root.to_child(NodeKind::TsEnumDecl(raw_enum));
+                self.define_deferred_type_maybe(&root, open_api, &raw_enum.id.sym, source_file_name)
+            }
+            NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::Class(raw_class)))) => {
+                let root = root.to_child(NodeKind::ClassDecl(raw_class));
+                self.define_deferred_type_maybe(&root, open_api, &raw_class.ident.sym, source_file_name)
+            }
+            NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(raw_interface)))) => {
+                let root = root.to_child(NodeKind::TsInterfaceDecl(raw_interface));
+                self.define_deferred_type_maybe(&root, open_api, &raw_interface.id.sym, source_file_name)
+            }
+            NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(raw_alias)))) => {
+                let root = root.to_child(NodeKind::TsTypeAliasDecl(raw_alias));
+                self.define_deferred_type_maybe(&root, open_api, &raw_alias.id.sym, source_file_name)
+            }
+            _ => {},
         }
     }
 
     fn define_deferred_type_maybe(
         &mut self,
-        root: Rc<SchemyNode>,
+        root: &Rc<SchemyNode>,
         open_api: &mut OpenApi,
         type_name: &str,
         source_file_name: &str,
     ) -> () {
         if let Some(deferred_operation_type) = self
-            .deferred_schemas
-            .take_deferred_operation_type(type_name, source_file_name)
+        .deferred_schemas
+        .take_deferred_operation_type(type_name, source_file_name)
         {
             match self.symbol_tables.get_root_declaration(source_file_name, type_name) {
                 Some(Declaration::Type { node }) => {
@@ -553,6 +577,7 @@ impl OpenApiFactory {
         }
 
         if let Some(deferred_type) = self.deferred_schemas.take_deferred_type(type_name, source_file_name) {
+            println!("I found a deferral for {}", type_name);
             match self.symbol_tables.get_root_declaration(source_file_name, &type_name) {
                 Some(Declaration::Type { node }) => {
                     let schema = open_api.components.schema(&deferred_type.schema_name);

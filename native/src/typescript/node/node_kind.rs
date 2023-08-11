@@ -132,6 +132,7 @@ pub enum NodeKind<'m> {
     Num(&'m Number),
     BigInt(&'m BigInt),
     Regex(&'m Regex),
+    DefaultDecl(&'m DefaultDecl),
 }
 
 impl<'n> Clone for NodeKind<'n> {
@@ -265,7 +266,8 @@ impl<'n> Clone for NodeKind<'n> {
             NodeKind::Num(raw) => NodeKind::Num(raw),
             NodeKind::BigInt(raw) => NodeKind::BigInt(raw),
             NodeKind::Regex(raw) => NodeKind::Regex(raw),
-            NodeKind::TsTypeParam(raw) => NodeKind::TsTypeParam(raw)
+            NodeKind::TsTypeParam(raw) => NodeKind::TsTypeParam(raw),
+            NodeKind::DefaultDecl(raw) => NodeKind::DefaultDecl(raw),
         }
     }
 }
@@ -402,6 +404,7 @@ impl<'m> Debug for NodeKind<'m> {
             NodeKind::BigInt(_) => f.debug_tuple("BigInt").finish(),
             NodeKind::Regex(_) => f.debug_tuple("Regex").finish(),
             NodeKind::TsTypeParam(_) => f.debug_tuple("TsTypeParam").finish(),
+            NodeKind::DefaultDecl(_) => f.debug_tuple("DefaultDecl").finish()
         }
     }
 }
