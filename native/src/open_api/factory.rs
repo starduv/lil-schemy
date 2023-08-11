@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use lazy_static::__Deref;
 
@@ -76,20 +76,21 @@ impl OpenApiFactory {
 
         let operation = open_api
             .path(&options.path.unwrap())
-            .add_operation(&options.method.unwrap());
+            .add_operation(&options.method.unwrap())
+            .clone();
 
-        unsafe {
-            let operation: &mut ApiPathOperation = &mut *operation;
-            operation.tags(options.tags.clone());
+        {
+            let mut borrow = (*operation).borrow_mut();
+            borrow.tags(options.tags.clone());
         }
 
-        self.add_request_details(open_api, operation, route_handler.clone(), file_path);
+        self.add_request_details(open_api, &operation, route_handler.clone(), file_path);
     }
 
     fn add_request_details(
         &mut self,
         open_api: &mut OpenApi,
-        operation: *mut ApiPathOperation,
+        operation: &Rc<RefCell<ApiPathOperation>>,
         route_handler: Rc<SchemyNode>,
         file_path: &str,
     ) -> () {
@@ -107,7 +108,7 @@ impl OpenApiFactory {
     fn add_request_params(
         &mut self,
         open_api: &mut OpenApi,
-        operation: *mut ApiPathOperation,
+        operation: &Rc<RefCell<ApiPathOperation>>,
         root: Rc<SchemyNode>,
         file_path: &str,
     ) {
@@ -141,63 +142,61 @@ impl OpenApiFactory {
 
     fn add_param_details(
         &mut self,
-        operation: *mut ApiPathOperation,
+        operation: &Rc<RefCell<ApiPathOperation>>,
         location: &str,
         root: Rc<SchemyNode>,
         file_path: &str,
     ) {
-        unsafe {
-            let operation: &mut ApiPathOperation = &mut *operation;
-            let parameter_name = get_parameter_name(root.clone());
-            let operation_param = operation.param(&parameter_name, location);
+        let mut operation = (**operation).borrow_mut();
+        let parameter_name = get_parameter_name(root.clone());
+        let operation_param = operation.param(&parameter_name, location);
 
-            let type_params = root.params();
-            if let Some(type_param) = type_params.get(0) {
-                let param_schema = operation_param.content().schema();
-                self.define_schema_details(param_schema, type_param.clone(), file_path);
-            }
+        let type_params = root.params();
+        if let Some(type_param) = type_params.get(0) {
+            let param_schema = operation_param.content().schema();
+            self.define_schema_details(param_schema, type_param.clone(), file_path);
+        }
 
-            match type_params.get(1) {
-                Some(param) => match &param.kind {
-                    NodeKind::TsType(required) => match required {
-                        TsType::TsLitType(raw) => match raw.lit {
-                            TsLit::Bool(raw_bool) => {
-                                operation_param.required(raw_bool.value);
-                            }
-                            _ => {}
-                        },
+        match type_params.get(1) {
+            Some(param) => match &param.kind {
+                NodeKind::TsType(required) => match required {
+                    TsType::TsLitType(raw) => match raw.lit {
+                        TsLit::Bool(raw_bool) => {
+                            operation_param.required(raw_bool.value);
+                        }
                         _ => {}
                     },
-                    other => println!("found this while looking for required: {:?}", other),
+                    _ => {}
                 },
-                None => println!("i didn't find a second param at all!"),
-            }
+                other => println!("found this while looking for required: {:?}", other),
+            },
+            None => println!("i didn't find a second param at all!"),
+        }
 
-            match type_params.get(3) {
-                Some(param) => match param.kind {
-                    NodeKind::TsType(raw_type) => match raw_type {
-                        TsType::TsLitType(raw_lit) => match &raw_lit.lit {
-                            TsLit::Str(raw_str) => {
-                                operation_param
-                                    .content()
-                                    .schema()
-                                    .format(Some(raw_str.value.to_string()));
-                            }
-                            _ => {}
-                        },
+        match type_params.get(3) {
+            Some(param) => match param.kind {
+                NodeKind::TsType(raw_type) => match raw_type {
+                    TsType::TsLitType(raw_lit) => match &raw_lit.lit {
+                        TsLit::Str(raw_str) => {
+                            operation_param
+                                .content()
+                                .schema()
+                                .format(Some(raw_str.value.to_string()));
+                        }
                         _ => {}
                     },
-                    _ => println!("found this while looking for format: {:?}", param.kind),
+                    _ => {}
                 },
-                None => {}
-            }
+                _ => println!("found this while looking for format: {:?}", param.kind),
+            },
+            None => {}
         }
     }
 
     fn find_response(
         &mut self,
         open_api: &mut OpenApi,
-        operation: *mut ApiPathOperation,
+        operation: &Rc<RefCell<ApiPathOperation>>,
         root: Rc<SchemyNode>,
         file_path: &str,
     ) -> () {
@@ -216,7 +215,7 @@ impl OpenApiFactory {
     fn add_response(
         &mut self,
         open_api: &mut OpenApi,
-        operation: *mut ApiPathOperation,
+        operation: &Rc<RefCell<ApiPathOperation>>,
         root: Rc<SchemyNode>,
         file_path: &str,
     ) -> () {
@@ -245,7 +244,7 @@ impl OpenApiFactory {
         root: &Rc<SchemyNode>,
         options: &ResponseOptions,
         file_path: &str,
-        operation: *mut ApiPathOperation,
+        operation: &Rc<RefCell<ApiPathOperation>>,
         open_api: &mut OpenApi,
     ) {
         match root.kind {
@@ -254,26 +253,24 @@ impl OpenApiFactory {
                     let status_code = options.status_code.as_ref().unwrap();
                     let description = options.description.as_ref().unwrap();
 
-                    unsafe {
-                        let operation: &mut ApiPathOperation = &mut *operation;
-                        let response = operation.response(&status_code, &description);
-                        let content = response.content();
-                        let items_schema = content.schema().data_type("array").items();
+                    let mut operation = (**operation).borrow_mut();
+                    let response = operation.response(&status_code, &description);
+                    let content = response.content();
+                    let items_schema = content.schema().data_type("array").items();
 
-                        if let Some(type_params) = root.parent().unwrap().parent().unwrap().type_params() {
-                            match type_params.kind {
-                                NodeKind::TsTypeParamInstantiation(raw) => {
-                                    if let Some(type_param) = raw.params.get(0) {
-                                        let type_param = type_params.to_child(NodeKind::TsType(type_param));
-                                        self.define_schema_details(items_schema, type_param, file_path);
-                                    }
+                    if let Some(type_params) = root.parent().unwrap().parent().unwrap().type_params() {
+                        match type_params.kind {
+                            NodeKind::TsTypeParamInstantiation(raw) => {
+                                if let Some(type_param) = raw.params.get(0) {
+                                    let type_param = type_params.to_child(NodeKind::TsType(type_param));
+                                    self.define_schema_details(items_schema, type_param, file_path);
                                 }
-                                _ => {}
                             }
+                            _ => {}
                         }
-
-                        content.example(options.example.clone(), options.namespace.clone());
                     }
+
+                    content.example(options.example.clone(), options.namespace.clone());
                 } else {
                     let name = self
                         .symbol_tables
@@ -282,13 +279,11 @@ impl OpenApiFactory {
                     let status_code = options.status_code.as_ref().unwrap();
                     let description = options.description.as_ref().unwrap();
 
-                    unsafe {
-                        let operation: &mut ApiPathOperation = &mut *operation;
-                        let response = operation.response(&status_code, &description);
-                        let content = response.content();
-                        content.schema().reference(Some(name.clone()), false);
-                        content.example(options.example.clone(), options.namespace.clone());
-                    }
+                    let mut operation = (**operation).borrow_mut();
+                    let response = operation.response(&status_code, &description);
+                    let content = response.content();
+                    content.schema().reference(Some(name.clone()), false);
+                    content.example(options.example.clone(), options.namespace.clone());
 
                     self.define_referenced_schema(root.clone(), &name, &name, open_api, file_path);
                 }
@@ -297,72 +292,60 @@ impl OpenApiFactory {
                 let status_code = options.status_code.as_ref().unwrap();
                 let description = options.description.as_ref().unwrap();
 
-                unsafe {
-                    let operation: &mut ApiPathOperation = &mut *operation;
-                    let response = operation.response(&status_code, &description);
-                    let content = response.content();
-                    content.schema().data_type("string");
-                    content.example(options.example.clone(), options.namespace.clone());
-                }
+                let mut operation = (**operation).borrow_mut();
+                let response = operation.response(&status_code, &description);
+                let content = response.content();
+                content.schema().data_type("string");
+                content.example(options.example.clone(), options.namespace.clone());
             }
             NodeKind::Bool(_) => {
                 let status_code = options.status_code.as_ref().unwrap();
                 let description = options.description.as_ref().unwrap();
 
-                unsafe {
-                    let operation: &mut ApiPathOperation = &mut *operation;
-                    let response = operation.response(&status_code, &description);
-                    let content = response.content();
-                    content.schema().data_type("boolean");
-                    content.example(options.example.clone(), options.namespace.clone());
-                }
+                let mut operation = (**operation).borrow_mut();
+                let response = operation.response(&status_code, &description);
+                let content = response.content();
+                content.schema().data_type("boolean");
+                content.example(options.example.clone(), options.namespace.clone());
             }
             NodeKind::Null(_) => {
                 let status_code = options.status_code.as_ref().unwrap();
                 let description = options.description.as_ref().unwrap();
 
-                unsafe {
-                    let operation: &mut ApiPathOperation = &mut *operation;
-                    let response = operation.response(&status_code, &description);
-                    let content = response.content();
-                    content.example(options.example.clone(), options.namespace.clone());
-                }
+                let mut operation = (**operation).borrow_mut();
+                let response = operation.response(&status_code, &description);
+                let content = response.content();
+                content.example(options.example.clone(), options.namespace.clone());
             }
             NodeKind::Num(_) => {
                 let status_code = options.status_code.as_ref().unwrap();
                 let description = options.description.as_ref().unwrap();
 
-                unsafe {
-                    let operation: &mut ApiPathOperation = &mut *operation;
-                    let response = operation.response(&status_code, &description);
-                    let content = response.content();
-                    content.schema().data_type("number");
-                    content.example(options.example.clone(), options.namespace.clone());
-                }
+                let mut operation = (**operation).borrow_mut();
+                let response = operation.response(&status_code, &description);
+                let content = response.content();
+                content.schema().data_type("number");
+                content.example(options.example.clone(), options.namespace.clone());
             }
             NodeKind::BigInt(_) => {
                 let status_code = options.status_code.as_ref().unwrap();
                 let description = options.description.as_ref().unwrap();
 
-                unsafe {
-                    let operation: &mut ApiPathOperation = &mut *operation;
-                    let response = operation.response(&status_code, &description);
-                    let content = response.content();
-                    content.schema().data_type("number");
-                    content.example(options.example.clone(), options.namespace.clone());
-                }
+                let mut operation = (**operation).borrow_mut();
+                let response = operation.response(&status_code, &description);
+                let content = response.content();
+                content.schema().data_type("number");
+                content.example(options.example.clone(), options.namespace.clone());
             }
             NodeKind::Regex(_) => {
                 let status_code = options.status_code.as_ref().unwrap();
                 let description = options.description.as_ref().unwrap();
 
-                unsafe {
-                    let operation: &mut ApiPathOperation = &mut *operation;
-                    let response = operation.response(&status_code, &description);
-                    let content = response.content();
-                    content.schema().data_type("string");
-                    content.example(options.example.clone(), options.namespace.clone());
-                }
+                let mut operation = (**operation).borrow_mut();
+                let response = operation.response(&status_code, &description);
+                let content = response.content();
+                content.schema().data_type("string");
+                content.example(options.example.clone(), options.namespace.clone());
             }
 
             _ => {
@@ -377,87 +360,79 @@ impl OpenApiFactory {
     fn add_body_param_details(
         &mut self,
         open_api: &mut OpenApi,
-        operation: *mut ApiPathOperation,
+        operation: &Rc<RefCell<ApiPathOperation>>,
         root: Rc<SchemyNode>,
         file_path: &str,
     ) -> () {
-        unsafe {
-            let operation: &mut ApiPathOperation = &mut *operation;
-            let operation_param = operation.body();
-            let type_params = root.params();
-            let namespace = match type_params.get(2) {
-                Some(namespace) => match namespace.kind {
-                    NodeKind::TsType(raw_type) => match raw_type {
-                        TsType::TsLitType(raw_lit) => match &raw_lit.lit {
-                            TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
-                            _ => None,
-                        },
+        let mut operation = (**operation).borrow_mut();
+        let operation_param = operation.body();
+        let type_params = root.params();
+        let namespace = match type_params.get(2) {
+            Some(namespace) => match namespace.kind {
+                NodeKind::TsType(raw_type) => match raw_type {
+                    TsType::TsLitType(raw_lit) => match &raw_lit.lit {
+                        TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
                         _ => None,
                     },
                     _ => None,
                 },
                 _ => None,
-            };
+            },
+            _ => None,
+        };
 
-            match type_params.get(0) {
-                Some(param) => match param.kind {
-                    NodeKind::TsType(raw_type) => match raw_type {
-                        TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
-                            TsKeywordTypeKind::TsNumberKeyword => {
-                                operation_param.content().schema().data_type("number");
-                            }
-                            TsKeywordTypeKind::TsBooleanKeyword => {
-                                operation_param.content().schema().data_type("boolean");
-                            }
-                            TsKeywordTypeKind::TsStringKeyword => {
-                                operation_param.content().schema().data_type("string");
-                            }
-                            _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
-                        },
-                        TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
-                            TsEntityName::Ident(identifier) => {
-                                let root_name = self
-                                    .symbol_tables
-                                    .get_root_declaration_name(file_path, identifier.sym.to_string());
+        match type_params.get(0) {
+            Some(param) => match param.kind {
+                NodeKind::TsType(raw_type) => match raw_type {
+                    TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
+                        TsKeywordTypeKind::TsNumberKeyword => {
+                            operation_param.content().schema().data_type("number");
+                        }
+                        TsKeywordTypeKind::TsBooleanKeyword => {
+                            operation_param.content().schema().data_type("boolean");
+                        }
+                        TsKeywordTypeKind::TsStringKeyword => {
+                            operation_param.content().schema().data_type("string");
+                        }
+                        _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
+                    },
+                    TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
+                        TsEntityName::Ident(identifier) => {
+                            let root_name = self
+                                .symbol_tables
+                                .get_root_declaration_name(file_path, identifier.sym.to_string());
 
-                                self.define_referenced_schema(
-                                    param.clone(),
-                                    &root_name,
-                                    &root_name,
-                                    open_api,
-                                    file_path,
-                                );
+                            self.define_referenced_schema(param.clone(), &root_name, &root_name, open_api, file_path);
 
-                                operation_param
-                                    .content()
-                                    .schema()
-                                    .reference(root_name.into(), false)
-                                    .namespace(namespace);
-                            }
-                            _ => println!("found some strang type ref"),
-                        },
+                            operation_param
+                                .content()
+                                .schema()
+                                .reference(root_name.into(), false)
+                                .namespace(namespace);
+                        }
+                        _ => println!("found some strang type ref"),
+                    },
+                    _ => {}
+                },
+                _ => println!("found some abstraction around your type ref {:?}", param.kind),
+            },
+            None => {}
+        }
+
+        match type_params.get(1) {
+            Some(param) => match &param.kind {
+                NodeKind::TsType(required) => match required {
+                    TsType::TsLitType(raw) => match raw.lit {
+                        TsLit::Bool(raw_bool) => {
+                            operation_param.required(raw_bool.value);
+                        }
                         _ => {}
                     },
-                    _ => println!("found some abstraction around your type ref {:?}", param.kind),
+                    _ => {}
                 },
-                None => {}
-            }
-
-            match type_params.get(1) {
-                Some(param) => match &param.kind {
-                    NodeKind::TsType(required) => match required {
-                        TsType::TsLitType(raw) => match raw.lit {
-                            TsLit::Bool(raw_bool) => {
-                                operation_param.required(raw_bool.value);
-                            }
-                            _ => {}
-                        },
-                        _ => {}
-                    },
-                    other => println!("found this while looking for required: {:?}", other),
-                },
-                None => println!("i didn't find a second param at all!"),
-            }
+                other => println!("found this while looking for required: {:?}", other),
+            },
+            None => println!("i didn't find a second param at all!"),
         }
     }
 
@@ -559,18 +534,17 @@ impl OpenApiFactory {
             .take_deferred_operation_type(type_name, source_file_name)
         {
             match self.symbol_tables.get_root_declaration(source_file_name, type_name) {
-                Some(Declaration::Type { node }) => unsafe {
+                Some(Declaration::Type { node }) => {
                     let root = root.get(node).unwrap();
-                    let operation: &mut ApiPathOperation = &mut *deferred_operation_type.operation;
-                    self.add_request_params(open_api, operation, root, source_file_name);
-                },
+                    self.add_request_params(open_api, &deferred_operation_type.operation, root, source_file_name);
+                }
                 Some(Declaration::Import {
                     name: imported_name,
                     source_file_name: module_file_name,
                 }) => {
                     self.deferred_schemas.add_deferred_operation_type(
                         &module_file_name,
-                        deferred_operation_type.operation,
+                        &deferred_operation_type.operation,
                         &imported_name,
                     );
                 }
@@ -620,7 +594,7 @@ impl OpenApiFactory {
                         let root_name = self
                             .symbol_tables
                             .get_root_declaration_name(file_path, identifier.sym.to_string());
-                        
+
                         root_schema.reference(Some(root_name.clone()), false);
 
                         self.deferred_schemas

@@ -15,7 +15,7 @@ url = "2.3.1"
 es_resolve = "0.4.2"
 ahash = "0.8.2"
 serde_json = { version = "1.0.89", features = ["preserve_order"] }
-serde = { version = "1.0.148", features = ["derive"] }
+serde = { version = "1.0.148", features = ["derive", "rc"] }
 neon = { version = "0.10.1", default-features = false, features = ["napi-1"] }
 swc_ecma_parser = "0.137.5"
 swc_atoms = "0.5.8"

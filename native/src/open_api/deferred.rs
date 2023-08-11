@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, rc::Rc, cell::RefCell};
 
 use super::schema::ApiPathOperation;
 
@@ -41,7 +41,7 @@ impl DeferredSchemas {
     pub(crate) fn add_deferred_operation_type(
         &mut self,
         source_file_name: &str,
-        operation: *mut ApiPathOperation,
+        operation: &Rc<RefCell<ApiPathOperation>>,
         type_name: &str,
     ) -> () {
         if !self.modules.contains(&source_file_name.to_string()) {
@@ -57,7 +57,7 @@ impl DeferredSchemas {
             types.insert(
                 type_name.to_string(),
                 DeferredOperationType {
-                    operation,
+                    operation: operation.clone(),
                     type_name: type_name.to_string(),
                 },
             );
@@ -105,7 +105,7 @@ pub struct DeferredType {
 
 #[derive(Debug)]
 pub struct DeferredOperationType {
-    pub operation: *mut ApiPathOperation,
+    pub operation: Rc<RefCell<ApiPathOperation>>,
     pub type_name: String,
 }
 

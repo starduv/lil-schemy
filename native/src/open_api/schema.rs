@@ -1,3 +1,5 @@
+use std::{rc::Rc, cell::RefCell};
+
 use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 
@@ -51,25 +53,25 @@ pub struct ApiPath {
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    get: Option<ApiPathOperation>,
+    get: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    put: Option<ApiPathOperation>,
+    put: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    post: Option<ApiPathOperation>,
+    post: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    delete: Option<ApiPathOperation>,
+    delete: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    options: Option<ApiPathOperation>,
+    options: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    head: Option<ApiPathOperation>,
+    head: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    patch: Option<ApiPathOperation>,
+    patch: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    trace: Option<ApiPathOperation>,
+    trace: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     servers: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    parameters: Option<ApiPathParameter>,
+    parameters: Option<Rc<RefCell<ApiPathParameter>>>,
 }
 
 impl<'v> ApiPath {
@@ -91,16 +93,16 @@ impl<'v> ApiPath {
         }
     }
 
-    pub fn add_operation(&mut self, method: &str) -> *mut ApiPathOperation {
+    pub fn add_operation(&mut self, method: &str) -> &Rc<RefCell<ApiPathOperation>> {
         match method.to_lowercase().as_str() {
-            "get" => self.get.insert(ApiPathOperation::new()),
-            "put" => self.put.insert(ApiPathOperation::new()),
-            "post" => self.post.insert(ApiPathOperation::new()),
-            "delete" => self.delete.insert(ApiPathOperation::new()),
-            "options" => self.options.insert(ApiPathOperation::new()),
-            "head" => self.head.insert(ApiPathOperation::new()),
-            "patch" => self.patch.insert(ApiPathOperation::new()),
-            "trace" => self.trace.insert(ApiPathOperation::new()),
+            "get" => self.get.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "put" => self.put.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "post" => self.post.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "delete" => self.delete.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "options" => self.options.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "head" => self.head.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "patch" => self.patch.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "trace" => self.trace.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
             other => panic!("Unsupported http method '{}'", other),
         }
     }
