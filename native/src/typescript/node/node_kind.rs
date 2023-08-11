@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use swc_ecma_ast::*;
 
-// #[derive(Debug)]
+#[derive(PartialEq)]
 pub enum NodeKind<'m> {
     TsTypeParam(&'m TsTypeParam),
     TsEntityName(&'m TsEntityName),

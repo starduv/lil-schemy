@@ -26,12 +26,14 @@ impl DeferredSchemas {
 
         let types = self.types.entry(source_file_name).or_insert(BTreeMap::new());
 
-        types.insert(type_name, DeferredType { schema_name });
+        if !types.contains_key(&type_name) {
+            types.insert(type_name, DeferredType { schema_name });
+        }
     }
 
-    pub(crate) fn get_deferred_type(&self, name: &str, source_file_name: &str) -> Option<&DeferredType> {
-        match self.types.get(source_file_name) {
-            Some(types) => types.get(name),
+    pub(crate) fn take_deferred_type(&mut self, name: &str, source_file_name: &str) -> Option<DeferredType> {
+        match self.types.get_mut(source_file_name) {
+            Some(types) => types.remove(name),
             None => None,
         }
     }
@@ -51,22 +53,24 @@ impl DeferredSchemas {
             .entry(source_file_name.to_string())
             .or_insert(BTreeMap::new());
 
-        types.insert(
-            type_name.to_string(),
-            DeferredOperationType {
-                operation,
-                type_name: type_name.to_string(),
-            },
-        );
+        if !types.contains_key(type_name){
+            types.insert(
+                type_name.to_string(),
+                DeferredOperationType {
+                    operation,
+                    type_name: type_name.to_string(),
+                },
+            );
+        }
     }
 
-    pub fn get_deferred_operation_type(
-        &self,
+    pub fn take_deferred_operation_type(
+        &mut self,
         type_name: &str,
         source_file_name: &str,
-    ) -> Option<&DeferredOperationType> {
-        match self.operation_types.get(source_file_name) {
-            Some(types) => types.get(type_name),
+    ) -> Option<DeferredOperationType> {
+        match self.operation_types.get_mut(source_file_name) {
+            Some(types) => types.remove(type_name),
             None => None,
         }
     }

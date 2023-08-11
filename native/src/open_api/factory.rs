@@ -39,7 +39,9 @@ impl OpenApiFactory {
                 file_path,
             )
         }
+    }
 
+    pub fn append_deferred_schemas(&mut self, open_api: &mut OpenApi, module_cache: &mut ModuleCache) {
         while let Some(source_file_name) = self.deferred_schemas.next_module() {
             let deferred_root = module_cache.parse(&source_file_name);
             for item_index in deferred_root.children() {
@@ -111,16 +113,16 @@ impl OpenApiFactory {
     ) {
         match root.kind {
             NodeKind::Ident(identifier) if identifier.sym.eq("BodyParam") => {
-                self.add_body_param_details(open_api, operation, root.parent().unwrap().parent().unwrap(), file_path);
+                self.add_body_param_details(open_api, operation, find_parent_type_ref(root), file_path);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("Header") => {
-                self.add_param_details(operation, "header", root.parent().unwrap().parent().unwrap(), file_path);
+                self.add_param_details(operation, "header", find_parent_type_ref(root), file_path);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("QueryParam") => {
-                self.add_param_details(operation, "query", root.parent().unwrap().parent().unwrap(), file_path);
+                self.add_param_details(operation, "query", find_parent_type_ref(root), file_path);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("RouteParam") => {
-                self.add_param_details(operation, "path", root.parent().unwrap().parent().unwrap(), file_path);
+                self.add_param_details(operation, "path", find_parent_type_ref(root), file_path);
             }
             NodeKind::Ident(identifier) => match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
                 Some(Declaration::Import { name, source_file_name }) => {
@@ -150,9 +152,9 @@ impl OpenApiFactory {
             let operation_param = operation.param(&parameter_name, location);
 
             let type_params = root.params();
-
             if let Some(type_param) = type_params.get(0) {
-                self.define_schema_details(operation_param.content().schema(), type_param.clone(), file_path);
+                let param_schema = operation_param.content().schema();
+                self.define_schema_details(param_schema, type_param.clone(), file_path);
             }
 
             match type_params.get(1) {
@@ -502,22 +504,18 @@ impl OpenApiFactory {
         match &root.kind {
             NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(raw_expr))) => {
                 let root = root.to_child(NodeKind::ExportDefaultExpr(raw_expr));
-                println!("- found a default export");
                 self.define_deferred_type_maybe(root, open_api, "default", source_file_name)
             }
             NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(raw_decl))) => match &raw_decl.decl {
                 Decl::Class(ref raw_class) => {
-                    println!("- found a class export");
                     let root = root.to_child(NodeKind::ClassDecl(raw_class));
                     self.define_deferred_type_maybe(root, open_api, &raw_class.ident.sym, source_file_name)
                 }
                 Decl::TsInterface(ref raw_interface) => {
-                    println!("- found a interface export");
                     let root = root.to_child(NodeKind::TsInterfaceDecl(raw_interface));
                     self.define_deferred_type_maybe(root, open_api, &raw_interface.id.sym, source_file_name)
                 }
                 Decl::TsTypeAlias(ref raw_alias) => {
-                    println!("- found a type alias export");
                     let root = root.to_child(NodeKind::TsTypeAliasDecl(raw_alias));
                     self.define_deferred_type_maybe(root, open_api, &raw_alias.id.sym, source_file_name)
                 }
@@ -539,8 +537,6 @@ impl OpenApiFactory {
                                 },
                             };
 
-                            println!("- found named export");
-
                             self.define_deferred_type_maybe(specifier, open_api, &name, source_file_name);
                         }
                         _ => {}
@@ -560,7 +556,7 @@ impl OpenApiFactory {
     ) -> () {
         if let Some(deferred_operation_type) = self
             .deferred_schemas
-            .get_deferred_operation_type(type_name, source_file_name)
+            .take_deferred_operation_type(type_name, source_file_name)
         {
             match self.symbol_tables.get_root_declaration(source_file_name, type_name) {
                 Some(Declaration::Type { node }) => unsafe {
@@ -582,7 +578,7 @@ impl OpenApiFactory {
             }
         }
 
-        if let Some(deferred_type) = self.deferred_schemas.get_deferred_type(type_name, source_file_name) {
+        if let Some(deferred_type) = self.deferred_schemas.take_deferred_type(type_name, source_file_name) {
             match self.symbol_tables.get_root_declaration(source_file_name, &type_name) {
                 Some(Declaration::Type { node }) => {
                     let schema = open_api.components.schema(&deferred_type.schema_name);
@@ -624,7 +620,7 @@ impl OpenApiFactory {
                         let root_name = self
                             .symbol_tables
                             .get_root_declaration_name(file_path, identifier.sym.to_string());
-
+                        
                         root_schema.reference(Some(root_name.clone()), false);
 
                         self.deferred_schemas
@@ -889,4 +885,11 @@ fn get_response_options(options: &ObjectLit) -> ResponseOptions {
     }
 
     response_options
+}
+
+fn find_parent_type_ref<'m>(root: Rc<SchemyNode<'m>>) -> Rc<SchemyNode<'m>> {
+    match &root.kind {
+        NodeKind::TsTypeRef(_) => root.clone(),
+        _ => find_parent_type_ref(root.parent().unwrap()),
+    }
 }
