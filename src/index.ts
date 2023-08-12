@@ -1,6 +1,9 @@
 export { generateOpenApi } from './commands/generate';
 export { getRootFiles } from './utils';
 
+type OptionalString = string | undefined;
+type OptionalArray<T> = T[] | undefined;
+type NumberFormat = "int32" | "int64" | "float" | "double";
 type F = StringFormat | NumberFormat | undefined;
 type StringFormat = "date-time" |
     "time" |
@@ -23,39 +26,39 @@ type StringFormat = "date-time" |
     "iri-reference" |
     undefined;
 
-type NumberFormat = "int32" | "int64" | "float" | "double";
+
+interface BodyParamArgs { required: boolean }
+
 
 export type OperationMethod = 'GET' | 'PUT' | 'POST' | 'DELETE' | 'OPTIONS' | 'HEAD' | 'PATCH' | 'TRACE';
+
 export interface PathItemOptions {
     method: OperationMethod;
     path: string;
     tags?: string[];
 }
-export function Path<Func>(fn: Func, options: PathItemOptions | null = null) {
+export function LilPath<Func>(fn: Func, options: PathItemOptions | null = null) {
     return fn;
 }
 
 export interface ResponseOptions {
     description?: string;
     example?: string;
-    namespace?: string;
     statusCode: number;
 }
-export function Response<ResponseType>(response: ResponseType, options: ResponseOptions) {
+export function LilResponse<ResponseType>(response: ResponseType, options: ResponseOptions) {
     return response;
 }
 
-interface BodyParamArgs { required: boolean, namespace: OptionalString }
-export function BodyParam<BodyType>(type: BodyType, args: BodyParamArgs = { required: false, namespace: undefined }) {
-    return type;
-}
+export type LilBodyParam<Param, Required extends boolean = true> = Param;
 
-type OptionalString = string | undefined;
-type OptionalArray<T> = T[] | undefined;
+export type LilHeader<Param, Required extends boolean = true, Format extends F = undefined> = Param;
 
-export type Path<Func extends (...args: unknown[]) => unknown | Promise<unknown>, Method extends OperationMethod, Path extends string, Tags extends OptionalArray<string> = undefined> = Func;
-export type Response<ResponseType, StatusCode extends number, Description extends OptionalString, Example extends OptionalString, Namespace extends OptionalString = undefined> = ResponseType;
-export type BodyParam<Param, Required extends boolean = true, Namespace extends OptionalString = undefined> = Param;
-export type Header<Param, Required extends boolean = true, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
-export type QueryParam<Param, Required extends boolean = false, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
-export type RouteParam<Param, Required extends true = true, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
+export type LilQueryParam<Param, Required extends boolean = false, Format extends F = undefined> = Param;
+
+export type LilRouteParam<Param, Required extends true = true, Format extends F = undefined> = Param;
+
+// export type LilPath<TParams extends LilPathParamArgs> = TParams;
+// export type LilResponse<ResponseType, StatusCode extends number, Description extends OptionalString, Example extends OptionalString> = ResponseType;
+// type LilPathParamArgs<QueryParam = undefined, BodyParam = undefined, RouteParam = undefined, Header = undefined, Response = undefined> = LilQueryParam<QueryParam> | LilBodyParam<BodyParam> | LilHeader<Header, any> | LilQueryParam<QueryParam, any> | LilRouteParam<any, any> | LilResponse<any, any, any, any>;
+// type LilPathParams<LilPathParamArgs> = Array<LilPathParamArgs>;
