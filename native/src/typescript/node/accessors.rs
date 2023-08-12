@@ -177,6 +177,19 @@ impl<'m> SchemyNode<'m> {
 
     pub fn members(&self) -> Vec<Rc<SchemyNode<'m>>> {
         match self.kind {
+            NodeKind::TsEnumDecl(raw_decl) => {
+                let mut borrow = self.context.borrow_mut();
+                raw_decl.members.iter().map(|raw_member| {
+                    let child_index = borrow.nodes.len();
+                    borrow.nodes.push(Rc::new(SchemyNode {
+                        index: child_index,
+                        parent_index: Some(self.index),
+                        kind: NodeKind::TsEnumMember(raw_member),
+                        context: self.context.clone(),
+                    }));
+                    borrow.nodes.get(child_index).map(|n| n.clone()).unwrap()
+                }).collect()
+            }
             NodeKind::TsTypeLit(type_lit) => {
                 let mut borrow = self.context.borrow_mut();
                 type_lit

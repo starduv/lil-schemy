@@ -232,6 +232,7 @@ pub struct ApiSchema {
     is_example: bool,
     properties: Option<HashMap<String, ApiSchema>>,
     required: HashSet<String>,
+    enums: Option<Vec<String>>,
 }
 
 impl Serialize for ApiSchema {
@@ -240,6 +241,9 @@ impl Serialize for ApiSchema {
         S: Serializer,
     {
         let mut state = serializer.serialize_struct("ApiSchema", 5)?;
+        if let Some(ref enums) = self.enums {
+            state.serialize_field("enum", enums)?;
+        }
         if let Some(ref format) = self.format {
             state.serialize_field("format", format)?;
         }
@@ -286,6 +290,7 @@ impl ApiSchema {
             is_example: false,
             items: None,
             properties: None,
+            enums: None,
             required: HashSet::new(),
         }
     }
@@ -328,6 +333,10 @@ impl ApiSchema {
 
     pub fn items(&mut self) -> &mut ApiSchema {
         self.items.get_or_insert(Box::new(ApiSchema::new()))
+    }
+
+    pub(crate) fn enum_value(&mut self, value: &str) {
+        self.enums.get_or_insert(Vec::new()).push(value.to_string());
     }
 }
 

@@ -29,16 +29,7 @@ impl OpenApiFactory {
         let root = module_cache.parse(&file_path);
         self.find_paths(open_api, root.clone(), file_path);
 
-        for immediate in self.deferred_schemas.take_immediate_types(file_path) {
-            let root = root.get(immediate.index).unwrap();
-            self.define_referenced_schema(
-                root,
-                &immediate.schema_name,
-                &immediate.schema_name,
-                open_api,
-                file_path,
-            )
-        }
+        self.define_immediates(file_path, &root, open_api);
     }
 
     pub fn append_deferred_schemas(&mut self, open_api: &mut OpenApi, module_cache: &mut ModuleCache) {
@@ -48,6 +39,21 @@ impl OpenApiFactory {
                 let item = deferred_root.get(item_index).unwrap();
                 self.define_deferred_schemas(open_api, item, &source_file_name);
             }
+
+            self.define_immediates(&source_file_name, &deferred_root, open_api);
+        }
+    }
+
+    fn define_immediates(&mut self, file_path: &str, root: &Rc<SchemyNode>, open_api: &mut OpenApi) {
+        for immediate in self.deferred_schemas.take_immediate_types(file_path) {
+            let root = root.get(immediate.index).unwrap();
+            self.define_referenced_schema(
+                root,
+                &immediate.schema_name,
+                &immediate.schema_name,
+                open_api,
+                file_path,
+            )
         }
     }
 
@@ -542,7 +548,7 @@ impl OpenApiFactory {
                 let root = root.to_child(NodeKind::TsTypeAliasDecl(raw_alias));
                 self.define_deferred_type_maybe(&root, open_api, &raw_alias.id.sym, source_file_name)
             }
-            _ => {},
+            _ => {}
         }
     }
 
@@ -554,8 +560,8 @@ impl OpenApiFactory {
         source_file_name: &str,
     ) -> () {
         if let Some(deferred_operation_type) = self
-        .deferred_schemas
-        .take_deferred_operation_type(type_name, source_file_name)
+            .deferred_schemas
+            .take_deferred_operation_type(type_name, source_file_name)
         {
             match self.symbol_tables.get_root_declaration(source_file_name, type_name) {
                 Some(Declaration::Type { node }) => {
@@ -577,7 +583,6 @@ impl OpenApiFactory {
         }
 
         if let Some(deferred_type) = self.deferred_schemas.take_deferred_type(type_name, source_file_name) {
-            println!("I found a deferral for {}", type_name);
             match self.symbol_tables.get_root_declaration(source_file_name, &type_name) {
                 Some(Declaration::Type { node }) => {
                     let schema = open_api.components.schema(&deferred_type.schema_name);
@@ -774,6 +779,29 @@ impl OpenApiFactory {
                     self.define_schema_details(root_schema, child, file_path);
                 }
             }
+            NodeKind::TsEnumDecl(_) => {
+                for member in root.members() {
+                    root_schema.data_type("string".into());
+                    self.define_schema_details(root_schema, member, file_path);
+                }
+            }
+            NodeKind::TsEnumMember(raw_member) => match &raw_member.init {
+                Some(expr) => match &**expr {
+                    Expr::Lit(raw_lit) => match raw_lit {
+                        Lit::Str(raw_str) => {
+                            root_schema.enum_value(&raw_str.value);
+                        }
+                        Lit::Num(raw_num) => {
+                            if let Some(raw) = &raw_num.raw {
+                                root_schema.enum_value(&raw);
+                            }
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                },
+                None => {}
+            },
             _ => {}
         }
     }
