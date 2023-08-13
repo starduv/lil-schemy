@@ -63,7 +63,7 @@ impl OpenApiFactory {
         for child_index in root.children() {
             let child = root.get(child_index).unwrap();
             match &child.kind {
-                NodeKind::Ident(raw_ident) if raw_ident.sym.eq("Path") => {
+                NodeKind::Ident(raw_ident) if raw_ident.sym.eq("LilPath") => {
                     let parent = child.parent().unwrap().parent().unwrap();
                     self.symbol_tables.add_child_scope(file_path);
                     self.add_path(open_api, parent, file_path);
@@ -119,16 +119,16 @@ impl OpenApiFactory {
         file_path: &str,
     ) {
         match root.kind {
-            NodeKind::Ident(identifier) if identifier.sym.eq("BodyParam") => {
+            NodeKind::Ident(identifier) if identifier.sym.eq("LilBodyParam") => {
                 self.add_body_param_details(open_api, operation, find_parent_type_ref(root), file_path);
             }
-            NodeKind::Ident(identifier) if identifier.sym.eq("Header") => {
+            NodeKind::Ident(identifier) if identifier.sym.eq("LilHeader") => {
                 self.add_param_details(operation, "header", find_parent_type_ref(root), file_path);
             }
-            NodeKind::Ident(identifier) if identifier.sym.eq("QueryParam") => {
+            NodeKind::Ident(identifier) if identifier.sym.eq("LilQueryParam") => {
                 self.add_param_details(operation, "query", find_parent_type_ref(root), file_path);
             }
-            NodeKind::Ident(identifier) if identifier.sym.eq("RouteParam") => {
+            NodeKind::Ident(identifier) if identifier.sym.eq("LilRouteParam") => {
                 self.add_param_details(operation, "path", find_parent_type_ref(root), file_path);
             }
             NodeKind::Ident(identifier) => match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
@@ -179,7 +179,7 @@ impl OpenApiFactory {
             None => println!("i didn't find a second param at all!"),
         }
 
-        match type_params.get(3) {
+        match type_params.get(2) {
             Some(param) => match param.kind {
                 NodeKind::TsType(raw_type) => match raw_type {
                     TsType::TsLitType(raw_lit) => match &raw_lit.lit {
@@ -210,7 +210,7 @@ impl OpenApiFactory {
             let child = root.get(child_index.clone()).unwrap();
             store_declaration_maybe(child.clone(), file_path, &mut self.symbol_tables);
             match child.kind {
-                NodeKind::Ident(raw) if raw.sym.eq("Response") => {
+                NodeKind::Ident(raw) if raw.sym.eq("LilResponse") => {
                     self.add_response(open_api, operation, root.parent().unwrap(), file_path)
                 }
                 _ => self.find_response(open_api, operation, child, file_path),
@@ -276,7 +276,7 @@ impl OpenApiFactory {
                         }
                     }
 
-                    content.example(options.example.clone(), options.namespace.clone());
+                    content.example(options.example.clone());
                 } else {
                     let name = self
                         .symbol_tables
@@ -289,7 +289,7 @@ impl OpenApiFactory {
                     let response = operation.response(&status_code, &description);
                     let content = response.content();
                     content.schema().reference(Some(name.clone()), false);
-                    content.example(options.example.clone(), options.namespace.clone());
+                    content.example(options.example.clone());
 
                     self.define_referenced_schema(root.clone(), &name, &name, open_api, file_path);
                 }
@@ -302,7 +302,7 @@ impl OpenApiFactory {
                 let response = operation.response(&status_code, &description);
                 let content = response.content();
                 content.schema().data_type("string");
-                content.example(options.example.clone(), options.namespace.clone());
+                content.example(options.example.clone());
             }
             NodeKind::Bool(_) => {
                 let status_code = options.status_code.as_ref().unwrap();
@@ -312,7 +312,7 @@ impl OpenApiFactory {
                 let response = operation.response(&status_code, &description);
                 let content = response.content();
                 content.schema().data_type("boolean");
-                content.example(options.example.clone(), options.namespace.clone());
+                content.example(options.example.clone());
             }
             NodeKind::Null(_) => {
                 let status_code = options.status_code.as_ref().unwrap();
@@ -321,7 +321,7 @@ impl OpenApiFactory {
                 let mut operation = (**operation).borrow_mut();
                 let response = operation.response(&status_code, &description);
                 let content = response.content();
-                content.example(options.example.clone(), options.namespace.clone());
+                content.example(options.example.clone());
             }
             NodeKind::Num(_) => {
                 let status_code = options.status_code.as_ref().unwrap();
@@ -331,7 +331,7 @@ impl OpenApiFactory {
                 let response = operation.response(&status_code, &description);
                 let content = response.content();
                 content.schema().data_type("number");
-                content.example(options.example.clone(), options.namespace.clone());
+                content.example(options.example.clone());
             }
             NodeKind::BigInt(_) => {
                 let status_code = options.status_code.as_ref().unwrap();
@@ -341,7 +341,7 @@ impl OpenApiFactory {
                 let response = operation.response(&status_code, &description);
                 let content = response.content();
                 content.schema().data_type("number");
-                content.example(options.example.clone(), options.namespace.clone());
+                content.example(options.example.clone());
             }
             NodeKind::Regex(_) => {
                 let status_code = options.status_code.as_ref().unwrap();
@@ -351,7 +351,7 @@ impl OpenApiFactory {
                 let response = operation.response(&status_code, &description);
                 let content = response.content();
                 content.schema().data_type("string");
-                content.example(options.example.clone(), options.namespace.clone());
+                content.example(options.example.clone());
             }
 
             _ => {
@@ -373,19 +373,6 @@ impl OpenApiFactory {
         let mut operation = (**operation).borrow_mut();
         let operation_param = operation.body();
         let type_params = root.params();
-        let namespace = match type_params.get(2) {
-            Some(namespace) => match namespace.kind {
-                NodeKind::TsType(raw_type) => match raw_type {
-                    TsType::TsLitType(raw_lit) => match &raw_lit.lit {
-                        TsLit::Str(literal_string) => Some(literal_string.value.to_string()),
-                        _ => None,
-                    },
-                    _ => None,
-                },
-                _ => None,
-            },
-            _ => None,
-        };
 
         match type_params.get(0) {
             Some(param) => match param.kind {
@@ -413,8 +400,7 @@ impl OpenApiFactory {
                             operation_param
                                 .content()
                                 .schema()
-                                .reference(root_name.into(), false)
-                                .namespace(namespace);
+                                .reference(root_name.into(), false);
                         }
                         _ => println!("found some strang type ref"),
                     },
@@ -470,10 +456,6 @@ impl OpenApiFactory {
 
                 if let Some(node) = type_node.get(node_index) {
                     self.define_schema_details(schema, node, file_path);
-                } else {
-                    // we may not have found this type yet as we traverse the module
-                    // self.deferred_schemas.add_deferred_type(file_path, schema_name, type_name, namespace);
-                    panic!("we didn't find the type node for {}", type_name);
                 }
             }
             _ => {}
@@ -900,7 +882,6 @@ fn get_response_options(options: &ObjectLit) -> ResponseOptions {
                     match key {
                         Some(k) if k.eq("description") => response_options.description = value,
                         Some(k) if k.eq("example") => response_options.example = value,
-                        Some(k) if k.eq("namespace") => response_options.namespace = value,
                         Some(k) if k.eq("statusCode") => response_options.status_code = value,
                         _ => {}
                     }

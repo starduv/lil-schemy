@@ -212,10 +212,10 @@ impl ApiConent {
         self.schema.get_or_insert(ApiSchema::new())
     }
 
-    pub fn example(&mut self, example: Option<String>, namespace: Option<String>) -> &mut ApiConent {
+    pub fn example(&mut self, example: Option<String>) -> &mut ApiConent {
         if example.is_some() {
             let mut schema = ApiSchema::new();
-            schema.reference(example, true).namespace(namespace);
+            schema.reference(example, true);
             self.example = Some(Box::new(schema));
         }
         self
@@ -228,7 +228,6 @@ pub struct ApiSchema {
     format: Option<String>,
     data_type: Option<String>,
     reference: Option<String>,
-    namespace: Option<String>,
     is_example: bool,
     properties: Option<HashMap<String, ApiSchema>>,
     required: HashSet<String>,
@@ -265,14 +264,6 @@ impl Serialize for ApiSchema {
                 false => "#/components/schemas/",
             });
 
-            if let Some(ref namespace) = self.namespace {
-                path.push_str(namespace);
-                match self.is_example {
-                    true => path.push('.'),
-                    false => path.push_str("/properties/"),
-                }
-            }
-
             path.push_str(reference);
             state.serialize_field("$ref", &path)?;
         }
@@ -286,7 +277,6 @@ impl ApiSchema {
             format: None,
             data_type: None,
             reference: None,
-            namespace: None,
             is_example: false,
             items: None,
             properties: None,
@@ -303,11 +293,6 @@ impl ApiSchema {
     pub fn format(&mut self, format: Option<String>) -> &mut ApiSchema {
         // TODO add format tests
         self.format = format;
-        self
-    }
-
-    pub fn namespace(&mut self, namespace: Option<String>) -> &mut ApiSchema {
-        self.namespace = namespace;
         self
     }
 
@@ -396,7 +381,6 @@ impl PathOptions {
 pub struct ResponseOptions {
     pub description: Option<String>,
     pub example: Option<String>,
-    pub namespace: Option<String>,
     pub status_code: Option<String>,
 }
 impl ResponseOptions {
@@ -404,7 +388,6 @@ impl ResponseOptions {
         ResponseOptions {
             description: None,
             example: None,
-            namespace: None,
             status_code: None,
         }
     }

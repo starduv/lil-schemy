@@ -2,7 +2,6 @@ export { generateOpenApi } from './commands/generate';
 export { getRootFiles } from './utils';
 
 type NumberFormat = "int32" | "int64" | "float" | "double";
-type OptionalString = string | undefined;
 type F = StringFormat | NumberFormat | undefined;
 type StringFormat = "date-time" |
     "time" |
@@ -32,21 +31,20 @@ export interface PathItemOptions {
     path: string;
     tags?: string[];
 }
-export function Path<Func>(fn: Func, options: PathItemOptions | null = null) {
+export function LilPath<Func>(fn: Func, options: PathItemOptions | null = null) {
     return fn;
 }
 
 export interface ResponseOptions {
     description?: string;
     example?: string;
-    namespace?: string;
     statusCode: number;
 }
-export function Response<ResponseType>(response: ResponseType, options: ResponseOptions) {
+export function LilResponse<ResponseType>(response: ResponseType, options: ResponseOptions) {
     return response;
 }
 
-export type BodyParam<Param, Required extends boolean = true, Namespace extends OptionalString = undefined> = Param;
-export type Header<Param, Required extends boolean = true, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
-export type QueryParam<Param, Required extends boolean = false, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
-export type RouteParam<Param, Required extends true = true, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
+export type LilBodyParam<Param, Required extends boolean = true> = Param;
+export type LilHeader<Param, Required extends boolean = true, Format extends F = undefined> = Param;
+export type LilQueryParam<Param, Required extends boolean = false, Format extends F = undefined> = Param;
+export type LilRouteParam<Param, Required extends true = true, Format extends F = undefined> = Param;

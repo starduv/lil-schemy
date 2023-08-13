@@ -1,12 +1,12 @@
-import { BodyParam, Header, Path, QueryParam, Response, RouteParam } from '../../../src';
+import { LilBodyParam, LilHeader, LilPath, LilQueryParam, LilResponse, LilRouteParam } from '../../../src';
 import AdminUser, { Account, CreateUserRequest, User, UserPatch } from '../dtos';
 import { GetAccountRequest } from '../dtos/requests';
 import { Router } from './router';
 
-export default Router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: QueryParam<number, false>; headers: { user: Header<User, true>; }; }, reply: any): Promise<void> => {
+export default Router.get("", {}, LilPath(async (request: { lat: LilQueryParam<number, false>, long: LilQueryParam<number, false>; headers: { user: LilHeader<User, true>; }; }, reply: any): Promise<void> => {
     let success = {} as User;
 
-    let response = Response(success, {
+    let response = LilResponse(success, {
         statusCode: 200,
         description: "Who am I",
         example: "User"
@@ -19,10 +19,10 @@ export default Router.get("", {}, Path(async (request: { lat: QueryParam<number,
     tags: ['Users'],
 }));
 
-Router.patch("", {}, Path(async (request: { id: RouteParam<string, true>; date: QueryParam<string, false, undefined, "date">; }, reply: any): Promise<void> => {
+Router.patch("", {}, LilPath(async (request: { id: LilRouteParam<string, true>; date: LilQueryParam<string, false, "date">; }, reply: any): Promise<void> => {
     let admin = new AdminUser();
 
-    let response = Response(admin, {
+    let response = LilResponse(admin, {
         statusCode: 202,
         description: "a modified admin user"
     });
@@ -33,8 +33,8 @@ Router.patch("", {}, Path(async (request: { id: RouteParam<string, true>; date: 
     path: '/user/{id}',
 }));
 
-Router.get("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
-    let response = Response(new AdminUser(), {
+Router.get("", {}, LilPath(async (request: { id: LilRouteParam<string, true>; }, reply: any): Promise<void> => {
+    let response = LilResponse(new AdminUser(), {
         statusCode: 200,
         description: "a specific admin user"
     });
@@ -45,8 +45,8 @@ Router.get("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply
     path: '/user/{id}',
 }));
 
-Router.delete("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
-    let response = Response(null, {
+Router.delete("", {}, LilPath(async (request: { id: LilRouteParam<string, true>; }, reply: any): Promise<void> => {
+    let response = LilResponse(null, {
         statusCode: 204,
         description: "no content",
         example: "NoContent"
@@ -59,8 +59,8 @@ Router.delete("", {}, Path(async (request: { id: RouteParam<string, true>; }, re
     tags: ["Admin", "Users"],
 }));
 
-Router.post("", {}, Path(async (request: { user: BodyParam<CreateUserRequest, true>; }, reply: any): Promise<void> => {
-    let response = Response(<User>{}, {
+Router.post("", {}, LilPath(async (request: { user: LilBodyParam<CreateUserRequest, true>; }, reply: any): Promise<void> => {
+    let response = LilResponse(<User>{}, {
         statusCode: 201,
         description: "Create a new user",
     });
@@ -72,8 +72,8 @@ Router.post("", {}, Path(async (request: { user: BodyParam<CreateUserRequest, tr
     tags: ["Admin"]
 }));
 
-Router.put("", {}, Path(async (request: { tomato: BodyParam<UserPatch, false>; }, reply: any): Promise<void> => {
-    let response = Response({} as AdminUser, {
+Router.put("", {}, LilPath(async (request: { tomato: LilBodyParam<UserPatch, false>; }, reply: any): Promise<void> => {
+    let response = LilResponse({} as AdminUser, {
         statusCode: 202,
         description: "Updated User",
     });
@@ -89,10 +89,10 @@ const ledger = {
     getAccount: () => ({} as Account)
 };
 
-Router.get("", {}, Path(async (request: GetAccountRequest, reply: any): Promise<void> => {
+Router.get("", {}, LilPath(async (request: GetAccountRequest, reply: any): Promise<void> => {
     let success: Account = ledger.getAccount();
 
-    let response = Response(success, {
+    let response = LilResponse(success, {
         statusCode: 200,
         description: "Get user account",
     });

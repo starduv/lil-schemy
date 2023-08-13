@@ -1,4 +1,4 @@
-import { QueryParam, RouteParam } from "../../../src";
+import { LilQueryParam, LilRouteParam } from "../../../src";
 
 export default interface PatchUserRequest { }
 
@@ -15,11 +15,11 @@ interface RequestGenericInterface {
 
 export interface Request<T extends RequestGenericInterface = RequestGenericInterface> { }
 
-export interface GetAccountRequest { id: RouteParam<string, true>; }
+export interface GetAccountRequest { id: LilRouteParam<string, true>; }
 
 export interface AnimalsRequest {
     Querystring: {
-        kind: QueryParam<AnimalKind, true>
+        kind: LilQueryParam<AnimalKind, true>
     }
 }
 
