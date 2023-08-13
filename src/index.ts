@@ -1,6 +1,8 @@
 export { generateOpenApi } from './commands/generate';
 export { getRootFiles } from './utils';
 
+type NumberFormat = "int32" | "int64" | "float" | "double";
+type OptionalString = string | undefined;
 type F = StringFormat | NumberFormat | undefined;
 type StringFormat = "date-time" |
     "time" |
@@ -23,9 +25,8 @@ type StringFormat = "date-time" |
     "iri-reference" |
     undefined;
 
-type NumberFormat = "int32" | "int64" | "float" | "double";
-
 export type OperationMethod = 'GET' | 'PUT' | 'POST' | 'DELETE' | 'OPTIONS' | 'HEAD' | 'PATCH' | 'TRACE';
+
 export interface PathItemOptions {
     method: OperationMethod;
     path: string;
@@ -45,16 +46,6 @@ export function Response<ResponseType>(response: ResponseType, options: Response
     return response;
 }
 
-interface BodyParamArgs { required: boolean, namespace: OptionalString }
-export function BodyParam<BodyType>(type: BodyType, args: BodyParamArgs = { required: false, namespace: undefined }) {
-    return type;
-}
-
-type OptionalString = string | undefined;
-type OptionalArray<T> = T[] | undefined;
-
-export type Path<Func extends (...args: unknown[]) => unknown | Promise<unknown>, Method extends OperationMethod, Path extends string, Tags extends OptionalArray<string> = undefined> = Func;
-export type Response<ResponseType, StatusCode extends number, Description extends OptionalString, Example extends OptionalString, Namespace extends OptionalString = undefined> = ResponseType;
 export type BodyParam<Param, Required extends boolean = true, Namespace extends OptionalString = undefined> = Param;
 export type Header<Param, Required extends boolean = true, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
 export type QueryParam<Param, Required extends boolean = false, Namespace extends OptionalString = undefined, Format extends F = undefined> = Param;
