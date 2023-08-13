@@ -176,7 +176,7 @@ impl OpenApiFactory {
                 },
                 other => println!("found this while looking for required: {:?}", other),
             },
-            None => {},
+            None => println!("i didn't find a second param at all!"),
         }
 
         match type_params.get(3) {
@@ -438,7 +438,7 @@ impl OpenApiFactory {
                 },
                 other => println!("found this while looking for required: {:?}", other),
             },
-            None => {},
+            None => println!("i didn't find a second param at all!"),
         }
     }
 

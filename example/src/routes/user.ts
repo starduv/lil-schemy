@@ -1,11 +1,11 @@
-import { LilBodyParam, LilHeader, LilPath, LilQueryParam, LilResponse, LilRouteParam } from '../../../src';
+import { BodyParam, Header, Path, QueryParam, Response, RouteParam } from '../../../src';
 import AdminUser, { CreateUserRequest, User, UserPatch } from '../dtos';
 import { Router } from './router'
 
-Router.get("", {}, LilPath(async (request: { lat: LilQueryParam<number, false>, long: LilQueryParam<number, false>; headers: { user: LilHeader<User, true, "v1">; }; }, reply: any): Promise<void> => {
+Router.get("", {}, Path(async (request: { lat: QueryParam<number, false>, long: QueryParam<number, false>; headers: { user: Header<User, true, "v1">; }; }, reply: any): Promise<void> => {
     let success = {} as User;
 
-    let response = LilResponse(success, {
+    let response = Response(success, {
         statusCode: 200,
         namespace: "v1",
         description: "Who am I",
@@ -19,10 +19,10 @@ Router.get("", {}, LilPath(async (request: { lat: LilQueryParam<number, false>, 
     tags: ['space'],
 }));
 
-Router.patch("", {}, LilPath(async (request: { id: LilRouteParam<string, true>; date: LilQueryParam<string, false, undefined, "date">; }, reply: any): Promise<void> => {
+Router.patch("", {}, Path(async (request: { id: RouteParam<string, true>; date: QueryParam<string, false, undefined, "date">; }, reply: any): Promise<void> => {
     let admin = new AdminUser();
 
-    let response = LilResponse(admin, {
+    let response = Response(admin, {
         statusCode: 202,
         description: "a modified admin user"
     });
@@ -33,8 +33,8 @@ Router.patch("", {}, LilPath(async (request: { id: LilRouteParam<string, true>; 
     path: '/user/{id}',
 }));
 
-Router.get("", {}, LilPath(async (request: { id: LilRouteParam<string, true>; }, reply: any): Promise<void> => {
-    let response = LilResponse(new AdminUser(), {
+Router.get("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
+    let response = Response(new AdminUser(), {
         statusCode: 200,
         description: "a specific admin user"
     });
@@ -45,8 +45,8 @@ Router.get("", {}, LilPath(async (request: { id: LilRouteParam<string, true>; },
     path: '/user/{id}',
 }));
 
-Router.delete("", {}, LilPath(async (request: { id: LilRouteParam<string, true>; }, reply: any): Promise<void> => {
-    let response = LilResponse(null, {
+Router.delete("", {}, Path(async (request: { id: RouteParam<string, true>; }, reply: any): Promise<void> => {
+    let response = Response(null, {
         statusCode: 204,
         description: "no content",
         namespace: "v1",
@@ -60,8 +60,8 @@ Router.delete("", {}, LilPath(async (request: { id: LilRouteParam<string, true>;
     tags: ["Admin", "Users"],
 }));
 
-Router.post("", {}, LilPath(async (request: { user: BodyParam<CreateUserRequest, true, "v1">; }, reply: any): Promise<void> => {
-    let response = LilResponse(<User>{}, {
+Router.post("", {}, Path(async (request: { user: BodyParam<CreateUserRequest, true, "v1">; }, reply: any): Promise<void> => {
+    let response = Response(<User>{}, {
         statusCode: 201,
         description: "Create a new user",
         namespace: "v1"
@@ -74,8 +74,8 @@ Router.post("", {}, LilPath(async (request: { user: BodyParam<CreateUserRequest,
     tags: ["Admin"]
 }));
 
-Router.put("", {}, LilPath(async (request: { tomato: BodyParam<UserPatch, false, "v1">; }, reply: any): Promise<void> => {
-    let response = LilResponse({} as AdminUser, {
+Router.put("", {}, Path(async (request: { tomato: BodyParam<UserPatch, false, "v1">; }, reply: any): Promise<void> => {
+    let response = Response({} as AdminUser, {
         statusCode: 202,
         description: "Updated User",
         namespace: "v1"
