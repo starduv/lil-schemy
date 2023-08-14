@@ -123,13 +123,13 @@ impl OpenApiFactory {
                 self.add_body_param_details(open_api, operation, find_parent_type_ref(root), file_path);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("LilHeader") => {
-                self.add_param_details(operation, "header", find_parent_type_ref(root), file_path);
+                self.add_param_details(operation, "header", find_parent_type_ref(root), file_path, false);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("LilQueryParam") => {
-                self.add_param_details(operation, "query", find_parent_type_ref(root), file_path);
+                self.add_param_details(operation, "query", find_parent_type_ref(root), file_path, false);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("LilRouteParam") => {
-                self.add_param_details(operation, "path", find_parent_type_ref(root), file_path);
+                self.add_param_details(operation, "path", find_parent_type_ref(root), file_path, true);
             }
             NodeKind::Ident(identifier) => match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
                 Some(Declaration::Import { name, source_file_name }) => {
@@ -152,6 +152,7 @@ impl OpenApiFactory {
         location: &str,
         root: Rc<SchemyNode>,
         file_path: &str,
+        required_default: bool,
     ) {
         let mut operation = (**operation).borrow_mut();
         let parameter_name = get_parameter_name(root.clone());
@@ -176,7 +177,9 @@ impl OpenApiFactory {
                 },
                 _ => {}
             },
-            None => {}
+            None => {
+                operation_param.required(required_default);
+            }
         }
 
         match type_params.get(2) {
@@ -193,7 +196,7 @@ impl OpenApiFactory {
                     },
                     _ => {}
                 },
-                _ => println!("found this while looking for format: {:?}", param.kind),
+                _ => {}
             },
             None => {}
         }
@@ -639,25 +642,31 @@ impl OpenApiFactory {
             NodeKind::ClassDecl(_) => {
                 root_schema.data_type("object".into());
                 if let Some(class_node) = root.class() {
-                    for property in class_node.body() {
+                    for property in class_node.class_props() {
                         match property.kind {
-                            NodeKind::ClassMember(_) => {
-                                let class_prop = property.class_prop().unwrap();
-                                if let NodeKind::ClassProp(raw_prop) = class_prop.kind {
-                                    let name = match &raw_prop.key {
-                                        PropName::Ident(identifier) => Some(identifier.sym.to_string()),
-                                        _ => None,
-                                    };
+                            NodeKind::ClassProp(raw_prop) => {
+                                let name = match &raw_prop.key {
+                                    PropName::Ident(identifier) => Some(identifier.sym.to_string()),
+                                    _ => None,
+                                };
 
-                                    if let Some(name) = name {
-                                        if let Some(annotation) = class_prop.type_ann() {
-                                            self.define_schema_details(
-                                                root_schema.property(&name),
-                                                annotation.clone(),
-                                                file_path,
-                                            );
-                                        }
+                                if let Some(name) = name {
+                                    if let Some(annotation) = property.type_ann() {
+                                        self.define_schema_details(
+                                            root_schema.property(&name),
+                                            annotation.clone(),
+                                            file_path,
+                                        );
                                     }
+                                }
+                            }
+                            NodeKind::BindingIdent(raw_ident) => {
+                                if let Some(annotation) = property.type_ann() {
+                                    self.define_schema_details(
+                                        root_schema.property(&raw_ident.sym),
+                                        annotation.clone(),
+                                        file_path,
+                                    );
                                 }
                             }
                             _ => {}

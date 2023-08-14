@@ -17,8 +17,8 @@ Lil Schemy is a [Node addon]. The supported platforms/architectures are:
 - Windows - x86_64 | aarch64
 - Apple - x86_64 | aarch64
 
-### Upcoming Features
-__Generate schemas from return type of functions__
+### Not Supported Yet
+__Generate schemas from return type of functions and from tuples__
 ```JS
 getDriverRoutes = async (): Promise<[string, boolean, Array<number>]> => {
     return ["sup", true, [1,2,3]];

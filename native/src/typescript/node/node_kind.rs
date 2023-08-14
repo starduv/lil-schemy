@@ -3,6 +3,8 @@ use swc_ecma_ast::*;
 
 #[derive(PartialEq)]
 pub enum NodeKind<'m> {
+    BindingIdent(&'m BindingIdent),
+    Constructor(&'m Constructor),
     TsTypeParam(&'m TsTypeParam),
     TsEntityName(&'m TsEntityName),
     TsTypeParamDecl(&'m TsTypeParamDecl),
@@ -268,6 +270,8 @@ impl<'n> Clone for NodeKind<'n> {
             NodeKind::Regex(raw) => NodeKind::Regex(raw),
             NodeKind::TsTypeParam(raw) => NodeKind::TsTypeParam(raw),
             NodeKind::DefaultDecl(raw) => NodeKind::DefaultDecl(raw),
+            NodeKind::Constructor(raw) => NodeKind::Constructor(raw),
+            NodeKind::BindingIdent(raw) => NodeKind::BindingIdent(raw),
         }
     }
 }
@@ -404,7 +408,9 @@ impl<'m> Debug for NodeKind<'m> {
             NodeKind::BigInt(_) => f.debug_tuple("BigInt").finish(),
             NodeKind::Regex(_) => f.debug_tuple("Regex").finish(),
             NodeKind::TsTypeParam(_) => f.debug_tuple("TsTypeParam").finish(),
-            NodeKind::DefaultDecl(_) => f.debug_tuple("DefaultDecl").finish()
+            NodeKind::DefaultDecl(_) => f.debug_tuple("DefaultDecl").finish(),
+            NodeKind::Constructor(_) => f.debug_tuple("Constructor").finish(),
+            NodeKind::BindingIdent(_) => f.debug_tuple("BindingIdent").finish()
         }
     }
 }

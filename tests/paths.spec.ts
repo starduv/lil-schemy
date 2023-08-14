@@ -25,6 +25,15 @@ describe('open api generator', () => {
 
     it('generates schemas', () => {
         expect(schema.components?.schemas).to.deep.equalInAnyOrder({
+            Animal: {
+                type: "object",
+                properties: {
+                    name: {
+                        type: "string"
+                    }
+                },
+                required: ["name"]
+            },
             AnimalKind: {
                 enum: ["cat", "dog", "bird"],
                 type: "string",
@@ -103,6 +112,37 @@ describe('open api generator', () => {
                                 "application/json": {
                                     schema: {
                                         $ref: "#/components/schemas/AnimalKind"
+                                    }
+                                },
+                            }
+                        }
+                    ]
+                }
+            },
+            "/animals/{id}": {
+                get: {
+                    tags: ["Animals"],
+                    responses: {
+                        200: {
+                            description: "A specific animal",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/Animal"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    parameters: [
+                        {
+                            in: "path",
+                            name: "id",
+                            required: true,
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "number"
                                     }
                                 },
                             }
