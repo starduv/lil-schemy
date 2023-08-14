@@ -5,6 +5,8 @@ use serde::{ser::SerializeStruct, Serialize, Serializer};
 
 #[derive(Serialize, Debug)]
 pub struct OpenApi {
+    #[serde(rename = "openapi")]
+    pub open_api: String,
     pub components: ApiComponents,
     pub paths: HashMap<String, ApiPath>,
 }
@@ -12,6 +14,7 @@ pub struct OpenApi {
 impl OpenApi {
     pub fn new() -> Self {
         OpenApi {
+            open_api: "3.0.1".to_string(),
             components: ApiComponents::new(),
             paths: HashMap::new(),
         }

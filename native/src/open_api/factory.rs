@@ -174,9 +174,9 @@ impl OpenApiFactory {
                     },
                     _ => {}
                 },
-                other => println!("found this while looking for required: {:?}", other),
+                _ => {}
             },
-            None => println!("i didn't find a second param at all!"),
+            None => {}
         }
 
         match type_params.get(2) {
@@ -397,10 +397,7 @@ impl OpenApiFactory {
 
                             self.define_referenced_schema(param.clone(), &root_name, &root_name, open_api, file_path);
 
-                            operation_param
-                                .content()
-                                .schema()
-                                .reference(root_name.into(), false);
+                            operation_param.content().schema().reference(root_name.into(), false);
                         }
                         _ => println!("found some strang type ref"),
                     },
@@ -422,9 +419,9 @@ impl OpenApiFactory {
                     },
                     _ => {}
                 },
-                other => println!("found this while looking for required: {:?}", other),
+                _ => {}
             },
-            None => println!("i didn't find a second param at all!"),
+            None => {}
         }
     }
 

@@ -36,7 +36,7 @@ export function LilPath<Func>(fn: Func, options: PathItemOptions | null = null) 
 }
 
 export interface ResponseOptions {
-    description?: string;
+    description: string;
     example?: string;
     statusCode: number;
 }
