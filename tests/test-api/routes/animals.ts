@@ -1,5 +1,5 @@
-import { LilPath, LilQueryParam, LilResponse, LilRouteParam } from '../../../src';
-import { AnimalsRequest, Request } from '../dtos/requests';
+import { LilBodyParam, LilPath, LilQueryParam, LilResponse, LilRouteParam } from '../../../src';
+import { AnimalsRequest, Request, AnimalUpdate } from '../dtos/requests';
 import { Router } from './router';
 
 class Animal {
@@ -26,6 +26,17 @@ Router.get("", {}, LilPath(async (request: Request<{ Querystring: { id: LilRoute
     }));
 }, {
     method: 'GET',
+    path: '/animals/{id}',
+    tags: ['Animals'],
+}));
+
+Router.put("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUpdate> }>, reply: any): Promise<void> => {
+    await reply.send(LilResponse(new Animal("Billy", ["tetnis", "rabies"]), {
+        statusCode: 200,
+        description: "A specific animal",
+    }));
+}, {
+    method: 'POST',
     path: '/animals/{id}',
     tags: ['Animals'],
 }));

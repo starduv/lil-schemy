@@ -29,7 +29,9 @@ impl OpenApiFactory {
         let root = module_cache.parse(&file_path);
         self.find_paths(open_api, root.clone(), file_path);
 
-        self.define_immediates(file_path, &root, open_api);
+        while self.deferred_schemas.has_immediate_types(file_path) {
+            self.define_immediates(file_path, &root, open_api);
+        }
     }
 
     pub fn append_deferred_schemas(&mut self, open_api: &mut OpenApi, module_cache: &mut ModuleCache) {
@@ -40,7 +42,9 @@ impl OpenApiFactory {
                 self.define_deferred_schemas(open_api, item, &source_file_name);
             }
 
-            self.define_immediates(&source_file_name, &deferred_root, open_api);
+            while self.deferred_schemas.has_immediate_types(&source_file_name) {
+                self.define_immediates(&source_file_name, &deferred_root, open_api);
+            }
         }
     }
 
@@ -453,7 +457,7 @@ impl OpenApiFactory {
             }
             Some(Declaration::Type { node: node_index }) => {
                 let schema = open_api.components.schema(schema_name);
-
+                
                 if let Some(node) = type_node.get(node_index) {
                     self.define_schema_details(schema, node, file_path);
                 }
@@ -587,6 +591,20 @@ impl OpenApiFactory {
 
     fn define_schema_details(&mut self, root_schema: &mut ApiSchema, root: Rc<SchemyNode>, file_path: &str) -> () {
         match root.kind {
+            NodeKind::TsExprWithTypeArgs(raw_expr) => match &*raw_expr.expr {
+                Expr::Ident(raw_ident) => match self.symbol_tables.get_root_declaration(file_path, &raw_ident.sym) {
+                    Some(Declaration::Import { name, source_file_name }) => {
+                        root_schema.additional_properties(&name);
+                        self.deferred_schemas.add_deferred_type(&source_file_name, &name, &name);
+                    }
+                    _ => {
+                        root_schema.additional_properties(&raw_ident.sym);
+                        self.deferred_schemas
+                            .add_deferred_immediate(file_path, &raw_ident.sym, root.index);
+                    }
+                },
+                _ => {}
+            },
             NodeKind::TsTypeRef(raw_type) => match &raw_type.type_name {
                 TsEntityName::Ident(identifier) => {
                     if identifier.sym.eq("Array") {
@@ -603,14 +621,16 @@ impl OpenApiFactory {
                             }
                         }
                     } else {
-                        let root_name = self
-                            .symbol_tables
-                            .get_root_declaration_name(file_path, identifier.sym.to_string());
-
-                        root_schema.reference(Some(root_name.clone()), false);
-
-                        self.deferred_schemas
-                            .add_deferred_immediate(file_path, &root_name, root.index);
+                        match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
+                            Some(Declaration::Import { name, source_file_name }) => {
+                                root_schema.reference(Some(name.clone()), false);
+                                self.deferred_schemas.add_deferred_type(&source_file_name, &name, &name);
+                            }
+                            _ => {
+                                root_schema.reference(Some(identifier.sym.to_string()), false);
+                                self.deferred_schemas.add_deferred_immediate(file_path, &identifier.sym, root.index);
+                            }
+                        }
                     }
                 }
                 _ => println!("found some strang type ref"),
@@ -707,6 +727,10 @@ impl OpenApiFactory {
             }
             NodeKind::TsInterfaceDecl(_) => {
                 root_schema.data_type("object".into());
+                for extension in root.extends() {
+                    self.define_schema_details(root_schema, extension, file_path);
+                }
+
                 if let Some(interface_body) = root.interface_body() {
                     for interface_member in interface_body.body() {
                         match interface_member.kind {

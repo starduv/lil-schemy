@@ -235,6 +235,7 @@ pub struct ApiSchema {
     properties: Option<HashMap<String, ApiSchema>>,
     required: HashSet<String>,
     enums: Option<Vec<String>>,
+    additional_properties: Option<AllOf>,
 }
 
 impl Serialize for ApiSchema {
@@ -243,6 +244,9 @@ impl Serialize for ApiSchema {
         S: Serializer,
     {
         let mut state = serializer.serialize_struct("ApiSchema", 5)?;
+        if let Some(ref additional) = self.additional_properties {
+            state.serialize_field("additionalProperties", additional)?;
+        }
         if let Some(ref enums) = self.enums {
             state.serialize_field("enum", enums)?;
         }
@@ -277,6 +281,7 @@ impl Serialize for ApiSchema {
 impl ApiSchema {
     pub fn new() -> Self {
         ApiSchema {
+            additional_properties: None,
             format: None,
             data_type: None,
             reference: None,
@@ -286,6 +291,16 @@ impl ApiSchema {
             enums: None,
             required: HashSet::new(),
         }
+    }
+
+    pub fn additional_properties(&mut self, reference: &str) -> () {
+        let mut schema = ApiSchema::new();
+        schema.reference(Some(reference.to_string()), false);
+
+        self.additional_properties
+            .get_or_insert(AllOf { all_of: Vec::new() })
+            .all_of
+            .push(schema);
     }
 
     pub fn data_type(&mut self, data_type: &str) -> &mut ApiSchema {
@@ -394,4 +409,10 @@ impl ResponseOptions {
             status_code: None,
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct AllOf {
+    #[serde(rename = "allOf")]
+    all_of: Vec<ApiSchema>,
 }

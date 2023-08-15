@@ -28,3 +28,16 @@ enum AnimalKind {
     Cat = "cat",
     Bird = "bird"
 }
+
+export interface AnimalUpdate extends Registered {
+    name: string;
+}
+
+interface Registered {
+    serialNumber: string;
+    record: Registration;
+}
+
+interface Registration {
+    date: string;
+}

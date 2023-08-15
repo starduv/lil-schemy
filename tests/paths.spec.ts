@@ -3,7 +3,6 @@ import deepEqual from 'deep-equal-in-any-order';
 import { OpenAPIV3 } from 'openapi-types';
 import { generateSchemas } from '../src/generator';
 import { getRootFiles } from '../src/utils';
-import { writeFile, writeFileSync } from 'fs';
 
 use(deepEqual);
 
@@ -19,8 +18,6 @@ describe('open api generator', () => {
         });
 
         schema = JSON.parse(result.openApi.schema || "");
-
-        writeFileSync("./result.json", result.openApi.schema as string);
     });
 
     it('generates schemas', () => {
@@ -43,6 +40,22 @@ describe('open api generator', () => {
             AnimalKind: {
                 enum: ["cat", "dog", "bird"],
                 type: "string",
+            },
+            AnimalUpdate: {
+                type: "object",
+                additionalProperties: {
+                    allOf: [
+                        {
+                            $ref: "#/components/schemas/Registered",
+                        }
+                    ]
+                },
+                properties: {
+                    name: {
+                        type: "string"
+                    },
+                },
+                required: ["name"]
             },
             User: {
                 type: "object",
@@ -86,6 +99,27 @@ describe('open api generator', () => {
                 },
                 required: ['permissions', 'name']
             },
+            Registered: {
+                type: 'object',
+                properties: {
+                    serialNumber: {
+                        type: 'string'
+                    },
+                    record: {
+                        $ref: '#/components/schemas/Registration'
+                    }
+                },
+                required: ['serialNumber', 'record']
+            },
+            Registration: {
+                type: 'object',
+                properties: {
+                    date: {
+                        type: 'string',
+                    },
+                },
+                required: ['date']
+            }
         });
     });
 
@@ -123,7 +157,7 @@ describe('open api generator', () => {
                             }
                         }
                     ]
-                }
+                },
             },
             "/animals/{id}": {
                 get: {
@@ -153,6 +187,33 @@ describe('open api generator', () => {
                                 },
                             }
                         }
+                    ]
+                },
+                "post": {
+                    requestBody: {
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    $ref: "#/components/schemas/AnimalUpdate"
+                                }
+                            }
+                        },
+                        required: false
+                    },
+                    responses: {
+                        200: {
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/Animal"
+                                    }
+                                }
+                            },
+                            description: "A specific animal"
+                        }
+                    },
+                    tags: [
+                        "Animals"
                     ]
                 }
             },

@@ -3,6 +3,7 @@ use swc_ecma_ast::*;
 
 #[derive(PartialEq)]
 pub enum NodeKind<'m> {
+    TsExprWithTypeArgs(&'m TsExprWithTypeArgs),
     BindingIdent(&'m BindingIdent),
     Constructor(&'m Constructor),
     TsTypeParam(&'m TsTypeParam),
@@ -272,6 +273,7 @@ impl<'n> Clone for NodeKind<'n> {
             NodeKind::DefaultDecl(raw) => NodeKind::DefaultDecl(raw),
             NodeKind::Constructor(raw) => NodeKind::Constructor(raw),
             NodeKind::BindingIdent(raw) => NodeKind::BindingIdent(raw),
+            NodeKind::TsExprWithTypeArgs(raw) => NodeKind::TsExprWithTypeArgs(raw),
         }
     }
 }
@@ -410,7 +412,8 @@ impl<'m> Debug for NodeKind<'m> {
             NodeKind::TsTypeParam(_) => f.debug_tuple("TsTypeParam").finish(),
             NodeKind::DefaultDecl(_) => f.debug_tuple("DefaultDecl").finish(),
             NodeKind::Constructor(_) => f.debug_tuple("Constructor").finish(),
-            NodeKind::BindingIdent(_) => f.debug_tuple("BindingIdent").finish()
+            NodeKind::BindingIdent(_) => f.debug_tuple("BindingIdent").finish(),
+            NodeKind::TsExprWithTypeArgs(_) => f.debug_tuple("TsExprWithTypeArgs").finish()
         }
     }
 }

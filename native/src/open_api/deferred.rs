@@ -64,6 +64,13 @@ impl DeferredSchemas {
         }
     }
 
+    pub fn has_immediate_types(&self, file_path: &str) -> bool {
+        match self.immediate_types.get(file_path) {
+            Some(immediate_types) => immediate_types.len() > 0,
+            None => false,
+        }
+    }
+
     pub fn take_deferred_operation_type(
         &mut self,
         type_name: &str,

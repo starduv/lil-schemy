@@ -154,6 +154,27 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
+    pub fn extends(&self) -> Vec<Rc<SchemyNode<'m>>> {
+        let mut borrow = self.context.borrow_mut();
+        match self.kind {
+            NodeKind::TsInterfaceDecl(raw_decl) => raw_decl
+            .extends
+            .iter()
+            .map(|raw_extend| {
+                let child_index = borrow.nodes.len();
+                borrow.nodes.push(Rc::new(SchemyNode {
+                    index: child_index,
+                    parent_index: Some(self.index),
+                    kind: NodeKind::TsExprWithTypeArgs(raw_extend),
+                    context: self.context.clone(),
+                }));
+                borrow.nodes.get(child_index).map(|n| n.clone()).unwrap()
+            })
+            .collect(),
+            _ => vec![]
+        }
+    }
+
     pub fn get_context(&self) -> Rc<RefCell<Context<'m>>> {
         self.context.clone()
     }
@@ -321,7 +342,7 @@ impl<'m> SchemyNode<'m> {
                                                 context: self.context.clone(),
                                             }));
                                             props.push(borrow.nodes.get(class_index).map(|n| n.clone()).unwrap());
-                                        },
+                                        }
                                         _ => {}
                                     },
                                     _ => {}
@@ -356,18 +377,20 @@ impl<'m> SchemyNode<'m> {
 
     pub fn type_ann(&self) -> Option<Rc<SchemyNode<'m>>> {
         match self.kind {
-            NodeKind::BindingIdent(raw_ident) => if let Some(raw_ann) = &raw_ident.type_ann {
-                let mut borrow = self.context.borrow_mut();
-                let class_index = borrow.nodes.len();
-                borrow.nodes.push(Rc::new(SchemyNode {
-                    index: class_index,
-                    parent_index: Some(self.index),
-                    kind: NodeKind::TsTypeAnnotation(&raw_ann),
-                    context: self.context.clone(),
-                }));
-                borrow.nodes.get(class_index).map(|n| n.clone())
-            } else {
-                None
+            NodeKind::BindingIdent(raw_ident) => {
+                if let Some(raw_ann) = &raw_ident.type_ann {
+                    let mut borrow = self.context.borrow_mut();
+                    let class_index = borrow.nodes.len();
+                    borrow.nodes.push(Rc::new(SchemyNode {
+                        index: class_index,
+                        parent_index: Some(self.index),
+                        kind: NodeKind::TsTypeAnnotation(&raw_ann),
+                        context: self.context.clone(),
+                    }));
+                    borrow.nodes.get(class_index).map(|n| n.clone())
+                } else {
+                    None
+                }
             }
             NodeKind::TsTypeAliasDecl(raw_decl) => {
                 let mut borrow = self.context.borrow_mut();
