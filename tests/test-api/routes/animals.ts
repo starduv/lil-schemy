@@ -3,7 +3,7 @@ import { AnimalsRequest, Request } from '../dtos/requests';
 import { Router } from './router';
 
 class Animal {
-    constructor(public name: string) { }
+    constructor(public name: string, public shots: string[]) { }
 }
 
 export default Router.get("", {}, LilPath(async (request: Request<AnimalsRequest>, reply: any): Promise<void> => {
@@ -20,15 +20,12 @@ export default Router.get("", {}, LilPath(async (request: Request<AnimalsRequest
 }));
 
 Router.get("", {}, LilPath(async (request: Request<{ Querystring: { id: LilRouteParam<number> } }>, reply: any): Promise<void> => {
-    let response = LilResponse(new Animal("Billy"), {
+    await reply.send(LilResponse(new Animal("Billy", ["tetnis", "rabies"]), {
         statusCode: 200,
         description: "A specific animal",
-    });
-
-    reply.send(response);
+    }));
 }, {
     method: 'GET',
     path: '/animals/{id}',
     tags: ['Animals'],
 }));
-

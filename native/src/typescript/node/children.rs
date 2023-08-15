@@ -8,6 +8,7 @@ impl<'n> SchemyNode<'n> {
     pub fn children(&self) -> Vec<usize> {
         let mut children = vec![];
         match self.kind {
+            NodeKind::AwaitExpr(raw_await) => self.get_await_expr_children(raw_await, &mut children),
             NodeKind::ArrowExpr(arrow) => self.get_arrow_expr_children(arrow, &mut children),
             NodeKind::BlockStmt(raw) => self.get_block_statement_children(raw, &mut children),
             NodeKind::BlockStmtOrExpr(temp) => match temp {
@@ -42,7 +43,9 @@ impl<'n> SchemyNode<'n> {
             NodeKind::TsTypeElement(raw) => self.get_ts_type_element_children(raw, &mut children),
             NodeKind::TsTypeLit(raw) => self.get_type_lit_children(raw, &mut children),
             NodeKind::TsTypeParam(raw) => self.get_ts_type_param(raw, &mut children),
-            NodeKind::TsTypeParamInstantiation(raw) => self.get_ts_type_param_instantiation_children(raw, &mut children),
+            NodeKind::TsTypeParamInstantiation(raw) => {
+                self.get_ts_type_param_instantiation_children(raw, &mut children)
+            }
             NodeKind::TsTypeRef(raw) => self.get_ts_type_ref_children(raw, &mut children),
             NodeKind::VarDecl(raw) => self.get_var_decl_children(raw, &mut children),
             NodeKind::VarDeclarator(raw) => self.get_var_declarator_children(raw, &mut children),
@@ -51,13 +54,21 @@ impl<'n> SchemyNode<'n> {
         children
     }
 
-    fn get_ts_type_param_instantiation_children(&self, type_params: &'n TsTypeParamInstantiation, children: &mut Vec<usize>) {
+    fn get_await_expr_children(&self, raw_await: &'n AwaitExpr, children: &mut Vec<usize>) {
+        self.get_expr_children(&*raw_await.arg, children);
+    }
+
+    fn get_ts_type_param_instantiation_children(
+        &self,
+        type_params: &'n TsTypeParamInstantiation,
+        children: &mut Vec<usize>,
+    ) {
         for param in &type_params.params {
             self.get_ts_type_children(param, children);
         }
     }
 
-    fn get_ts_type_param(&self, type_param: &'n TsTypeParam, children: &mut Vec<usize>){
+    fn get_ts_type_param(&self, type_param: &'n TsTypeParam, children: &mut Vec<usize>) {
         if let Some(constraint) = &type_param.constraint {
             self.get_ts_type_children(constraint, children);
         }

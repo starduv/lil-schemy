@@ -30,9 +30,15 @@ describe('open api generator', () => {
                 properties: {
                     name: {
                         type: "string"
+                    },
+                    shots: {
+                        type: "array",
+                        items: {
+                            type: "string"
+                        }
                     }
                 },
-                required: ["name"]
+                required: ["name", "shots"]
             },
             AnimalKind: {
                 enum: ["cat", "dog", "bird"],
