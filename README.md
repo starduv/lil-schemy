@@ -27,6 +27,23 @@ getDriverRoutes = async (): Promise<[string, boolean, Array<number>]> => {
 const response = LilResponse(await getDriverRoutes())
 ```
 
+__Omit and Pick are ignored.__
+```TS
+interface Mammal {
+    furLength: number,
+    milkTemperature: number
+}
+
+interface Terran {
+    litterRate: number,
+    isDomesticable: boolean
+}
+
+interface Human extends Omit<Mammal, "furLength">, Pick<Terran, "litterRate"> {
+    language: string
+}
+```
+
 ## [LICENSE](LICENSE)
 
 [Node addon]:(https://github.com/neon-bindings/neon)

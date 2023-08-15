@@ -29,7 +29,7 @@ enum AnimalKind {
     Bird = "bird"
 }
 
-export interface AnimalUpdate extends Registered {
+export interface AnimalUpdate extends Omit<Registered, "serialNumber"> {
     name: string;
 }
 
