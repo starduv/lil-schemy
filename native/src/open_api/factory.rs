@@ -594,10 +594,10 @@ impl OpenApiFactory {
             NodeKind::TsExprWithTypeArgs(raw_expr) => match &*raw_expr.expr {
                 Expr::Ident(raw_ident) => {
                     if raw_ident.sym.eq("Omit") || raw_ident.sym.eq("Pick") {
-                        for param in  root.params() {
-                            let schema = root_schema.additional_properties();
-                            self.define_schema_details(schema, param, file_path);
-                        }
+                        let params = root.params();
+                        let param = params.first().unwrap();
+                        let schema = root_schema.additional_properties();
+                        self.define_schema_details(schema, param.clone(), file_path);
                     } else {
                         match self.symbol_tables.get_root_declaration(file_path, &raw_ident.sym) {
                             Some(Declaration::Import { name, source_file_name }) => {
