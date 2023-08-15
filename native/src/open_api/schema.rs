@@ -1,4 +1,4 @@
-use std::{rc::Rc, cell::RefCell};
+use std::{cell::RefCell, rc::Rc};
 
 use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
@@ -293,14 +293,12 @@ impl ApiSchema {
         }
     }
 
-    pub fn additional_properties(&mut self, reference: &str) -> () {
-        let mut schema = ApiSchema::new();
-        schema.reference(Some(reference.to_string()), false);
+    pub fn additional_properties(&mut self) -> &mut ApiSchema {
+        let properties = self.additional_properties.get_or_insert(AllOf { all_of: Vec::new() });
 
-        self.additional_properties
-            .get_or_insert(AllOf { all_of: Vec::new() })
-            .all_of
-            .push(schema);
+        properties.all_of.push(ApiSchema::new());
+
+        properties.all_of.last_mut().unwrap()
     }
 
     pub fn data_type(&mut self, data_type: &str) -> &mut ApiSchema {

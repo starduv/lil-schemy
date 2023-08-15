@@ -592,15 +592,25 @@ impl OpenApiFactory {
     fn define_schema_details(&mut self, root_schema: &mut ApiSchema, root: Rc<SchemyNode>, file_path: &str) -> () {
         match root.kind {
             NodeKind::TsExprWithTypeArgs(raw_expr) => match &*raw_expr.expr {
-                Expr::Ident(raw_ident) => match self.symbol_tables.get_root_declaration(file_path, &raw_ident.sym) {
-                    Some(Declaration::Import { name, source_file_name }) => {
-                        root_schema.additional_properties(&name);
-                        self.deferred_schemas.add_deferred_type(&source_file_name, &name, &name);
-                    }
-                    _ => {
-                        root_schema.additional_properties(&raw_ident.sym);
-                        self.deferred_schemas
-                            .add_deferred_immediate(file_path, &raw_ident.sym, root.index);
+                Expr::Ident(raw_ident) => {
+                    if raw_ident.sym.eq("Omit") || raw_ident.sym.eq("Pick") {
+                        for param in  root.params() {
+                            let schema = root_schema.additional_properties();
+                            self.define_schema_details(schema, param, file_path);
+                        }
+                    } else {
+                        match self.symbol_tables.get_root_declaration(file_path, &raw_ident.sym) {
+                            Some(Declaration::Import { name, source_file_name }) => {
+                                self.deferred_schemas.add_deferred_type(&source_file_name, &name, &name);
+                                let schema = root_schema.additional_properties();
+                                schema.reference(Some(name), false);
+                            }
+                            _ => {
+                                self.deferred_schemas.add_deferred_immediate(file_path, &raw_ident.sym, root.index);
+                                let schema = root_schema.additional_properties();
+                                schema.reference(Some(raw_ident.sym.to_string()), false);
+                            }
+                        }
                     }
                 },
                 _ => {}
@@ -627,6 +637,7 @@ impl OpenApiFactory {
                                 self.deferred_schemas.add_deferred_type(&source_file_name, &name, &name);
                             }
                             _ => {
+                                println!("didn't find {} so deferring", identifier.sym);
                                 root_schema.reference(Some(identifier.sym.to_string()), false);
                                 self.deferred_schemas.add_deferred_immediate(file_path, &identifier.sym, root.index);
                             }

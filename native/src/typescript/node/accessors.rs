@@ -255,6 +255,27 @@ impl<'m> SchemyNode<'m> {
 
     pub fn params(&self) -> Vec<Rc<SchemyNode<'m>>> {
         match self.kind {
+            NodeKind::TsExprWithTypeArgs(raw_expr) => {
+                if let Some(raw_args) = &raw_expr.type_args {
+                    let mut borrow = self.context.borrow_mut();
+                    raw_args
+                        .params
+                        .iter()
+                        .map(|param| {
+                            let params_index = borrow.nodes.len();
+                            borrow.nodes.push(Rc::new(SchemyNode {
+                                index: params_index,
+                                parent_index: Some(self.index),
+                                kind: NodeKind::TsType(&*param),
+                                context: self.context.clone(),
+                            }));
+                            borrow.nodes.get(params_index).map(|n| n.clone()).unwrap()
+                        })
+                        .collect()
+                } else {
+                    vec![]
+                }
+            }
             NodeKind::TsTypeRef(raw_ref) => {
                 let mut params = vec![];
                 if let Some(raw_params) = &raw_ref.type_params {
