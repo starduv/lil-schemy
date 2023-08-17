@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{any, cell::RefCell, rc::Rc, vec};
 
 use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
@@ -227,15 +227,17 @@ impl ApiConent {
 
 #[derive(Clone, Debug)]
 pub struct ApiSchema {
-    items: Option<Box<ApiSchema>>,
-    format: Option<String>,
-    data_type: Option<String>,
-    reference: Option<String>,
-    is_example: bool,
-    properties: Option<HashMap<String, ApiSchema>>,
-    required: HashSet<String>,
-    enums: Option<Vec<String>>,
+    any_of: Option<Vec<ApiSchema>>,
+    all_of: Option<Vec<ApiSchema>>,
     additional_properties: Option<AllOf>,
+    data_type: Option<String>,
+    enums: Option<Vec<String>>,
+    format: Option<String>,
+    is_example: bool,
+    items: Option<Box<ApiSchema>>,
+    properties: Option<HashMap<String, ApiSchema>>,
+    reference: Option<String>,
+    required: HashSet<String>,
 }
 
 impl Serialize for ApiSchema {
@@ -244,6 +246,15 @@ impl Serialize for ApiSchema {
         S: Serializer,
     {
         let mut state = serializer.serialize_struct("ApiSchema", 5)?;
+
+        if let Some(ref any_of) = self.any_of {
+            state.serialize_field("anyOf", any_of)?;
+        }
+
+        if let Some(ref all_of) = self.all_of {
+            state.serialize_field("allOf", all_of)?;
+        }
+
         if let Some(ref additional) = self.additional_properties {
             state.serialize_field("additionalProperties", additional)?;
         }
@@ -282,13 +293,16 @@ impl ApiSchema {
     pub fn new() -> Self {
         ApiSchema {
             additional_properties: None,
-            format: None,
+            any_of: None,
+            all_of: None,
             data_type: None,
-            reference: None,
+            enums: None,
+            format: None,
             is_example: false,
             items: None,
+            // nullable: true,
             properties: None,
-            enums: None,
+            reference: None,
             required: HashSet::new(),
         }
     }
@@ -307,7 +321,6 @@ impl ApiSchema {
     }
 
     pub fn format(&mut self, format: Option<String>) -> &mut ApiSchema {
-        // TODO add format tests
         self.format = format;
         self
     }
@@ -338,6 +351,27 @@ impl ApiSchema {
 
     pub(crate) fn enum_value(&mut self, value: &str) {
         self.enums.get_or_insert(Vec::new()).push(value.to_string());
+    }
+
+    pub(crate) fn any_of(&mut self) -> &mut Vec<ApiSchema> {
+        self.any_of.insert(vec![])
+    }
+
+    pub(crate) fn all_of(&mut self) -> &mut Vec<ApiSchema> {
+        self.any_of.insert(vec![])
+    }
+
+    fn append_enums(&mut self, enums: &Vec<String>) -> &mut ApiSchema {
+        self.enums.get_or_insert(Vec::new()).extend(enums.iter().cloned());
+        self
+    }
+
+    pub(crate) fn has_enums(&self) -> bool {
+        if let Some(enums) = &self.enums {
+            enums.len() > 0
+        } else {
+            false
+        }
     }
 }
 
@@ -414,3 +448,5 @@ pub struct AllOf {
     #[serde(rename = "allOf")]
     all_of: Vec<ApiSchema>,
 }
+
+fn get_merged_schemas(root: &mut ApiSchema) -> () {}

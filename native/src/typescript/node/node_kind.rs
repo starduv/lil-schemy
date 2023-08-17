@@ -136,6 +136,9 @@ pub enum NodeKind<'m> {
     BigInt(&'m BigInt),
     Regex(&'m Regex),
     DefaultDecl(&'m DefaultDecl),
+    TsUnionType(&'m TsUnionType),
+    TsIntersectionType(&'m TsIntersectionType),
+    TsTplLit(&'m TsTplLitType),
 }
 
 impl<'n> Clone for NodeKind<'n> {
@@ -274,6 +277,9 @@ impl<'n> Clone for NodeKind<'n> {
             NodeKind::Constructor(raw) => NodeKind::Constructor(raw),
             NodeKind::BindingIdent(raw) => NodeKind::BindingIdent(raw),
             NodeKind::TsExprWithTypeArgs(raw) => NodeKind::TsExprWithTypeArgs(raw),
+            NodeKind::TsUnionType(raw) => NodeKind::TsUnionType(raw),
+            NodeKind::TsIntersectionType(raw) => NodeKind::TsIntersectionType(raw),
+            NodeKind::TsTplLit(raw) => NodeKind::TsTplLit(raw),
         }
     }
 }
@@ -413,7 +419,10 @@ impl<'m> Debug for NodeKind<'m> {
             NodeKind::DefaultDecl(_) => f.debug_tuple("DefaultDecl").finish(),
             NodeKind::Constructor(_) => f.debug_tuple("Constructor").finish(),
             NodeKind::BindingIdent(_) => f.debug_tuple("BindingIdent").finish(),
-            NodeKind::TsExprWithTypeArgs(_) => f.debug_tuple("TsExprWithTypeArgs").finish()
+            NodeKind::TsExprWithTypeArgs(_) => f.debug_tuple("TsExprWithTypeArgs").finish(),
+            NodeKind::TsUnionType(_) => f.debug_tuple("TsUnionType").finish(),
+            NodeKind::TsIntersectionType(_) => f.debug_tuple("TsIntersectionType").finish(),
+            NodeKind::TsTplLit(_) => f.debug_tuple("TsTplLit").finish(),
         }
     }
 }

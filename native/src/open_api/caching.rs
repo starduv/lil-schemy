@@ -10,9 +10,6 @@ pub(in crate::open_api) fn store_declaration_maybe(
     file_path: &str,
     symbol_tables: &mut DeclarationTables,
 ) -> () {
-    // if file_path.contains("routes/requests") {
-    //     println!("I may cache {:?}", root.kind);
-    // }
     match root.kind {
         NodeKind::ModuleItem(_) => {
             for child_item in root.children() {

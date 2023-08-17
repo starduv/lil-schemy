@@ -29,8 +29,11 @@ enum AnimalKind {
     Bird = "bird"
 }
 
+type AnimalMood = "happy" | "sad" | "angry" | { ambivalence: number };
+
 export interface AnimalUpdate extends Omit<Registered, "serialNumber"> {
     name: string;
+    mood: AnimalMood;
 }
 
 interface Registered {

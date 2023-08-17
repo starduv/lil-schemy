@@ -41,6 +41,25 @@ describe('open api generator', () => {
                 enum: ["cat", "dog", "bird"],
                 type: "string",
             },
+            AnimalMood: {
+                anyOf: [
+                    {
+                        enum: [
+                            "happy",
+                            "sad",
+                            "angry"
+                        ]
+                    },
+                    {
+                        type: 'object',
+                        properties: {
+                            ambivalence: {
+                                type: "number"
+                            }
+                        },
+                    }
+                ]
+            },
             AnimalUpdate: {
                 type: "object",
                 additionalProperties: {
@@ -51,11 +70,14 @@ describe('open api generator', () => {
                     ]
                 },
                 properties: {
+                    mood: {
+                        $ref: "#/components/schemas/AnimalMood"
+                    },
                     name: {
                         type: "string"
                     },
                 },
-                required: ["name"]
+                required: ["mood", "name"]
             },
             User: {
                 type: "object",
@@ -206,6 +228,35 @@ describe('open api generator', () => {
                                 "application/json": {
                                     schema: {
                                         $ref: "#/components/schemas/Animal"
+                                    }
+                                }
+                            },
+                            description: "A specific animal"
+                        }
+                    },
+                    tags: [
+                        "Animals"
+                    ]
+                }
+            },
+            "/animals/{id}/unregister": {
+                post: {
+                    requestBody: {
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    "$ref": "#/components/schemas/AnimalUpdate"
+                                }
+                            }
+                        },
+                        required: false
+                    },
+                    responses: {
+                        200: {
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        "$ref": "#/components/schemas/Animal"
                                     }
                                 }
                             },

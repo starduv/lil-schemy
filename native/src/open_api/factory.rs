@@ -457,7 +457,7 @@ impl OpenApiFactory {
             }
             Some(Declaration::Type { node: node_index }) => {
                 let schema = open_api.components.schema(schema_name);
-                
+
                 if let Some(node) = type_node.get(node_index) {
                     self.define_schema_details(schema, node, file_path);
                 }
@@ -491,7 +491,6 @@ impl OpenApiFactory {
                 }
                 Decl::TsEnum(ref raw_alias) => {
                     let root = root.to_child(NodeKind::TsEnumDecl(raw_alias));
-                    println!("found an enum: {}", raw_alias.id.sym);
                     self.define_deferred_type_maybe(&root, open_api, &raw_alias.id.sym, source_file_name)
                 }
                 _ => {}
@@ -591,6 +590,74 @@ impl OpenApiFactory {
 
     fn define_schema_details(&mut self, root_schema: &mut ApiSchema, root: Rc<SchemyNode>, file_path: &str) -> () {
         match root.kind {
+            NodeKind::TsUnionOrIntersectionType(_) => {
+                for child in root.children() {
+                    let child = root.get(child).unwrap();
+                    self.define_schema_details(root_schema, child, file_path);
+                }
+            }
+            NodeKind::TsUnionType(_) => {
+                let any_of = root_schema.any_of();
+                let mut enum_schema = ApiSchema::new();
+                for child in root.children() {
+                    let child = root.get(child).unwrap();
+                    match child.kind {
+                        NodeKind::TsLitType(raw) => match &raw.lit {
+                            TsLit::Number(raw_num) => enum_schema.enum_value(&format!("{}", &raw_num.value)),
+                            TsLit::Str(raw_str) => enum_schema.enum_value(&format!("{}", &raw_str.value)),
+                            TsLit::Bool(raw_bool) => enum_schema.enum_value(&format!("{}", &raw_bool.value)),
+                            TsLit::BigInt(raw_int) => enum_schema.enum_value(&format!("{}", &raw_int.value)),
+                            _ => {}
+                        },
+                        NodeKind::TsTypeLit(_) => {
+                            let mut schema = ApiSchema::new();
+                            self.define_schema_details(&mut schema, child, file_path);
+                            any_of.push(schema);
+                        }
+                        NodeKind::Ident(_) => {
+                            let mut schema = ApiSchema::new();
+                            self.define_schema_details(&mut schema, child, file_path);
+                            any_of.push(schema);
+                        }
+                        _ => {}
+                    }
+                }
+
+                if enum_schema.has_enums() {
+                    any_of.push(enum_schema);
+                }
+            }
+            NodeKind::TsIntersectionType(_) => {
+                let all_of = root_schema.all_of();
+                let mut enum_schema = ApiSchema::new();
+                for child in root.children() {
+                    let child = root.get(child).unwrap();
+                    match child.kind {
+                        NodeKind::TsLitType(raw) => match &raw.lit {
+                            TsLit::Number(raw_num) => enum_schema.enum_value(&format!("{}", &raw_num.value)),
+                            TsLit::Str(raw_str) => enum_schema.enum_value(&format!("{}", &raw_str.value)),
+                            TsLit::Bool(raw_bool) => enum_schema.enum_value(&format!("{}", &raw_bool.value)),
+                            TsLit::BigInt(raw_int) => enum_schema.enum_value(&format!("{}", &raw_int.value)),
+                            _ => {}
+                        },
+                        NodeKind::TsTypeLit(_) => {
+                            let mut schema = ApiSchema::new();
+                            self.define_schema_details(&mut schema, child, file_path);
+                            all_of.push(schema);
+                        }
+                        NodeKind::Ident(_) => {
+                            let mut schema = ApiSchema::new();
+                            self.define_schema_details(&mut schema, child, file_path);
+                            all_of.push(schema);
+                        }
+                        _ => {}
+                    }
+                }
+
+                if enum_schema.has_enums() {
+                    all_of.push(enum_schema);
+                }
+            }
             NodeKind::TsExprWithTypeArgs(raw_expr) => match &*raw_expr.expr {
                 Expr::Ident(raw_ident) => {
                     if raw_ident.sym.eq("Omit") || raw_ident.sym.eq("Pick") {
@@ -606,13 +673,14 @@ impl OpenApiFactory {
                                 schema.reference(Some(name), false);
                             }
                             _ => {
-                                self.deferred_schemas.add_deferred_immediate(file_path, &raw_ident.sym, root.index);
+                                self.deferred_schemas
+                                    .add_deferred_immediate(file_path, &raw_ident.sym, root.index);
                                 let schema = root_schema.additional_properties();
                                 schema.reference(Some(raw_ident.sym.to_string()), false);
                             }
                         }
                     }
-                },
+                }
                 _ => {}
             },
             NodeKind::TsTypeRef(raw_type) => match &raw_type.type_name {
@@ -637,9 +705,9 @@ impl OpenApiFactory {
                                 self.deferred_schemas.add_deferred_type(&source_file_name, &name, &name);
                             }
                             _ => {
-                                println!("didn't find {} so deferring", identifier.sym);
                                 root_schema.reference(Some(identifier.sym.to_string()), false);
-                                self.deferred_schemas.add_deferred_immediate(file_path, &identifier.sym, root.index);
+                                self.deferred_schemas
+                                    .add_deferred_immediate(file_path, &identifier.sym, root.index);
                             }
                         }
                     }
