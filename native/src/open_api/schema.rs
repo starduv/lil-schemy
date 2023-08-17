@@ -332,8 +332,6 @@ impl ApiSchema {
     }
 
     pub fn property(&mut self, name_text: &str) -> &mut ApiSchema {
-        self.required.insert(name_text.to_string());
-
         self.properties
             .get_or_insert(HashMap::new())
             .entry(name_text.to_string())
