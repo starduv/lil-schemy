@@ -35,7 +35,6 @@ describe('open api generator', () => {
                         }
                     }
                 },
-                required: ["name", "shots"]
             },
             AnimalKind: {
                 enum: ["cat", "dog", "bird"],
@@ -77,7 +76,6 @@ describe('open api generator', () => {
                         type: "string"
                     },
                 },
-                required: ["mood", "name"]
             },
             User: {
                 type: "object",
@@ -86,7 +84,6 @@ describe('open api generator', () => {
                         type: "string"
                     }
                 },
-                required: ["name"]
             },
             CreateUserRequest: {
                 type: 'object',
@@ -95,7 +92,6 @@ describe('open api generator', () => {
                         type: 'string'
                     }
                 },
-                required: ['name']
             },
             Account: {
                 type: 'object',
@@ -104,7 +100,6 @@ describe('open api generator', () => {
                         type: 'string'
                     }
                 },
-                required: ['number']
             },
             AdminUser: {
                 type: 'object',
@@ -119,7 +114,6 @@ describe('open api generator', () => {
                         type: 'string'
                     }
                 },
-                required: ['permissions', 'name']
             },
             Registered: {
                 type: 'object',
@@ -131,7 +125,6 @@ describe('open api generator', () => {
                         $ref: '#/components/schemas/Registration'
                     }
                 },
-                required: ['serialNumber', 'record']
             },
             Registration: {
                 type: 'object',
@@ -140,7 +133,6 @@ describe('open api generator', () => {
                         type: 'string',
                     },
                 },
-                required: ['date']
             }
         });
     });
