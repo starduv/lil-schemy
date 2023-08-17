@@ -1,9 +1,9 @@
-import { LilBodyParam, LilPath, LilQueryParam, LilResponse, LilRouteParam } from '../../../src';
+import { LilBodyParam, LilPath, LilRequiredField, LilResponse, LilRouteParam } from '../../../src';
 import { AnimalsRequest, Request, AnimalUpdate } from '../dtos/requests';
 import { Router } from './router';
 
 class Animal {
-    constructor(public name: string, public shots: string[]) { }
+    constructor(public name: LilRequiredField<string>, public shots: string[]) { }
 }
 
 export default Router.get("", {}, LilPath(async (request: Request<AnimalsRequest>, reply: any): Promise<void> => {

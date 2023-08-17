@@ -48,3 +48,4 @@ export type LilBodyParam<Param, Required extends boolean = true> = Param;
 export type LilHeader<Param, Required extends boolean = true, Format extends F = undefined> = Param;
 export type LilQueryParam<Param, Required extends boolean = false, Format extends F = undefined> = Param;
 export type LilRouteParam<Param, Required extends true = true, Format extends F = undefined> = Param;
+export type LilRequiredField<Param> = Param;

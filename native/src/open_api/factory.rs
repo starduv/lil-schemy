@@ -165,7 +165,7 @@ impl OpenApiFactory {
         let type_params = root.params();
         if let Some(type_param) = type_params.get(0) {
             let param_schema = operation_param.content().schema();
-            self.define_schema_details(param_schema, type_param.clone(), file_path);
+            self.define_schema_details(param_schema, type_param.clone(), file_path, false);
         }
 
         match type_params.get(1) {
@@ -276,7 +276,7 @@ impl OpenApiFactory {
                             NodeKind::TsTypeParamInstantiation(raw) => {
                                 if let Some(type_param) = raw.params.get(0) {
                                     let type_param = type_params.to_child(NodeKind::TsType(type_param));
-                                    self.define_schema_details(items_schema, type_param, file_path);
+                                    self.define_schema_details(items_schema, type_param, file_path, true);
                                 }
                             }
                             _ => {}
@@ -459,7 +459,7 @@ impl OpenApiFactory {
                 let schema = open_api.components.schema(schema_name);
 
                 if let Some(node) = type_node.get(node_index) {
-                    self.define_schema_details(schema, node, file_path);
+                    self.define_schema_details(schema, node, file_path, false);
                 }
             }
             _ => {}
@@ -574,7 +574,7 @@ impl OpenApiFactory {
 
                     let node = root.get(node).unwrap();
 
-                    self.define_schema_details(schema, node, source_file_name);
+                    self.define_schema_details(schema, node, source_file_name, false);
                 }
                 Some(Declaration::Import {
                     name: imported_name,
@@ -588,12 +588,18 @@ impl OpenApiFactory {
         }
     }
 
-    fn define_schema_details(&mut self, root_schema: &mut ApiSchema, root: Rc<SchemyNode>, file_path: &str) -> () {
+    fn define_schema_details(
+        &mut self,
+        root_schema: &mut ApiSchema,
+        root: Rc<SchemyNode>,
+        file_path: &str,
+        is_required: bool,
+    ) -> () {
         match root.kind {
             NodeKind::TsUnionOrIntersectionType(_) => {
                 for child in root.children() {
                     let child = root.get(child).unwrap();
-                    self.define_schema_details(root_schema, child, file_path);
+                    self.define_schema_details(root_schema, child, file_path, is_required);
                 }
             }
             NodeKind::TsUnionType(_) => {
@@ -611,12 +617,12 @@ impl OpenApiFactory {
                         },
                         NodeKind::TsTypeLit(_) => {
                             let mut schema = ApiSchema::new();
-                            self.define_schema_details(&mut schema, child, file_path);
+                            self.define_schema_details(&mut schema, child, file_path, is_required);
                             any_of.push(schema);
                         }
                         NodeKind::Ident(_) => {
                             let mut schema = ApiSchema::new();
-                            self.define_schema_details(&mut schema, child, file_path);
+                            self.define_schema_details(&mut schema, child, file_path, is_required);
                             any_of.push(schema);
                         }
                         _ => {}
@@ -642,12 +648,12 @@ impl OpenApiFactory {
                         },
                         NodeKind::TsTypeLit(_) => {
                             let mut schema = ApiSchema::new();
-                            self.define_schema_details(&mut schema, child, file_path);
+                            self.define_schema_details(&mut schema, child, file_path, is_required);
                             all_of.push(schema);
                         }
                         NodeKind::Ident(_) => {
                             let mut schema = ApiSchema::new();
-                            self.define_schema_details(&mut schema, child, file_path);
+                            self.define_schema_details(&mut schema, child, file_path, is_required);
                             all_of.push(schema);
                         }
                         _ => {}
@@ -664,7 +670,7 @@ impl OpenApiFactory {
                         let params = root.params();
                         let param = params.first().unwrap();
                         let schema = root_schema.additional_properties();
-                        self.define_schema_details(schema, param.clone(), file_path);
+                        self.define_schema_details(schema, param.clone(), file_path, is_required);
                     } else {
                         match self.symbol_tables.get_root_declaration(file_path, &raw_ident.sym) {
                             Some(Declaration::Import { name, source_file_name }) => {
@@ -685,14 +691,18 @@ impl OpenApiFactory {
             },
             NodeKind::TsTypeRef(raw_type) => match &raw_type.type_name {
                 TsEntityName::Ident(identifier) => {
-                    if identifier.sym.eq("Array") {
+                    if identifier.sym.eq("LilRequiredField") {
+                        let params = root.params();
+                        let param = params.first().unwrap();
+                        self.define_schema_details(root_schema, param.clone(), file_path, true);
+                    } else if identifier.sym.eq("Array") {
                         let items_schema = root_schema.data_type("array").items();
                         if let Some(type_params) = root.type_params() {
                             match type_params.kind {
                                 NodeKind::TsTypeParamInstantiation(raw) => {
                                     if let Some(type_param) = raw.params.get(0) {
                                         let type_param = type_params.to_child(NodeKind::TsType(type_param));
-                                        self.define_schema_details(items_schema, type_param, file_path);
+                                        self.define_schema_details(items_schema, type_param, file_path, is_required);
                                     }
                                 }
                                 _ => {}
@@ -717,7 +727,7 @@ impl OpenApiFactory {
             NodeKind::TsTypeAnnotation(_) => {
                 for child_index in root.children() {
                     let child = root.get(child_index).unwrap();
-                    self.define_schema_details(root_schema, child, file_path);
+                    self.define_schema_details(root_schema, child, file_path, is_required);
                 }
             }
             NodeKind::TsKeywordType(raw) => match raw.kind {
@@ -751,20 +761,34 @@ impl OpenApiFactory {
 
                                 if let Some(name) = name {
                                     if let Some(annotation) = property.type_ann() {
+                                        let property_schema = root_schema.property(&name);
+
+                                        if is_required {
+                                            property_schema.required_field(&name);
+                                        }
+
                                         self.define_schema_details(
-                                            root_schema.property(&name),
+                                            property_schema,
                                             annotation.clone(),
                                             file_path,
+                                            is_required,
                                         );
                                     }
                                 }
                             }
                             NodeKind::BindingIdent(raw_ident) => {
                                 if let Some(annotation) = property.type_ann() {
+                                    let property_schema = root_schema.property(&raw_ident.sym.to_string());
+
+                                    if is_required {
+                                        property_schema.required_field(&raw_ident.sym);
+                                    }
+
                                     self.define_schema_details(
-                                        root_schema.property(&raw_ident.sym),
+                                        property_schema,
                                         annotation.clone(),
                                         file_path,
+                                        is_required,
                                     );
                                 }
                             }
@@ -786,10 +810,17 @@ impl OpenApiFactory {
 
                                 if let Some(name) = name {
                                     if let Some(annotation) = class_member.type_ann() {
+                                        let property_schema = root_schema.property(&name);
+
+                                        if is_required {
+                                            property_schema.required_field(&name);
+                                        }
+
                                         self.define_schema_details(
-                                            root_schema.property(&name),
+                                            property_schema,
                                             annotation.clone(),
                                             file_path,
+                                            is_required,
                                         );
                                     }
                                 }
@@ -802,12 +833,12 @@ impl OpenApiFactory {
             NodeKind::TsArrayType(_) => {
                 root_schema.data_type("array".into());
                 let elem_type = root.elem_type().unwrap();
-                self.define_schema_details(root_schema.items(), elem_type.clone(), file_path);
+                self.define_schema_details(root_schema.items(), elem_type.clone(), file_path, is_required);
             }
             NodeKind::TsInterfaceDecl(_) => {
                 root_schema.data_type("object".into());
                 for extension in root.extends() {
-                    self.define_schema_details(root_schema, extension, file_path);
+                    self.define_schema_details(root_schema, extension, file_path, is_required);
                 }
 
                 if let Some(interface_body) = root.interface_body() {
@@ -817,14 +848,25 @@ impl OpenApiFactory {
                                 let property_schema = match &*raw_prop.key {
                                     Expr::Ident(identifier) => {
                                         let name = identifier.sym.to_string();
-                                        Some(root_schema.property(&name))
+                                        let property_schema = root_schema.property(&name);
+
+                                        if is_required {
+                                            property_schema.required_field(&name);
+                                        }
+
+                                        Some(property_schema)
                                     }
                                     _ => None,
                                 };
 
                                 if let Some(property_schema) = property_schema {
                                     if let Some(annotation) = interface_member.type_ann() {
-                                        self.define_schema_details(property_schema, annotation.clone(), file_path);
+                                        self.define_schema_details(
+                                            property_schema,
+                                            annotation.clone(),
+                                            file_path,
+                                            is_required,
+                                        );
                                     }
                                 }
                             }
@@ -842,14 +884,25 @@ impl OpenApiFactory {
                                 let property_schema = match &*raw_prop.key {
                                     Expr::Ident(identifier) => {
                                         let name = identifier.sym.to_string();
-                                        Some(root_schema.property(&name))
+                                        let property_schema = root_schema.property(&name);
+
+                                        if is_required {
+                                            property_schema.required_field(&name);
+                                        }
+
+                                        Some(property_schema)
                                     }
                                     _ => None,
                                 };
 
                                 if let Some(property_schema) = property_schema {
                                     if let Some(annotation) = member.type_ann() {
-                                        self.define_schema_details(property_schema, annotation.clone(), file_path);
+                                        self.define_schema_details(
+                                            property_schema,
+                                            annotation.clone(),
+                                            file_path,
+                                            is_required,
+                                        );
                                     }
                                 }
                             }
@@ -861,19 +914,19 @@ impl OpenApiFactory {
             }
             NodeKind::TsTypeAliasDecl(_) => {
                 if let Some(annotation) = root.type_ann() {
-                    self.define_schema_details(root_schema, annotation.clone(), file_path);
+                    self.define_schema_details(root_schema, annotation.clone(), file_path, is_required);
                 }
             }
             NodeKind::TsType(_) => {
                 for child_index in root.children() {
                     let child = root.get(child_index).unwrap();
-                    self.define_schema_details(root_schema, child, file_path);
+                    self.define_schema_details(root_schema, child, file_path, is_required);
                 }
             }
             NodeKind::TsEnumDecl(_) => {
                 for member in root.members() {
                     root_schema.data_type("string".into());
-                    self.define_schema_details(root_schema, member, file_path);
+                    self.define_schema_details(root_schema, member, file_path, is_required);
                 }
             }
             NodeKind::TsEnumMember(raw_member) => match &raw_member.init {
