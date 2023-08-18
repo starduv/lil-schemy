@@ -46,7 +46,7 @@ impl<'m> ModuleCache {
                     // Unrecoverable fatal error occurred
                     e.into_diagnostic(&handler).emit()
                 })
-                .expect("failed to parser module")
+                .expect(format!("Could not parse module '{}'", path).as_str())
         });
 
         SchemyNode::from_module(self.cache.get(path).unwrap())
