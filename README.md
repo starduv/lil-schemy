@@ -1,6 +1,6 @@
 <p align="center" style="font-weight:900;font-size:25px;">Lil' Schemy</p>
 <p align="center">
-<img src="./lil-schemy.png" width="175px" style="border-radius:50px;margin:auto;"/>
+<img src="./lil-schemy.png" width="200px" style="border-radius:50px;margin:auto;"/>
 </p>
 <p align="center">"Open-Api, Json-Schemer, input, Typescript, ouput, Beamer"</p>
 
