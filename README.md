@@ -17,8 +17,8 @@ Lil Schemy is a [Node addon]. The supported platforms/architectures are:
 - Windows - x86_64 | aarch64
 - Apple - x86_64 | aarch64
 
-### Not Supported Yet
-__Generate schemas from return type of functions and from tuples__
+### Roadmap
+__Derive types from return statement of functions__
 ```JS
 getDriverRoutes = async (): Promise<[string, boolean, Array<number>]> => {
     return ["sup", true, [1,2,3]];
@@ -27,7 +27,7 @@ getDriverRoutes = async (): Promise<[string, boolean, Array<number>]> => {
 const response = LilResponse(await getDriverRoutes())
 ```
 
-__Omit and Pick are ignored.__
+__Create schemas that honor Omit and Pick keywords.__
 ```TS
 interface Mammal {
     furLength: number,
@@ -41,6 +41,25 @@ interface Terran {
 
 interface Human extends Omit<Mammal, "furLength">, Pick<Terran, "litterRate"> {
     language: string
+}
+
+// schema
+{
+    ...
+    Human: {
+        type: "object",
+        properties: {
+            language: {
+                type: "string"
+            },
+            milkTemperature: {
+                type: "number"
+            },
+            litterRate: {
+                type: "number"
+            }
+        }
+    }
 }
 ```
 
