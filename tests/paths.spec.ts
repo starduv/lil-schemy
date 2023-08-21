@@ -40,6 +40,23 @@ describe('open api generator', () => {
                 enum: ["cat", "dog", "bird"],
                 type: "string",
             },
+            AnimalLicense: {
+                properties: {
+                    adjacents: {
+                        items: {
+                            $ref: "#/components/schemas/AdjacentLicense"
+                        },
+                        type: "array"
+                    },
+                    exp: {
+                        type: "string"
+                    },
+                    state: {
+                        type: "string"
+                    }
+                },
+                type: "object"
+            },
             AnimalMood: {
                 anyOf: [
                     {
@@ -100,6 +117,9 @@ describe('open api generator', () => {
                         type: 'string'
                     }
                 },
+            },
+            AdjacentLicense: {
+                $ref: "#/components/schemas/AnimalLicense"
             },
             AdminUser: {
                 type: 'object',
@@ -224,6 +244,35 @@ describe('open api generator', () => {
                                 }
                             },
                             description: "A specific animal"
+                        }
+                    },
+                    tags: [
+                        "Animals"
+                    ]
+                }
+            },
+            "/animals/{id}/license": {
+                get: {
+                    requestBody: {
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    $ref: "#/components/schemas/AnimalUpdate"
+                                }
+                            }
+                        },
+                        required: false
+                    },
+                    responses: {
+                        200: {
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/AnimalLicense"
+                                    }
+                                }
+                            },
+                            description: "A specific animal license"
                         }
                     },
                     tags: [

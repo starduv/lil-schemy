@@ -45,6 +45,10 @@ impl ApiComponents {
     pub fn schema(&mut self, name: &str) -> &mut ApiSchema {
         self.schemas.entry(name.to_string()).or_insert(ApiSchema::new())
     }
+
+    pub(crate) fn contains_schema(&self, type_name: &str) -> bool {
+        self.schemas.contains_key(type_name)
+    }
 }
 
 #[derive(Serialize, Debug)]
