@@ -94,37 +94,30 @@ impl OpenApiFactory {
             borrow.tags(options.tags.clone());
         }
 
-        self.add_request_details(open_api, &operation, route_handler.clone(), file_path);
+        self.add_request_details(&operation, route_handler.clone(), file_path);
     }
 
     fn add_request_details(
         &mut self,
-        open_api: &mut OpenApi,
         operation: &Rc<RefCell<ApiPathOperation>>,
         route_handler: Rc<SchemyNode>,
         file_path: &str,
     ) -> () {
         for param in route_handler.params() {
-            self.add_request_params(open_api, operation, param, file_path);
+            self.add_request_params(operation, param, file_path);
         }
 
         self.symbol_tables.add_child_scope(file_path);
 
-        self.find_response(open_api, operation, route_handler, file_path);
+        self.find_response(operation, route_handler, file_path);
 
         self.symbol_tables.parent_scope(file_path);
     }
 
-    fn add_request_params(
-        &mut self,
-        open_api: &mut OpenApi,
-        operation: &Rc<RefCell<ApiPathOperation>>,
-        root: Rc<SchemyNode>,
-        file_path: &str,
-    ) {
+    fn add_request_params(&mut self, operation: &Rc<RefCell<ApiPathOperation>>, root: Rc<SchemyNode>, file_path: &str) {
         match root.kind {
             NodeKind::Ident(identifier) if identifier.sym.eq("LilBodyParam") => {
-                self.add_body_param_details(open_api, operation, find_parent_type_ref(root), file_path);
+                self.add_body_param_details(operation, find_parent_type_ref(root), file_path);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("LilHeader") => {
                 self.add_param_details(operation, "header", find_parent_type_ref(root), file_path, false);
@@ -144,7 +137,7 @@ impl OpenApiFactory {
             },
             _ => {
                 for child_index in root.children() {
-                    self.add_request_params(open_api, operation, root.get(child_index).unwrap(), file_path);
+                    self.add_request_params(operation, root.get(child_index).unwrap(), file_path);
                 }
             }
         }
@@ -208,7 +201,6 @@ impl OpenApiFactory {
 
     fn find_response(
         &mut self,
-        open_api: &mut OpenApi,
         operation: &Rc<RefCell<ApiPathOperation>>,
         root: Rc<SchemyNode>,
         file_path: &str,
@@ -218,20 +210,14 @@ impl OpenApiFactory {
             store_declaration_maybe(child.clone(), file_path, &mut self.symbol_tables);
             match child.kind {
                 NodeKind::Ident(raw) if raw.sym.eq("LilResponse") => {
-                    self.add_response(open_api, operation, root.parent().unwrap(), file_path)
+                    self.add_response(operation, root.parent().unwrap(), file_path)
                 }
-                _ => self.find_response(open_api, operation, child, file_path),
+                _ => self.find_response(operation, child, file_path),
             }
         }
     }
 
-    fn add_response(
-        &mut self,
-        open_api: &mut OpenApi,
-        operation: &Rc<RefCell<ApiPathOperation>>,
-        root: Rc<SchemyNode>,
-        file_path: &str,
-    ) -> () {
+    fn add_response(&mut self, operation: &Rc<RefCell<ApiPathOperation>>, root: Rc<SchemyNode>, file_path: &str) -> () {
         let args = root.args();
         let options = match args.get(1) {
             Some(arg) => match arg.kind {
@@ -246,7 +232,7 @@ impl OpenApiFactory {
 
         match args.get(0) {
             Some(response_type) if options.is_some() => {
-                self.add_response_details(&response_type, &options.unwrap(), file_path, operation, open_api);
+                self.add_response_details(&response_type, &options.unwrap(), file_path, operation);
             }
             _ => {}
         };
@@ -258,7 +244,6 @@ impl OpenApiFactory {
         options: &ResponseOptions,
         file_path: &str,
         operation: &Rc<RefCell<ApiPathOperation>>,
-        open_api: &mut OpenApi,
     ) {
         match root.kind {
             NodeKind::Ident(raw_ident) => {
@@ -298,7 +283,7 @@ impl OpenApiFactory {
                     content.schema().reference(Some(name.clone()), false);
                     content.example(options.example.clone());
 
-                    self.define_referenced_schema(root.clone(), &name, &name, open_api, file_path);
+                    self.deferred_schemas.defer_local_type(file_path, &name, root.index);
                 }
             }
             NodeKind::Str(_) => {
@@ -363,7 +348,7 @@ impl OpenApiFactory {
             _ => {
                 for child_index in root.children() {
                     let child = root.get(child_index).unwrap();
-                    self.add_response_details(&child, options, file_path, operation, open_api);
+                    self.add_response_details(&child, options, file_path, operation);
                 }
             }
         };
@@ -371,7 +356,6 @@ impl OpenApiFactory {
 
     fn add_body_param_details(
         &mut self,
-        open_api: &mut OpenApi,
         operation: &Rc<RefCell<ApiPathOperation>>,
         root: Rc<SchemyNode>,
         file_path: &str,
@@ -401,7 +385,8 @@ impl OpenApiFactory {
                                 .symbol_tables
                                 .get_root_declaration_name(file_path, identifier.sym.to_string());
 
-                            self.define_referenced_schema(param.clone(), &root_name, &root_name, open_api, file_path);
+                            self.deferred_schemas
+                                .defer_local_type(file_path, &root_name, param.index);
 
                             operation_param.content().schema().reference(root_name.into(), false);
                         }
@@ -550,7 +535,7 @@ impl OpenApiFactory {
             match self.symbol_tables.get_root_declaration(source_file_name, type_name) {
                 Some(Declaration::Type { node }) => {
                     let root = root.get(node).unwrap();
-                    self.add_request_params(open_api, &deferred_operation_type.operation, root, source_file_name);
+                    self.add_request_params(&deferred_operation_type.operation, root, source_file_name);
                 }
                 Some(Declaration::Import {
                     name: imported_name,
@@ -566,7 +551,10 @@ impl OpenApiFactory {
             }
         }
 
-        if let Some(deferred_type) = self.deferred_schemas.recognize_external_type(type_name, source_file_name) {
+        if let Some(deferred_type) = self
+            .deferred_schemas
+            .recognize_external_type(type_name, source_file_name)
+        {
             match self.symbol_tables.get_root_declaration(source_file_name, &type_name) {
                 Some(Declaration::Type { node }) => {
                     let schema = open_api.components.schema(&deferred_type.schema_name);
@@ -673,7 +661,8 @@ impl OpenApiFactory {
                     } else {
                         match self.symbol_tables.get_root_declaration(file_path, &raw_ident.sym) {
                             Some(Declaration::Import { name, source_file_name }) => {
-                                self.deferred_schemas.defer_external_type(&source_file_name, &name, &name);
+                                self.deferred_schemas
+                                    .defer_external_type(&source_file_name, &name, &name);
                                 let schema = root_schema.additional_properties();
                                 schema.reference(Some(name), false);
                             }
@@ -711,7 +700,8 @@ impl OpenApiFactory {
                         match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
                             Some(Declaration::Import { name, source_file_name }) => {
                                 root_schema.reference(Some(name.clone()), false);
-                                self.deferred_schemas.defer_external_type(&source_file_name, &name, &name);
+                                self.deferred_schemas
+                                    .defer_external_type(&source_file_name, &name, &name);
                             }
                             _ => {
                                 root_schema.reference(Some(identifier.sym.to_string()), false);

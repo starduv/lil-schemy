@@ -52,15 +52,15 @@ Router.put("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUp
     tags: ['Animals'],
 }));
 
-Router.get("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUpdate> }>, reply: any): Promise<void> => {
-    const license: AnimalLicense = { adjacents: [], exp: "2020-01-01", state: "NY" }
+// Router.get("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUpdate> }>, reply: any): Promise<void> => {
+//     const license: AnimalLicense = { adjacents: [], exp: "2020-01-01", state: "NY" }
 
-    await reply.send(LilResponse(license, {
-        statusCode: 200,
-        description: "A specific animal license",
-    }));
-}, {
-    method: 'GET',
-    path: '/animals/{id}/license',
-    tags: ['Animals'],
-}));
+//     await reply.send(LilResponse(license, {
+//         statusCode: 200,
+//         description: "A specific animal license",
+//     }));
+// }, {
+//     method: 'GET',
+//     path: '/animals/{id}/license',
+//     tags: ['Animals'],
+// }));
