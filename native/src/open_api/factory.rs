@@ -29,7 +29,7 @@ impl OpenApiFactory {
         let root = module_cache.parse(&file_path);
         self.find_paths(open_api, root.clone(), file_path);
 
-        while self.deferred_schemas.has_immediate_types(file_path) {
+        while self.deferred_schemas.has_unrecognized_local_types(file_path) {
             self.define_immediates(file_path, &root, open_api);
         }
     }
@@ -42,14 +42,14 @@ impl OpenApiFactory {
                 self.define_deferred_schemas(open_api, item, &source_file_name);
             }
 
-            while self.deferred_schemas.has_immediate_types(&source_file_name) {
+            while self.deferred_schemas.has_unrecognized_local_types(&source_file_name) {
                 self.define_immediates(&source_file_name, &deferred_root, open_api);
             }
         }
     }
 
     fn define_immediates(&mut self, file_path: &str, root: &Rc<SchemyNode>, open_api: &mut OpenApi) {
-        for immediate in self.deferred_schemas.take_immediate_types(file_path) {
+        for immediate in self.deferred_schemas.recognize_local_types(file_path) {
             let root = root.get(immediate.index).unwrap();
             self.define_referenced_schema(
                 root,
@@ -138,7 +138,7 @@ impl OpenApiFactory {
             NodeKind::Ident(identifier) => match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
                 Some(Declaration::Import { name, source_file_name }) => {
                     self.deferred_schemas
-                        .add_deferred_operation_type(&source_file_name, operation, &name);
+                        .defer_operation_type(&source_file_name, operation, &name);
                 }
                 _ => {}
             },
@@ -445,14 +445,14 @@ impl OpenApiFactory {
                 source_file_name,
             }) => {
                 self.deferred_schemas
-                    .add_deferred_type(&source_file_name, schema_name.into(), &type_name);
+                    .defer_external_type(&source_file_name, schema_name.into(), &type_name);
             }
             Some(Declaration::Import {
                 name: type_name,
                 source_file_name,
             }) => {
                 self.deferred_schemas
-                    .add_deferred_type(&source_file_name, schema_name.into(), &type_name);
+                    .defer_external_type(&source_file_name, schema_name.into(), &type_name);
             }
             Some(Declaration::Type { node: node_index }) => {
                 let schema = open_api.components.schema(schema_name);
@@ -545,7 +545,7 @@ impl OpenApiFactory {
     ) -> () {
         if let Some(deferred_operation_type) = self
             .deferred_schemas
-            .take_deferred_operation_type(type_name, source_file_name)
+            .recognize_operation_type(type_name, source_file_name)
         {
             match self.symbol_tables.get_root_declaration(source_file_name, type_name) {
                 Some(Declaration::Type { node }) => {
@@ -556,7 +556,7 @@ impl OpenApiFactory {
                     name: imported_name,
                     source_file_name: module_file_name,
                 }) => {
-                    self.deferred_schemas.add_deferred_operation_type(
+                    self.deferred_schemas.defer_operation_type(
                         &module_file_name,
                         &deferred_operation_type.operation,
                         &imported_name,
@@ -566,7 +566,7 @@ impl OpenApiFactory {
             }
         }
 
-        if let Some(deferred_type) = self.deferred_schemas.take_deferred_type(type_name, source_file_name) {
+        if let Some(deferred_type) = self.deferred_schemas.recognize_external_type(type_name, source_file_name) {
             match self.symbol_tables.get_root_declaration(source_file_name, &type_name) {
                 Some(Declaration::Type { node }) => {
                     let schema = open_api.components.schema(&deferred_type.schema_name);
@@ -580,7 +580,7 @@ impl OpenApiFactory {
                     source_file_name: module_file_name,
                 }) => {
                     self.deferred_schemas
-                        .add_deferred_type(&module_file_name, type_name, &imported_name);
+                        .defer_external_type(&module_file_name, type_name, &imported_name);
                 }
                 _ => {}
             }
@@ -673,13 +673,13 @@ impl OpenApiFactory {
                     } else {
                         match self.symbol_tables.get_root_declaration(file_path, &raw_ident.sym) {
                             Some(Declaration::Import { name, source_file_name }) => {
-                                self.deferred_schemas.add_deferred_type(&source_file_name, &name, &name);
+                                self.deferred_schemas.defer_external_type(&source_file_name, &name, &name);
                                 let schema = root_schema.additional_properties();
                                 schema.reference(Some(name), false);
                             }
                             _ => {
                                 self.deferred_schemas
-                                    .add_deferred_immediate(file_path, &raw_ident.sym, root.index);
+                                    .defer_local_type(file_path, &raw_ident.sym, root.index);
                                 let schema = root_schema.additional_properties();
                                 schema.reference(Some(raw_ident.sym.to_string()), false);
                             }
@@ -711,12 +711,12 @@ impl OpenApiFactory {
                         match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
                             Some(Declaration::Import { name, source_file_name }) => {
                                 root_schema.reference(Some(name.clone()), false);
-                                self.deferred_schemas.add_deferred_type(&source_file_name, &name, &name);
+                                self.deferred_schemas.defer_external_type(&source_file_name, &name, &name);
                             }
                             _ => {
                                 root_schema.reference(Some(identifier.sym.to_string()), false);
                                 self.deferred_schemas
-                                    .add_deferred_immediate(file_path, &identifier.sym, root.index);
+                                    .defer_local_type(file_path, &identifier.sym, root.index);
                             }
                         }
                     }

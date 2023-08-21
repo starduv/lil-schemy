@@ -137,7 +137,7 @@ describe('open api generator', () => {
         });
     });
 
-    it('generates api paths', () => {
+    it('generates paths', () => {
         expect(schema.paths).to.deep.equal({
             "/animals": {
                 get: {

@@ -29,7 +29,7 @@ enum AnimalKind {
     Bird = "bird"
 }
 
-type AnimalMood = "happy" | "sad" | "angry" | { ambivalence: number };
+export type AnimalMood = "happy" | "sad" | "angry" | { ambivalence: number };
 
 export interface AnimalUpdate extends Omit<Registered, "serialNumber"> {
     name: string;
@@ -44,3 +44,11 @@ interface Registered {
 interface Registration {
     date: string;
 }
+
+export interface AnimalLicense {
+    state: string;
+    exp: string;
+    adjacents: Array<AdjacentLicense>;
+}
+
+export type AdjacentLicense = AnimalLicense;

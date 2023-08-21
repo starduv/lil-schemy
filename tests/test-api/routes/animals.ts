@@ -1,5 +1,5 @@
 import { LilBodyParam, LilPath, LilRequiredField, LilResponse, LilRouteParam } from '../../../src';
-import { AnimalsRequest, Request, AnimalUpdate } from '../dtos/requests';
+import { AnimalsRequest, Request, AnimalUpdate, AnimalLicense } from '../dtos/requests';
 import { Router } from './router';
 
 class Animal {
@@ -49,5 +49,18 @@ Router.put("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUp
 }, {
     method: 'POST',
     path: '/animals/{id}/unregister',
+    tags: ['Animals'],
+}));
+
+Router.get("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUpdate> }>, reply: any): Promise<void> => {
+    const license: AnimalLicense = { adjacents: [], exp: "2020-01-01", state: "NY" }
+
+    await reply.send(LilResponse(license, {
+        statusCode: 200,
+        description: "A specific animal license",
+    }));
+}, {
+    method: 'GET',
+    path: '/animals/{id}/license',
     tags: ['Animals'],
 }));
