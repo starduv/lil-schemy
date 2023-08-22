@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 lil_schemy = { path="../native" }
+serde_json = "1.0.105"

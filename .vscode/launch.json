@@ -13,6 +13,7 @@
             "cwd": "${workspaceFolder}/native-debug",
             "terminal": "integrated",
             "stopOnEntry": false,
+            "envFile": "${workspaceFolder}/native-debug/.envrc",
             "sourceLanguages": [
                 "rust"
             ]

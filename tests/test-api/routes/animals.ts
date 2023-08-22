@@ -53,7 +53,7 @@ Router.put("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUp
 }));
 
 Router.get("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUpdate> }>, reply: any): Promise<void> => {
-    const license: AnimalLicense = { adjacents: [], exp: "2020-01-01", state: "NY" }
+    const license: AnimalLicense = { adjacents: [], exp: new Date("2020-01-01"), state: "NY" }
 
     await reply.send(LilResponse(license, {
         statusCode: 200,

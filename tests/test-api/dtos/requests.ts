@@ -1,4 +1,4 @@
-import { LilQueryParam, LilRouteParam } from "../../../src";
+import { LilQueryParam, LilRouteParam, LilSub } from "../../../src";
 
 export default interface PatchUserRequest { }
 
@@ -47,7 +47,7 @@ interface Registration {
 
 export interface AnimalLicense {
     state: string;
-    exp: string;
+    exp: LilSub<Date, string>;
     adjacents: Array<AdjacentLicense>;
 }
 

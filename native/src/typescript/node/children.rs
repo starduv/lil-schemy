@@ -35,6 +35,8 @@ impl<'n> SchemyNode<'n> {
             NodeKind::TsAsExpr(raw) => self.get_ts_as_expr_children(raw, &mut children),
             NodeKind::TsEntityName(raw) => self.get_ts_entity_name_children(raw, &mut children),
             NodeKind::TsInterfaceDecl(raw) => self.get_ts_interface_decl_children(raw, &mut children),
+            NodeKind::TsLitType(raw) => self.get_ts_lit_type_chilren(raw, &mut children),
+            NodeKind::TsModuleDecl(raw) => self.get_ts_module_decl_children(raw, &mut children),
             NodeKind::TsPropertySignature(raw) => self.get_ts_property_signature_children(raw, &mut children),
             NodeKind::TsType(raw) => self.get_ts_type_children(raw, &mut children),
             NodeKind::TsTypeAliasDecl(raw) => self.get_ts_type_alias_declaration(raw, &mut children),
@@ -42,13 +44,12 @@ impl<'n> SchemyNode<'n> {
             NodeKind::TsTypeAssertionExpr(raw) => self.get_ts_type_assertion_expr_children(raw, &mut children),
             NodeKind::TsTypeElement(raw) => self.get_ts_type_element_children(raw, &mut children),
             NodeKind::TsTypeLit(raw) => self.get_type_lit_children(raw, &mut children),
-            NodeKind::TsLitType(raw) => self.get_ts_lit_type_chilren(raw, &mut children),
             NodeKind::TsTypeParam(raw) => self.get_ts_type_param(raw, &mut children),
+            NodeKind::TsIntersectionType(raw) => self.get_ts_intersection_type_children(raw, &mut children),
             NodeKind::TsTypeParamInstantiation(raw) => {
                 self.get_ts_type_param_instantiation_children(raw, &mut children)
             }
             NodeKind::TsUnionType(raw) => self.get_ts_union_type_children(raw, &mut children),
-            NodeKind::TsIntersectionType(raw) => self.get_ts_intersection_type_children(raw, &mut children),
             NodeKind::TsUnionOrIntersectionType(raw) => self.get_ts_union_or_intersection_children(raw, &mut children),
             NodeKind::TsTypeRef(raw) => self.get_ts_type_ref_children(raw, &mut children),
             NodeKind::VarDecl(raw) => self.get_var_decl_children(raw, &mut children),
@@ -1984,7 +1985,7 @@ impl<'n> SchemyNode<'n> {
                     };
                     borrow.nodes.push(Rc::new(child_node));
                     children.push(child_index);
-                }
+                },
             },
             ModuleItem::Stmt(statement) => self.get_statement_children(statement, children),
         }

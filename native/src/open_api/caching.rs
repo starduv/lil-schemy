@@ -112,11 +112,11 @@ pub(in crate::open_api) fn store_declaration_maybe(
                                     name,
                                     Declaration::Import {
                                         name: String::from("default"),
-                                        source_file_name: module_path,
+                                        source_file_name: module_path.replace(".js", ".d.ts"),
                                     },
                                 )
                             }
-                            Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
+                            Err(err) => println!("module resolution error: {:?}", err),
                         }
                     }
                     NodeKind::ImportSpecifier(ImportSpecifier::Named(raw_specifier)) => {
@@ -129,11 +129,11 @@ pub(in crate::open_api) fn store_declaration_maybe(
                                     name.to_string(),
                                     Declaration::Import {
                                         name: name.to_string(),
-                                        source_file_name: module_path,
+                                        source_file_name: module_path.replace(".js", ".d.ts"),
                                     },
                                 )
                             }
-                            Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
+                            Err(err) => println!("module resolution error: {:?}", err),
                         }
                     }
                     _ => {}
@@ -141,47 +141,52 @@ pub(in crate::open_api) fn store_declaration_maybe(
             }
         }
         NodeKind::NamedExport(raw) => {
-            let src = &raw.src.as_ref().unwrap().value;
-            match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
-                Ok(module_file_name) => {
-                    for specifier in &raw.specifiers {
-                        match specifier {
-                            ExportSpecifier::Named(named_specifier) => {
-                                let type_name = match &named_specifier.orig {
-                                    ModuleExportName::Ident(identifier) => &identifier.sym,
-                                    ModuleExportName::Str(identifier) => &identifier.value,
-                                };
-
-                                if let Some(exported_name) = &named_specifier.exported {
-                                    let exported_name = match exported_name {
-                                        ModuleExportName::Ident(id) => &id.sym,
-                                        ModuleExportName::Str(id) => &id.value,
-                                    };
-
-                                    symbol_tables.insert(
-                                        file_path,
-                                        exported_name.to_string(),
-                                        Declaration::Import {
-                                            name: type_name.to_string(),
-                                            source_file_name: module_file_name.to_string(),
-                                        },
-                                    )
-                                } else {
-                                    symbol_tables.insert(
-                                        file_path,
-                                        type_name.to_string(),
-                                        Declaration::Import {
-                                            name: type_name.to_string(),
-                                            source_file_name: module_file_name.to_string(),
-                                        },
-                                    )
+            match &raw.src.as_ref() {
+                Some(src) => {
+                    let src = &src.value;
+                    match EsResolver::new(&src, &PathBuf::from(file_path), TargetEnv::Node).resolve() {
+                        Ok(module_path) => {
+                            for specifier in &raw.specifiers {
+                                match specifier {
+                                    ExportSpecifier::Named(named_specifier) => {
+                                        let type_name = match &named_specifier.orig {
+                                            ModuleExportName::Ident(identifier) => &identifier.sym,
+                                            ModuleExportName::Str(identifier) => &identifier.value,
+                                        };
+        
+                                        if let Some(exported_name) = &named_specifier.exported {
+                                            let exported_name = match exported_name {
+                                                ModuleExportName::Ident(id) => &id.sym,
+                                                ModuleExportName::Str(id) => &id.value,
+                                            };
+        
+                                            symbol_tables.insert(
+                                                file_path,
+                                                exported_name.to_string(),
+                                                Declaration::Import {
+                                                    name: type_name.to_string(),
+                                                    source_file_name: module_path.replace(".js", ".d.ts"),
+                                                },
+                                            )
+                                        } else {
+                                            symbol_tables.insert(
+                                                file_path,
+                                                type_name.to_string(),
+                                                Declaration::Import {
+                                                    name: type_name.to_string(),
+                                                    source_file_name: module_path.replace(".js", ".d.ts"),
+                                                },
+                                            )
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             }
-                            _ => {}
                         }
+                        Err(err) => println!("module resolution error: {:?}", err),
                     }
-                }
-                Err(err) => println!("'{}', module resolution error: {:?}", file_path, err),
+                },
+                None => {}
             }
         }
         NodeKind::VarDeclarator(raw) => {

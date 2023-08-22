@@ -1,4 +1,4 @@
-use std::{any, cell::RefCell, rc::Rc, vec};
+use std::{cell::RefCell, rc::Rc, vec};
 
 use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
@@ -455,5 +455,3 @@ pub struct AllOf {
     #[serde(rename = "allOf")]
     all_of: Vec<ApiSchema>,
 }
-
-fn get_merged_schemas(root: &mut ApiSchema) -> () {}
