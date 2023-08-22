@@ -709,6 +709,8 @@ impl OpenApiFactory {
                                 _ => {}
                             }
                         }
+                    } else if identifier.sym.eq("Uint8Array") {
+                        root_schema.data_type("string").format(Some("binary".into()));
                     } else {
                         match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
                             Some(Declaration::Import { name, source_file_name }) => {
@@ -734,24 +736,24 @@ impl OpenApiFactory {
             }
             NodeKind::TsKeywordType(raw) => match raw.kind {
                 TsKeywordTypeKind::TsNumberKeyword => {
-                    root_schema.data_type("number".into());
+                    root_schema.data_type("number");
                 }
                 TsKeywordTypeKind::TsBooleanKeyword => {
-                    root_schema.data_type("boolean".into());
+                    root_schema.data_type("boolean");
                 }
                 TsKeywordTypeKind::TsBigIntKeyword => {
-                    root_schema.data_type("number".into());
+                    root_schema.data_type("number");
                 }
                 TsKeywordTypeKind::TsStringKeyword => {
-                    root_schema.data_type("string".into());
+                    root_schema.data_type("string");
                 }
                 TsKeywordTypeKind::TsSymbolKeyword => {
-                    root_schema.data_type("string".into());
+                    root_schema.data_type("string");
                 }
                 _ => {}
             },
             NodeKind::ClassDecl(_) => {
-                root_schema.data_type("object".into());
+                root_schema.data_type("object");
                 if let Some(class_node) = root.class() {
                     for property in class_node.class_props() {
                         match property.kind {
@@ -795,7 +797,7 @@ impl OpenApiFactory {
                 }
             }
             NodeKind::ClassExpr(_) => {
-                root_schema.data_type("object".into());
+                root_schema.data_type("object");
                 if let Some(class_node) = root.class() {
                     for class_member in class_node.body() {
                         match class_member.kind {
@@ -828,12 +830,12 @@ impl OpenApiFactory {
                 }
             }
             NodeKind::TsArrayType(_) => {
-                root_schema.data_type("array".into());
+                root_schema.data_type("array");
                 let elem_type = root.elem_type().unwrap();
                 self.define_schema_details(root_schema.items(), &elem_type, file_path, is_required);
             }
             NodeKind::TsInterfaceDecl(_) => {
-                root_schema.data_type("object".into());
+                root_schema.data_type("object");
                 for extension in root.extends() {
                     self.define_schema_details(root_schema, &extension, file_path, is_required);
                 }
@@ -873,7 +875,7 @@ impl OpenApiFactory {
                 }
             }
             NodeKind::TsTypeLit(_) => {
-                root_schema.data_type("object".into());
+                root_schema.data_type("object");
                 for member in root.members() {
                     match member.kind {
                         NodeKind::TsTypeElement(raw_element) => match raw_element {
@@ -922,7 +924,7 @@ impl OpenApiFactory {
             }
             NodeKind::TsEnumDecl(_) => {
                 for member in root.members() {
-                    root_schema.data_type("string".into());
+                    root_schema.data_type("string");
                     self.define_schema_details(root_schema, &member, file_path, is_required);
                 }
             }

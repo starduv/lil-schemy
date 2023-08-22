@@ -62,6 +62,39 @@ interface Human extends Omit<Mammal, "furLength">, Pick<Terran, "litterRate"> {
     }
 }
 ```
+__Support multipart form data__
+```TS
+interface FormData {
+    name: string;
+    file: Uint8Array;
+}
+
+let params: LilFormData<FormData> = {};
+
+//schema
+{
+    ...
+    requestBody: {
+        content: {
+            "multipart/form-data":{
+                schema: {
+                    type: "object",
+                    properties: {
+                        name: {
+                            type: "string"
+                        },
+                        file: {
+                            type: "string",
+                            format: "binary"
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+}
+```
 
 ## [LICENSE](LICENSE)
 
