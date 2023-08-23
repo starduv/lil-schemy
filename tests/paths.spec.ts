@@ -77,22 +77,22 @@ describe('open api generator', () => {
                 ]
             },
             AnimalUpdate: {
-                type: "object",
-                additionalProperties: {
-                    allOf: [
-                        {
-                            $ref: "#/components/schemas/Registered",
+                allOf: [
+                    {
+                        $ref: "#/components/schemas/Registered",
+                    },
+                    {
+                        type: "object",
+                        properties: {
+                            mood: {
+                                $ref: "#/components/schemas/AnimalMood"
+                            },
+                            name: {
+                                type: "string"
+                            },
                         }
-                    ]
-                },
-                properties: {
-                    mood: {
-                        $ref: "#/components/schemas/AnimalMood"
-                    },
-                    name: {
-                        type: "string"
-                    },
-                },
+                    }
+                ]
             },
             User: {
                 type: "object",

@@ -116,7 +116,7 @@ pub(in crate::open_api) fn store_declaration_maybe(
                                     },
                                 )
                             }
-                            Err(err) => println!("module resolution error: {:?}", err),
+                            Err(_) => {}, // TODO improve debugging
                         }
                     }
                     NodeKind::ImportSpecifier(ImportSpecifier::Named(raw_specifier)) => {
@@ -133,7 +133,7 @@ pub(in crate::open_api) fn store_declaration_maybe(
                                     },
                                 )
                             }
-                            Err(err) => println!("module resolution error: {:?}", err),
+                            Err(_) => {}, // TODO improve debugging
                         }
                     }
                     _ => {}
@@ -183,7 +183,7 @@ pub(in crate::open_api) fn store_declaration_maybe(
                                 }
                             }
                         }
-                        Err(err) => println!("module resolution error: {:?}", err),
+                        Err(_) => {}, // TODO improve debugging
                     }
                 },
                 None => {}

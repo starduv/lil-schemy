@@ -138,8 +138,9 @@ impl OpenApiFactory {
                         .defer_operation_type(&source_file_name, operation, &name);
                 }
                 Some(Declaration::Type { node }) => {
-                    let root = root.get(node).unwrap();
-                    self.add_request_params(operation, root, file_path);
+                    if let Some(root) = root.get(node) {
+                        self.add_request_params(operation, root, file_path);
+                    }
                 }
                 _ => {}
             },
@@ -708,15 +709,13 @@ impl OpenApiFactory {
                     if raw_ident.sym.eq("Omit") || raw_ident.sym.eq("Pick") {
                         let params = root.params();
                         let param = params.first().unwrap();
-                        let schema = root_schema.additional_properties();
-                        self.define_schema_details(schema, &param, file_path, is_required);
+                        self.define_schema_details(root_schema, &param, file_path, is_required);
                     } else {
                         match self.symbol_tables.get_root_declaration(file_path, &raw_ident.sym) {
                             Some(Declaration::Import { name, source_file_name }) => {
                                 self.deferred_schemas
                                     .defer_external_type(&source_file_name, &name, &name);
-                                let schema = root_schema.additional_properties();
-                                schema.reference(Some(name), false);
+                                root_schema.reference(Some(name), false);
                             }
                             _ => {
                                 self.deferred_schemas.defer_local_type(
@@ -725,8 +724,7 @@ impl OpenApiFactory {
                                     &raw_ident.sym,
                                     root.index,
                                 );
-                                let schema = root_schema.additional_properties();
-                                schema.reference(Some(raw_ident.sym.to_string()), false);
+                                root_schema.reference(Some(raw_ident.sym.to_string()), false);
                             }
                         }
                     }
@@ -886,10 +884,26 @@ impl OpenApiFactory {
                 self.define_schema_details(root_schema.items(), &elem_type, file_path, is_required);
             }
             NodeKind::TsInterfaceDecl(_) => {
-                root_schema.data_type("object");
-                for extension in root.extends() {
-                    self.define_schema_details(root_schema, &extension, file_path, is_required);
+                let extends = root.extends();
+                if extends.len().gt(&0) {
+                    let all_of = root_schema.all_of();
+                    for extend in &extends {
+                        let mut schema = ApiSchema::new();
+                        self.define_schema_details(&mut schema, &extend, file_path, is_required);
+                        all_of.push(schema);
+                    }
                 }
+
+                let root_schema = match extends.len() > 0 {
+                    true => {
+                        let all_of = root_schema.all_of();
+                        all_of.push(ApiSchema::new());
+                        all_of.last_mut().unwrap()
+                    }
+                    false => root_schema,
+                };
+
+                root_schema.data_type("object");
 
                 if let Some(interface_body) = root.interface_body() {
                     for interface_member in interface_body.body() {

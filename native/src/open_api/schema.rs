@@ -233,7 +233,6 @@ impl ApiConent {
 pub struct ApiSchema {
     any_of: Option<Vec<ApiSchema>>,
     all_of: Option<Vec<ApiSchema>>,
-    additional_properties: Option<AllOf>,
     data_type: Option<String>,
     enums: Option<Vec<String>>,
     format: Option<String>,
@@ -254,13 +253,8 @@ impl Serialize for ApiSchema {
         if let Some(ref any_of) = self.any_of {
             state.serialize_field("anyOf", any_of)?;
         }
-
         if let Some(ref all_of) = self.all_of {
             state.serialize_field("allOf", all_of)?;
-        }
-
-        if let Some(ref additional) = self.additional_properties {
-            state.serialize_field("additionalProperties", additional)?;
         }
         if let Some(ref enums) = self.enums {
             state.serialize_field("enum", enums)?;
@@ -296,7 +290,6 @@ impl Serialize for ApiSchema {
 impl ApiSchema {
     pub fn new() -> Self {
         ApiSchema {
-            additional_properties: None,
             any_of: None,
             all_of: None,
             data_type: None,
@@ -304,19 +297,10 @@ impl ApiSchema {
             format: None,
             is_example: false,
             items: None,
-            // nullable: true,
             properties: None,
             reference: None,
             required: HashSet::new(),
         }
-    }
-
-    pub fn additional_properties(&mut self) -> &mut ApiSchema {
-        let properties = self.additional_properties.get_or_insert(AllOf { all_of: Vec::new() });
-
-        properties.all_of.push(ApiSchema::new());
-
-        properties.all_of.last_mut().unwrap()
     }
 
     pub fn data_type(&mut self, data_type: &str) -> &mut ApiSchema {
@@ -361,11 +345,11 @@ impl ApiSchema {
     }
 
     pub(crate) fn any_of(&mut self) -> &mut Vec<ApiSchema> {
-        self.any_of.insert(vec![])
+        self.any_of.get_or_insert(vec![])
     }
 
     pub(crate) fn all_of(&mut self) -> &mut Vec<ApiSchema> {
-        self.any_of.insert(vec![])
+        self.all_of.get_or_insert(vec![])
     }
 
     fn append_enums(&mut self, enums: &Vec<String>) -> &mut ApiSchema {
