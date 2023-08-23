@@ -402,6 +402,10 @@ impl OpenApiFactory {
         match type_params.get(0) {
             Some(param) => match param.kind {
                 NodeKind::TsType(raw_type) => match raw_type {
+                    TsType::TsTypeLit(raw_lit) => {
+                        let child = root.to_child(NodeKind::TsTypeLit(raw_lit));
+                        self.define_schema_details(operation_param.content().schema(), &child, file_path, false);
+                    },
                     TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
                         TsKeywordTypeKind::TsNumberKeyword => {
                             operation_param.content().schema().data_type("number");
