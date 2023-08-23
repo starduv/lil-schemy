@@ -135,6 +135,14 @@ describe('open api generator', () => {
                     }
                 },
             },
+            PostAnimalsIdRegisterStatus: {
+                properties: {
+                    status: {
+                        type: "string"
+                    }
+                },
+                type: "object"
+            },
             Registered: {
                 type: 'object',
                 properties: {
@@ -273,6 +281,28 @@ describe('open api generator', () => {
                                 }
                             },
                             description: "A specific animal license"
+                        }
+                    },
+                    tags: [
+                        "Animals"
+                    ]
+                }
+            },
+            "/animals/{id}/register": {
+                post: {
+                    requestBody: {
+                        required: false
+                    },
+                    responses: {
+                        200: {
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/PostAnimalsIdRegisterStatus"
+                                    }
+                                }
+                            },
+                            description: "Status of animal registration"
                         }
                     },
                     tags: [

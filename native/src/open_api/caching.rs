@@ -206,6 +206,15 @@ pub(in crate::open_api) fn store_declaration_maybe(
                                 ),
                                 _ => {}
                             },
+                            TsType::TsTypeLit(raw_type) => {
+                                symbol_tables.insert(
+                                    file_path,
+                                    name.to_string(),
+                                    Declaration::Type {
+                                        node: root.to_child(NodeKind::TsTypeLit(raw_type)).index.clone(),
+                                    },
+                                )
+                            }
                             _ => {}
                         },
                         None => match &raw.init {

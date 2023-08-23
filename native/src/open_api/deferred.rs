@@ -15,12 +15,13 @@ impl DeferredSchemas {
         self.modules.pop()
     }
 
-    pub(crate) fn defer_local_type(&mut self, file_path: &str, root_name: &str, node_index: usize) -> () {
+    pub(crate) fn defer_local_type(&mut self, file_path: &str, schema_name: &str, type_name: &str, node_index: usize) -> () {
         self.local_types
             .entry(file_path.to_string())
             .or_insert(Vec::new())
             .push(LocalType {
-                schema_name: root_name.into(),
+                schema_name: schema_name.into(),
+                type_name: type_name.into(),
                 index: node_index,
             });
     }
@@ -122,5 +123,6 @@ pub struct OperationType {
 #[derive(Debug, Clone)]
 pub struct LocalType {
     pub schema_name: String,
+    pub type_name: String,
     pub index: usize,
 }

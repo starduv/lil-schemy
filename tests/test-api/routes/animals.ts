@@ -64,3 +64,17 @@ Router.get("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUp
     path: '/animals/{id}/license',
     tags: ['Animals'],
 }));
+
+Router.post("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<{ name: string, freindliness: number }> }>, reply: any): Promise<void> => {
+    const status: { status: string } = { status: "processing" }
+
+    await reply.send(LilResponse(status, {
+        statusCode: 200,
+        description: "Status of animal registration",
+    }));
+}, {
+    method: 'POST',
+    path: '/animals/{id}/register',
+    tags: ['Animals'],
+}));
+

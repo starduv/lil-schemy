@@ -4,6 +4,8 @@ use lazy_static::__Deref;
 
 use swc_ecma_ast::*;
 
+use case::CaseExt;
+
 use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode};
 
 use super::{
@@ -30,7 +32,7 @@ impl OpenApiFactory {
         self.find_paths(open_api, root.clone(), file_path);
 
         while self.deferred_schemas.has_unrecognized_local_types(file_path) {
-            self.define_immediates(file_path, &root, open_api);
+            self.define_local_schemas(file_path, &root, open_api);
         }
     }
 
@@ -43,18 +45,18 @@ impl OpenApiFactory {
             }
 
             while self.deferred_schemas.has_unrecognized_local_types(&file_path) {
-                self.define_immediates(&file_path, &deferred_root, open_api);
+                self.define_local_schemas(&file_path, &deferred_root, open_api);
             }
         }
     }
 
-    fn define_immediates(&mut self, file_path: &str, root: &Rc<SchemyNode>, open_api: &mut OpenApi) {
-        for immediate in self.deferred_schemas.recognize_local_types(file_path) {
-            let root = root.get(immediate.index).unwrap();
-            self.define_local_schema_maybe(
+    fn define_local_schemas(&mut self, file_path: &str, root: &Rc<SchemyNode>, open_api: &mut OpenApi) {
+        for local_type in self.deferred_schemas.recognize_local_types(file_path) {
+            let root = root.get(local_type.index).unwrap();
+            self.define_local_schema(
                 root,
-                &immediate.schema_name,
-                &immediate.schema_name,
+                &local_type.type_name,
+                &local_type.schema_name,
                 open_api,
                 file_path,
             )
@@ -84,17 +86,18 @@ impl OpenApiFactory {
         let route_options = args.last().unwrap();
         let options = get_path_options(route_options.clone());
 
-        let operation = open_api
-            .path(&options.path.unwrap())
-            .add_operation(&options.method.unwrap())
-            .clone();
+        if let Some(path) = &options.path {
+            if let Some(method) = &options.method {
+                let operation = open_api.path(&path).add_operation(&method).clone();
 
-        {
-            let mut borrow = (*operation).borrow_mut();
-            borrow.tags(options.tags.clone());
+                {
+                    let mut borrow = (*operation).borrow_mut();
+                    borrow.tags(options.tags.clone());
+                }
+
+                self.add_request_details(&operation, route_handler.clone(), file_path, &options);
+            }
         }
-
-        self.add_request_details(&operation, route_handler.clone(), file_path);
     }
 
     fn add_request_details(
@@ -102,6 +105,7 @@ impl OpenApiFactory {
         operation: &Rc<RefCell<ApiPathOperation>>,
         route_handler: Rc<SchemyNode>,
         file_path: &str,
+        path_options: &PathOptions,
     ) -> () {
         for param in route_handler.params() {
             self.add_request_params(operation, param, file_path);
@@ -109,7 +113,7 @@ impl OpenApiFactory {
 
         self.symbol_tables.add_child_scope(file_path);
 
-        self.find_response(operation, route_handler, file_path);
+        self.find_response(operation, route_handler, file_path, path_options);
 
         self.symbol_tables.parent_scope(file_path);
     }
@@ -204,20 +208,27 @@ impl OpenApiFactory {
         operation: &Rc<RefCell<ApiPathOperation>>,
         root: Rc<SchemyNode>,
         file_path: &str,
+        path_options: &PathOptions,
     ) -> () {
         for child_index in root.children() {
             let child = root.get(child_index.clone()).unwrap();
             store_declaration_maybe(child.clone(), file_path, &mut self.symbol_tables);
             match child.kind {
                 NodeKind::Ident(raw) if raw.sym.eq("LilResponse") => {
-                    self.add_response(operation, root.parent().unwrap(), file_path)
+                    self.add_response(operation, root.parent().unwrap(), file_path, path_options)
                 }
-                _ => self.find_response(operation, child, file_path),
+                _ => self.find_response(operation, child, file_path, path_options),
             }
         }
     }
 
-    fn add_response(&mut self, operation: &Rc<RefCell<ApiPathOperation>>, root: Rc<SchemyNode>, file_path: &str) -> () {
+    fn add_response(
+        &mut self,
+        operation: &Rc<RefCell<ApiPathOperation>>,
+        root: Rc<SchemyNode>,
+        file_path: &str,
+        path_options: &PathOptions,
+    ) -> () {
         let args = root.args();
         let options = match args.get(1) {
             Some(arg) => match arg.kind {
@@ -232,7 +243,7 @@ impl OpenApiFactory {
 
         match args.get(0) {
             Some(response_type) if options.is_some() => {
-                self.add_response_details(&response_type, &options.unwrap(), file_path, operation);
+                self.add_response_details(&response_type, &options.unwrap(), file_path, operation, path_options);
             }
             _ => {}
         };
@@ -244,6 +255,7 @@ impl OpenApiFactory {
         options: &ResponseOptions,
         file_path: &str,
         operation: &Rc<RefCell<ApiPathOperation>>,
+        path_options: &PathOptions,
     ) {
         match root.kind {
             NodeKind::Ident(raw_ident) => {
@@ -274,16 +286,39 @@ impl OpenApiFactory {
                         .symbol_tables
                         .get_root_declaration_name(file_path, raw_ident.sym.to_string());
 
+                    let schema_name = match self.symbol_tables.get_root_declaration(file_path, &name) {
+                        Some(Declaration::Type { node: index }) => {
+                            let node = root.get(index).unwrap();
+                            match node.kind {
+                                NodeKind::TsTypeLit(_) => {
+                                    let mut method =
+                                        path_options.method.as_ref().unwrap().to_lowercase().to_capitalized();
+                                    let path = &path_options.path.as_ref().unwrap();
+                                    let path: String = path
+                                        .split(&['/', '{', '}'][..])
+                                        .map(|part| part.to_capitalized())
+                                        .collect();
+                                    method.push_str(&path.to_capitalized());
+                                    method.push_str(&name.to_capitalized());
+                                    method
+                                }
+                                _ => name.clone(),
+                            }
+                        }
+                        _ => name.clone(),
+                    };
+
                     let status_code = options.status_code.as_ref().unwrap();
                     let description = options.description.as_ref().unwrap();
 
                     let mut operation = (**operation).borrow_mut();
                     let response = operation.response(&status_code, &description);
                     let content = response.content();
-                    content.schema().reference(Some(name.clone()), false);
+                    content.schema().reference(Some(schema_name.clone()), false);
                     content.example(options.example.clone());
 
-                    self.deferred_schemas.defer_local_type(file_path, &name, root.index);
+                    self.deferred_schemas
+                        .defer_local_type(file_path, &schema_name, &name, root.index);
                 }
             }
             NodeKind::Str(_) => {
@@ -348,7 +383,7 @@ impl OpenApiFactory {
             _ => {
                 for child_index in root.children() {
                     let child = root.get(child_index).unwrap();
-                    self.add_response_details(&child, options, file_path, operation);
+                    self.add_response_details(&child, options, file_path, operation, path_options);
                 }
             }
         };
@@ -386,7 +421,7 @@ impl OpenApiFactory {
                                 .get_root_declaration_name(file_path, identifier.sym.to_string());
 
                             self.deferred_schemas
-                                .defer_local_type(file_path, &root_name, param.index);
+                                .defer_local_type(file_path, &root_name, &root_name, param.index);
 
                             operation_param.content().schema().reference(root_name.into(), false);
                         }
@@ -416,7 +451,7 @@ impl OpenApiFactory {
         }
     }
 
-    fn define_local_schema_maybe(
+    fn define_local_schema(
         &mut self,
         type_node: Rc<SchemyNode>,
         type_name: &str,
@@ -676,8 +711,12 @@ impl OpenApiFactory {
                                 schema.reference(Some(name), false);
                             }
                             _ => {
-                                self.deferred_schemas
-                                    .defer_local_type(file_path, &raw_ident.sym, root.index);
+                                self.deferred_schemas.defer_local_type(
+                                    file_path,
+                                    &raw_ident.sym,
+                                    &raw_ident.sym,
+                                    root.index,
+                                );
                                 let schema = root_schema.additional_properties();
                                 schema.reference(Some(raw_ident.sym.to_string()), false);
                             }
@@ -720,8 +759,12 @@ impl OpenApiFactory {
                             }
                             _ => {
                                 root_schema.reference(Some(identifier.sym.to_string()), false);
-                                self.deferred_schemas
-                                    .defer_local_type(file_path, &identifier.sym, root.index);
+                                self.deferred_schemas.defer_local_type(
+                                    file_path,
+                                    &identifier.sym,
+                                    &identifier.sym,
+                                    root.index,
+                                );
                             }
                         }
                     }
