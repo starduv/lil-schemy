@@ -32,6 +32,7 @@ impl<'n> SchemyNode<'n> {
             NodeKind::ModuleItem(raw) => self.get_module_item_children(raw, &mut children),
             NodeKind::NewExpr(raw) => self.get_new_expr_children(raw, &mut children),
             NodeKind::Pat(raw) => self.get_pat_children(raw, &mut children),
+            NodeKind::TryStmt(raw) => self.get_try_statement_children(raw, &mut children),
             NodeKind::TsAsExpr(raw) => self.get_ts_as_expr_children(raw, &mut children),
             NodeKind::TsEntityName(raw) => self.get_ts_entity_name_children(raw, &mut children),
             NodeKind::TsInterfaceDecl(raw) => self.get_ts_interface_decl_children(raw, &mut children),
@@ -57,6 +58,22 @@ impl<'n> SchemyNode<'n> {
             _ => {}
         }
         children
+    }
+
+    fn get_try_statement_children(&self, raw: &'n TryStmt, children: &mut Vec<usize>) {
+        self.get_block_statement_children(&raw.block, children);
+
+        if let Some(catch) = &raw.handler {
+            self.get_catch_clause_children(catch, children);
+        }
+
+        if let Some(finalizer) = &raw.finalizer {
+            self.get_block_statement_children(finalizer, children);
+        }
+    }
+
+    fn get_catch_clause_children(&self, raw: &'n CatchClause, children: &mut Vec<usize>) {
+        self.get_block_statement_children(&raw.body, children);
     }
 
     fn get_ts_lit_type_chilren(&self, raw: &'n TsLitType, children: &mut Vec<usize>) {
