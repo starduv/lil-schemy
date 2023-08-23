@@ -325,6 +325,7 @@ impl<'n> SchemyNode<'n> {
     fn get_ts_type_ref_children(&self, type_ref: &'n TsTypeRef, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         let child_index = borrow.nodes.len();
+
         let child_node = SchemyNode {
             index: child_index,
             parent_index: Some(self.index.clone()),

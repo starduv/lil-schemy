@@ -137,6 +137,10 @@ impl OpenApiFactory {
                     self.deferred_schemas
                         .defer_operation_type(&source_file_name, operation, &name);
                 }
+                Some(Declaration::Type { node }) => {
+                    let root = root.get(node).unwrap();
+                    self.add_request_params(operation, root, file_path);
+                }
                 _ => {}
             },
             _ => {
@@ -405,7 +409,7 @@ impl OpenApiFactory {
                     TsType::TsTypeLit(raw_lit) => {
                         let child = root.to_child(NodeKind::TsTypeLit(raw_lit));
                         self.define_schema_details(operation_param.content().schema(), &child, file_path, false);
-                    },
+                    }
                     TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
                         TsKeywordTypeKind::TsNumberKeyword => {
                             operation_param.content().schema().data_type("number");

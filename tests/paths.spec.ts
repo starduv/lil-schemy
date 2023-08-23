@@ -291,6 +291,21 @@ describe('open api generator', () => {
             "/animals/{id}/register": {
                 post: {
                     requestBody: {
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    properties: {
+                                        freindliness: {
+                                            type: "number"
+                                        },
+                                        name: {
+                                            type: "string"
+                                        }
+                                    },
+                                    type: "object"
+                                }
+                            }
+                        },
                         required: false
                     },
                     responses: {

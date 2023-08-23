@@ -4,10 +4,10 @@ use super::schema::ApiPathOperation;
 
 #[derive(Debug, Default)]
 pub struct DeferredSchemas {
+    external_types: BTreeMap<String, BTreeMap<String, ExternalType>>,
     local_types: BTreeMap<String, Vec<LocalType>>,
     modules: Vec<String>,
     operation_types: BTreeMap<String, BTreeMap<String, OperationType>>,
-    external_types: BTreeMap<String, BTreeMap<String, ExternalType>>,
 }
 
 impl DeferredSchemas {
@@ -90,8 +90,8 @@ impl DeferredSchemas {
     }
 
     pub fn recognize_local_types(&mut self, file_path: &str) -> Vec<LocalType> {
-        if let Some(immediates) = self.local_types.get_mut(file_path) {
-            immediates.drain(..).collect()
+        if let Some(local_types) = self.local_types.get_mut(file_path) {
+            local_types.drain(..).collect()
         } else {
             Vec::new()
         }
@@ -99,7 +99,7 @@ impl DeferredSchemas {
 
     pub fn has_unrecognized_local_types(&self, file_path: &str) -> bool {
         match self.local_types.get(file_path) {
-            Some(immediate_types) => immediate_types.len() > 0,
+            Some(local_types) => local_types.len() > 0,
             None => false,
         }
     }
