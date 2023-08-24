@@ -222,7 +222,7 @@ impl OpenApiFactory {
             match child.kind {
                 NodeKind::Ident(raw) if raw.sym.eq("LilResponse") => {
                     self.add_response(operation, root.parent().unwrap(), file_path, path_options)
-                },
+                }
                 _ => self.find_response(operation, child, file_path, path_options, &mut depth.clone()),
             }
         }
@@ -307,7 +307,7 @@ impl OpenApiFactory {
                                     method.push_str(&path.to_capitalized());
                                     method.push_str(&name.to_capitalized());
                                     method
-                                }
+                                },
                                 _ => name.clone(),
                             }
                         }
@@ -326,6 +326,16 @@ impl OpenApiFactory {
                     self.deferred_schemas
                         .defer_local_type(file_path, &schema_name, &name, root.index);
                 }
+            }
+            NodeKind::TemplateLiteral(_) => {
+                let status_code = options.status_code.as_ref().unwrap();
+                let description = options.description.as_ref().unwrap();
+
+                let mut operation = (**operation).borrow_mut();
+                let response = operation.response(&status_code, &description);
+                let content = response.content();
+                content.schema().data_type("string");
+                content.example(options.example.clone());
             }
             NodeKind::Str(_) => {
                 let status_code = options.status_code.as_ref().unwrap();

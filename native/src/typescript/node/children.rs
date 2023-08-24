@@ -1528,7 +1528,7 @@ impl<'n> SchemyNode<'n> {
                 let child_node = SchemyNode {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::Tpl(raw),
+                    kind: NodeKind::TemplateLiteral(raw),
                     context: self.context.clone(),
                 };
                 borrow.nodes.push(Rc::new(child_node));
