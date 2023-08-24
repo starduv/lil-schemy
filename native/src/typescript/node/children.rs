@@ -24,6 +24,7 @@ impl<'n> SchemyNode<'n> {
             NodeKind::Expr(raw) => self.get_expr_children(raw, &mut children),
             NodeKind::ExprOrSpread(raw) => self.get_expr_children(&*raw.expr, &mut children),
             NodeKind::ExprStmt(raw) => self.get_expr_children(&*raw.expr, &mut children),
+            NodeKind::IfStmt(raw) => self.get_if_statement_children(raw, &mut children),
             NodeKind::ImportDecl(raw) => self.get_import_decl_children(raw, &mut children),
             NodeKind::Lit(raw) => self.get_lit_children(raw, &mut children),
             NodeKind::MemberExpr(raw) => self.get_member_expr_children(raw, &mut children),
@@ -32,10 +33,12 @@ impl<'n> SchemyNode<'n> {
             NodeKind::ModuleItem(raw) => self.get_module_item_children(raw, &mut children),
             NodeKind::NewExpr(raw) => self.get_new_expr_children(raw, &mut children),
             NodeKind::Pat(raw) => self.get_pat_children(raw, &mut children),
+            NodeKind::ReturnStmt(raw) => self.get_return_statement_children(raw, &mut children),
             NodeKind::TryStmt(raw) => self.get_try_statement_children(raw, &mut children),
             NodeKind::TsAsExpr(raw) => self.get_ts_as_expr_children(raw, &mut children),
             NodeKind::TsEntityName(raw) => self.get_ts_entity_name_children(raw, &mut children),
             NodeKind::TsInterfaceDecl(raw) => self.get_ts_interface_decl_children(raw, &mut children),
+            NodeKind::TsIntersectionType(raw) => self.get_ts_intersection_type_children(raw, &mut children),
             NodeKind::TsLitType(raw) => self.get_ts_lit_type_chilren(raw, &mut children),
             NodeKind::TsModuleDecl(raw) => self.get_ts_module_decl_children(raw, &mut children),
             NodeKind::TsPropertySignature(raw) => self.get_ts_property_signature_children(raw, &mut children),
@@ -46,7 +49,6 @@ impl<'n> SchemyNode<'n> {
             NodeKind::TsTypeElement(raw) => self.get_ts_type_element_children(raw, &mut children),
             NodeKind::TsTypeLit(raw) => self.get_type_lit_children(raw, &mut children),
             NodeKind::TsTypeParam(raw) => self.get_ts_type_param(raw, &mut children),
-            NodeKind::TsIntersectionType(raw) => self.get_ts_intersection_type_children(raw, &mut children),
             NodeKind::TsTypeParamInstantiation(raw) => {
                 self.get_ts_type_param_instantiation_children(raw, &mut children)
             }
@@ -58,6 +60,20 @@ impl<'n> SchemyNode<'n> {
             _ => {}
         }
         children
+    }
+
+    fn get_return_statement_children(&self, raw: &'n ReturnStmt, children: &mut Vec<usize>) {
+        if let Some(arg) = &raw.arg {
+            self.get_expr_children(arg, children);
+        }
+    }
+
+    fn get_if_statement_children(&self, raw: &'n IfStmt, children: &mut Vec<usize>) {
+        self.get_expr_children(&*raw.test, children);
+        self.get_statement_children(&*raw.cons, children);
+        if let Some(alt) = &raw.alt {
+            self.get_statement_children(alt, children);
+        }
     }
 
     fn get_try_statement_children(&self, raw: &'n TryStmt, children: &mut Vec<usize>) {

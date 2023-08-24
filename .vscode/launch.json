@@ -14,6 +14,7 @@
             "terminal": "integrated",
             "stopOnEntry": false,
             "envFile": "${workspaceFolder}/native-debug/.envrc",
+            "preLaunchTask": "rust: build native-debug",
             "sourceLanguages": [
                 "rust"
             ]

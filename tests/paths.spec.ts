@@ -318,6 +318,16 @@ describe('open api generator', () => {
                                 }
                             },
                             description: "Status of animal registration"
+                        },
+                        404: {
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "number"
+                                    }
+                                }
+                            },
+                            description: "animal not found"
                         }
                     },
                     tags: [

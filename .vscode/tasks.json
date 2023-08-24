@@ -11,6 +11,14 @@
 			"problemMatcher": [],
 			"label": "npm: pretest",
 			"detail": "npm run build:addon -- --debug"
+		},
+		{
+			"type": "cargo",
+			"options": {
+				"cwd": "${workspaceFolder}/native-debug"
+			},
+			"command": "build",
+			"label": "rust: build native-debug",
 		}
 	]
 }

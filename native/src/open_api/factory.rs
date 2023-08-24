@@ -113,7 +113,7 @@ impl OpenApiFactory {
 
         self.symbol_tables.add_child_scope(file_path);
 
-        self.find_response(operation, route_handler, file_path, path_options);
+        self.find_response(operation, route_handler, file_path, path_options, &mut "".into());
 
         self.symbol_tables.parent_scope(file_path);
     }
@@ -214,6 +214,7 @@ impl OpenApiFactory {
         root: Rc<SchemyNode>,
         file_path: &str,
         path_options: &PathOptions,
+        depth: &mut String,
     ) -> () {
         for child_index in root.children() {
             let child = root.get(child_index.clone()).unwrap();
@@ -221,8 +222,8 @@ impl OpenApiFactory {
             match child.kind {
                 NodeKind::Ident(raw) if raw.sym.eq("LilResponse") => {
                     self.add_response(operation, root.parent().unwrap(), file_path, path_options)
-                }
-                _ => self.find_response(operation, child, file_path, path_options),
+                },
+                _ => self.find_response(operation, child, file_path, path_options, &mut depth.clone()),
             }
         }
     }
