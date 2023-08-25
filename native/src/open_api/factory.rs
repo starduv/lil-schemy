@@ -4,12 +4,7 @@ use lazy_static::__Deref;
 
 use swc_ecma_ast::*;
 
-use case::CaseExt;
-
-use crate::{
-    open_api::schema,
-    typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode},
-};
+use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode};
 
 use super::{
     caching::store_declaration_maybe,
@@ -339,7 +334,7 @@ impl OpenApiFactory {
                         TsKeywordTypeKind::TsStringKeyword => {
                             operation_param.content().schema().data_type("string");
                         }
-                        _ => {},
+                        _ => {}
                     },
                     TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
                         TsEntityName::Ident(identifier) => {
@@ -350,11 +345,11 @@ impl OpenApiFactory {
 
                             operation_param.content().schema().reference(root_name.into(), false);
                         }
-                        _ => {},
+                        _ => {}
                     },
                     _ => {}
                 },
-                _ => {},
+                _ => {}
             },
             None => {}
         }
@@ -684,7 +679,7 @@ impl OpenApiFactory {
                         is_required,
                     );
                 }
-                _ => {},
+                _ => {}
             },
             NodeKind::TsTypeAnnotation(_) => {
                 for child_index in root.children() {
