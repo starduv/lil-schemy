@@ -340,9 +340,7 @@ impl OpenApiFactory {
                     },
                     TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
                         TsEntityName::Ident(identifier) => {
-                            let root_name = self
-                                .symbol_tables
-                                .get_root_declaration_name(file_path, &identifier.sym);
+                            let root_name = self.symbol_tables.get_root_declaration_name(file_path, &identifier.sym);
 
                             self.deferred_schemas
                                 .defer_local_type(file_path, &root_name, &root_name, param.index);
@@ -576,7 +574,7 @@ impl OpenApiFactory {
                 _ => {
                     let name = self.symbol_tables.get_root_declaration_name(file_path, &raw_ident.sym);
                     self.define_schema_from_identifier(&name, root_schema, file_path, path_options, root, is_required);
-                },
+                }
             },
             NodeKind::TsUnionOrIntersectionType(_) => {
                 for child in root.children() {
@@ -990,6 +988,8 @@ impl OpenApiFactory {
             }
         } else if identifier.eq("Uint8Array") | identifier.eq("Buffer") {
             root_schema.data_type("string").format(Some("binary".into()));
+        } else if identifier.eq("URL") {
+            root_schema.data_type("string").format(Some("uri".into()));
         } else {
             match self.symbol_tables.get_root_declaration(file_path, identifier) {
                 Some(Declaration::Import { name, source_file_name }) => {
