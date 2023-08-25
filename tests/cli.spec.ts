@@ -16,7 +16,7 @@ describe('cli', function () {
         unlinkSync(customConfigPath);
     })
 
-    it('generates configuration in current directory', async () => {
+    it('writes configuration to current directory', async () => {
         execSync(`npx ts-node ../src/lil-schemy.ts init`, {
             cwd: __dirname
         });
@@ -26,7 +26,7 @@ describe('cli', function () {
         expect(config.openApi?.base.openapi).to.eq("3.0.3");
     })
 
-    it('generates configuration in user defined directory', async () => {
+    it('writes configuration to user defined directory', async () => {
         execSync(`npx ts-node ../src/lil-schemy.ts init --cwd ${customDirectory}`, {
             cwd: __dirname
         });

@@ -6,7 +6,10 @@ use swc_ecma_ast::*;
 
 use case::CaseExt;
 
-use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode};
+use crate::{
+    open_api::schema,
+    typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode},
+};
 
 use super::{
     caching::store_declaration_maybe,
@@ -556,24 +559,21 @@ impl OpenApiFactory {
     ) -> () {
         match root.kind {
             NodeKind::Ident(raw_ident) => match self.symbol_tables.get_root_declaration(file_path, &raw_ident.sym) {
-                Some(Declaration::Import { name, source_file_name }) => {
-                    let schema_name = match name.eq("default") {
-                        true => raw_ident.sym.to_string(),
-                        false => name.to_capitalized(),
-                    };
-
-                    self.deferred_schemas
-                        .defer_external_type(&source_file_name, &schema_name, &name);
-
-                    root_schema.reference(Some(schema_name), false);
-                }
                 Some(Declaration::Type { node: index }) => {
                     let node = root.get(index).unwrap();
                     self.define_schema_details(root_schema, &node, file_path, false, path_options);
                 }
                 _ => {
-                    let name = self.symbol_tables.get_root_declaration_name(file_path, &raw_ident.sym);
-                    self.define_schema_from_identifier(&name, root_schema, file_path, path_options, root, is_required);
+                    let schema_name = self.symbol_tables.get_root_declaration_name(file_path, &raw_ident.sym);
+
+                    self.define_schema_from_identifier(
+                        &schema_name,
+                        root_schema,
+                        file_path,
+                        path_options,
+                        root,
+                        is_required,
+                    );
                 }
             },
             NodeKind::TsUnionOrIntersectionType(_) => {

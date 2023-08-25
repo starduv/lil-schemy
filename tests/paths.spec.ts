@@ -22,23 +22,108 @@ describe('open api generator', () => {
 
     it('generates schemas', () => {
         expect(schema.components?.schemas).to.deep.equalInAnyOrder({
+            Account: {
+                properties: {
+                    number: {
+                        type: "string"
+                    }
+                },
+                type: "object"
+            },
+            AdminUser: {
+                properties: {
+                    name: {
+                        type: "string"
+                    },
+                    permissions: {
+                        items: {
+                            type: "string"
+                        },
+                        type: "array"
+                    }
+                },
+                type: "object"
+            },
+            Registration: {
+                properties: {
+                    date: {
+                        type: "string"
+                    }
+                },
+                type: "object"
+            },
+            CreateUserRequest: {
+                properties: {
+                    name: {
+                        type: "string"
+                    }
+                },
+                type: "object"
+            },
             AnimalKind: {
-                enum: ["cat", "dog", "bird"],
-                type: "string",
+                enum: [
+                    "dog",
+                    "cat",
+                    "bird"
+                ],
+                type: "string"
+            },
+            User: {
+                properties: {
+                    name: {
+                        type: "string"
+                    }
+                },
+                type: "object"
+            },
+            AnimalUpdate: {
+                allOf: [
+                    {
+                        $ref: "#/components/schemas/Registered"
+                    },
+                    {
+                        properties: {
+                            name: {
+                                type: "string"
+                            },
+                            mood: {
+                                $ref: "#/components/schemas/AnimalMood"
+                            }
+                        },
+                        type: "object"
+                    }
+                ]
+            },
+            Registered: {
+                properties: {
+                    serialNumber: {
+                        type: "string"
+                    },
+                    record: {
+                        $ref: "#/components/schemas/Registration"
+                    }
+                },
+                type: "object"
+            },
+            UserPatch: {
+                type: "object"
+            },
+            AdjacentLicense: {
+                $ref: "#/components/schemas/AnimalLicense"
             },
             AnimalLicense: {
                 properties: {
-                    adjacents: {
-                        items: {
-                            $ref: "#/components/schemas/AdjacentLicense"
-                        },
-                        type: "array"
-                    },
                     exp: {
                         type: "string"
                     },
                     state: {
                         type: "string"
+                    },
+                    adjacents: {
+                        items: {
+                            $ref: "#/components/schemas/AdjacentLicense"
+                        },
+                        type: "array"
                     }
                 },
                 type: "object"
@@ -46,244 +131,60 @@ describe('open api generator', () => {
             AnimalMood: {
                 anyOf: [
                     {
-                        enum: [
-                            "happy",
-                            "sad",
-                            "angry"
-                        ]
-                    },
-                    {
-                        type: 'object',
                         properties: {
                             ambivalence: {
                                 type: "number"
                             }
                         },
-                    }
-                ]
-            },
-            AnimalUpdate: {
-                allOf: [
-                    {
-                        $ref: "#/components/schemas/Registered",
+                        type: "object"
                     },
                     {
-                        type: "object",
-                        properties: {
-                            mood: {
-                                $ref: "#/components/schemas/AnimalMood"
-                            },
-                            name: {
-                                type: "string"
-                            },
-                        }
+                        enum: [
+                            "happy",
+                            "sad",
+                            "angry"
+                        ]
                     }
                 ]
-            },
-            User: {
-                type: "object",
-                properties: {
-                    name: {
-                        type: "string"
-                    }
-                },
-            },
-            UserPatch: {
-                type: "object",
-            },
-            CreateUserRequest: {
-                type: 'object',
-                properties: {
-                    name: {
-                        type: 'string'
-                    }
-                },
-            },
-            Account: {
-                type: 'object',
-                properties: {
-                    number: {
-                        type: 'string'
-                    }
-                },
-            },
-            AdjacentLicense: {
-                $ref: "#/components/schemas/AnimalLicense"
-            },
-            AdminUser: {
-                type: 'object',
-                properties: {
-                    permissions: {
-                        type: 'array',
-                        items: {
-                            type: 'string'
-                        }
-                    },
-                    name: {
-                        type: 'string'
-                    }
-                },
-            },
-            Registered: {
-                type: 'object',
-                properties: {
-                    serialNumber: {
-                        type: 'string'
-                    },
-                    record: {
-                        $ref: '#/components/schemas/Registration'
-                    }
-                },
-            },
-            Registration: {
-                type: 'object',
-                properties: {
-                    date: {
-                        type: 'string',
-                    },
-                },
             }
         });
     });
 
     it('generates paths', () => {
         expect(schema.paths).to.deep.equal({
-            "/animals": {
-                get: {
-                    tags: ["Animals"],
-                    responses: {
-                        200: {
-                            description: "List animals of a specific kind",
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        type: "array",
-                                        items: {
-                                            type: "string"
-                                        }
-                                    }
+            "/animals/{id}/unregister": {
+                post: {
+                    requestBody: {
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    $ref: "#/components/schemas/AnimalUpdate"
                                 }
                             }
-                        }
+                        },
+                        required: false
                     },
-                    parameters: [
-                        {
-                            in: "query",
-                            name: "kind",
-                            required: true,
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        $ref: "#/components/schemas/AnimalKind"
-                                    }
-                                },
-                            }
-                        }
-                    ]
-                },
-            },
-            "/animals/{id}": {
-                get: {
-                    tags: ["Animals"],
                     responses: {
                         200: {
                             description: "A specific animal",
                             content: {
                                 "application/json": {
                                     schema: {
-                                        type: "object",
                                         properties: {
-                                            name: {
-                                                type: "string"
-                                            },
                                             shots: {
-                                                type: "array",
                                                 items: {
                                                     type: "string"
-                                                }
-                                            }
-                                        },
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    parameters: [
-                        {
-                            in: "path",
-                            name: "id",
-                            required: true,
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        type: "number"
-                                    }
-                                },
-                            }
-                        }
-                    ]
-                },
-                "post": {
-                    requestBody: {
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    $ref: "#/components/schemas/AnimalUpdate"
-                                }
-                            }
-                        },
-                        required: false
-                    },
-                    responses: {
-                        200: {
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        type: "object",
-                                        properties: {
+                                                },
+                                                type: "array"
+                                            },
                                             name: {
                                                 type: "string"
-                                            },
-                                            shots: {
-                                                type: "array",
-                                                items: {
-                                                    type: "string"
-                                                }
                                             }
                                         },
+                                        type: "object"
                                     }
-                                }
-                            },
-                            description: "A specific animal"
-                        }
-                    },
-                    tags: [
-                        "Animals"
-                    ]
-                }
-            },
-            "/animals/{id}/license": {
-                get: {
-                    requestBody: {
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    $ref: "#/components/schemas/AnimalUpdate"
                                 }
                             }
-                        },
-                        required: false
-                    },
-                    responses: {
-                        200: {
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        $ref: "#/components/schemas/AnimalLicense"
-                                    }
-                                }
-                            },
-                            description: "A specific animal license"
                         }
                     },
                     tags: [
@@ -313,6 +214,7 @@ describe('open api generator', () => {
                     },
                     responses: {
                         200: {
+                            description: "Status of animal registration",
                             content: {
                                 "application/json": {
                                     schema: {
@@ -324,58 +226,17 @@ describe('open api generator', () => {
                                         type: "object"
                                     }
                                 }
-                            },
-                            description: "Status of animal registration"
+                            }
                         },
                         404: {
+                            description: "animal not found",
                             content: {
                                 "application/json": {
                                     schema: {
                                         type: "number"
                                     }
                                 }
-                            },
-                            description: "animal not found"
-                        }
-                    },
-                    tags: [
-                        "Animals"
-                    ]
-                }
-            },
-            "/animals/{id}/unregister": {
-                post: {
-                    requestBody: {
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    "$ref": "#/components/schemas/AnimalUpdate"
-                                }
                             }
-                        },
-                        required: false
-                    },
-                    responses: {
-                        200: {
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        type: "object",
-                                        properties: {
-                                            name: {
-                                                type: "string"
-                                            },
-                                            shots: {
-                                                type: "array",
-                                                items: {
-                                                    type: "string"
-                                                }
-                                            }
-                                        },
-                                    }
-                                }
-                            },
-                            description: "A specific animal"
                         }
                     },
                     tags: [
@@ -387,15 +248,15 @@ describe('open api generator', () => {
                 get: {
                     parameters: [
                         {
+                            name: "id",
+                            in: "path",
                             content: {
                                 "application/json": {
-                                    "schema": {
-                                        "type": "string"
+                                    schema: {
+                                        type: "string"
                                     }
                                 }
                             },
-                            in: "path",
-                            name: "id",
                             required: true
                         }
                     ],
@@ -411,26 +272,264 @@ describe('open api generator', () => {
                             }
                         }
                     },
-                    tags: ["Account"]
+                    tags: [
+                        "Account"
+                    ]
                 }
             },
-            "/user": {
+            "/animals": {
                 get: {
-                    responses: {
-                        200: {
-                            description: "Who am I",
+                    parameters: [
+                        {
+                            name: "kind",
+                            in: "query",
                             content: {
                                 "application/json": {
                                     schema: {
-                                        $ref: "#/components/schemas/User",
-                                    },
-                                    example: {
-                                        $ref: "#/components/examples/User"
+                                        $ref: "#/components/schemas/AnimalKind"
+                                    }
+                                }
+                            },
+                            required: true
+                        }
+                    ],
+                    responses: {
+                        200: {
+                            description: "List animals of a specific kind",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        items: {
+                                            type: "string"
+                                        },
+                                        type: "array"
                                     }
                                 }
                             }
                         }
                     },
+                    tags: [
+                        "Animals"
+                    ]
+                }
+            },
+            "/user/{id}": {
+                get: {
+                    parameters: [
+                        {
+                            name: "id",
+                            in: "path",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "string"
+                                    }
+                                }
+                            },
+                            required: true
+                        }
+                    ],
+                    responses: {
+                        200: {
+                            description: "a specific admin user",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/AdminUser"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                delete: {
+                    parameters: [
+                        {
+                            name: "id",
+                            in: "path",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "string"
+                                    }
+                                }
+                            },
+                            required: true
+                        }
+                    ],
+                    responses: {
+                        204: {
+                            description: "no content",
+                            content: {
+                                "application/json": {
+                                    schema: {},
+                                    example: {
+                                        $ref: "#/components/examples/NoContent"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    tags: [
+                        "Admin",
+                        "Users"
+                    ]
+                },
+                patch: {
+                    parameters: [
+                        {
+                            name: "id",
+                            in: "path",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "string"
+                                    }
+                                }
+                            },
+                            required: true
+                        },
+                        {
+                            name: "date",
+                            in: "query",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        format: "date",
+                                        type: "string"
+                                    }
+                                }
+                            },
+                            required: false
+                        }
+                    ],
+                    responses: {
+                        202: {
+                            description: "a modified admin user",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/AdminUser"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/animals/{id}": {
+                get: {
+                    parameters: [
+                        {
+                            name: "id",
+                            in: "path",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        type: "number"
+                                    }
+                                }
+                            },
+                            required: true
+                        }
+                    ],
+                    responses: {
+                        200: {
+                            description: "A specific animal",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        properties: {
+                                            shots: {
+                                                items: {
+                                                    type: "string"
+                                                },
+                                                type: "array"
+                                            },
+                                            name: {
+                                                type: "string"
+                                            }
+                                        },
+                                        type: "object"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    tags: [
+                        "Animals"
+                    ]
+                },
+                post: {
+                    requestBody: {
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    $ref: "#/components/schemas/AnimalUpdate"
+                                }
+                            }
+                        },
+                        required: false
+                    },
+                    responses: {
+                        200: {
+                            description: "A specific animal",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        properties: {
+                                            shots: {
+                                                items: {
+                                                    type: "string"
+                                                },
+                                                type: "array"
+                                            },
+                                            name: {
+                                                type: "string"
+                                            }
+                                        },
+                                        type: "object"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    tags: [
+                        "Animals"
+                    ]
+                }
+            },
+            "/animals/{id}/license": {
+                get: {
+                    requestBody: {
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    $ref: "#/components/schemas/AnimalUpdate"
+                                }
+                            }
+                        },
+                        required: false
+                    },
+                    responses: {
+                        200: {
+                            description: "A specific animal license",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/AnimalLicense"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    tags: [
+                        "Animals"
+                    ]
+                }
+            },
+            "/user": {
+                get: {
                     parameters: [
                         {
                             name: "lat",
@@ -462,15 +561,57 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        "$ref": "#/components/schemas/User"
+                                        $ref: "#/components/schemas/User"
                                     }
                                 }
                             },
                             required: true
                         }
                     ],
+                    responses: {
+                        200: {
+                            description: "Who am I",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/User"
+                                    },
+                                    example: {
+                                        $ref: "#/components/examples/User"
+                                    }
+                                }
+                            }
+                        }
+                    },
                     tags: [
                         "Users"
+                    ]
+                },
+                put: {
+                    requestBody: {
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    $ref: "#/components/schemas/UserPatch"
+                                }
+                            }
+                        },
+                        required: false
+                    },
+                    responses: {
+                        202: {
+                            description: "Updated User",
+                            content: {
+                                "application/json": {
+                                    schema: {
+                                        $ref: "#/components/schemas/AdminUser"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    tags: [
+                        "User"
                     ]
                 },
                 post: {
@@ -496,132 +637,9 @@ describe('open api generator', () => {
                             }
                         }
                     },
-                    tags: ["Admin"]
-                },
-                put: {
-                    requestBody: {
-                        content: {
-                            "application/json": {
-                                schema: {
-                                    $ref: "#/components/schemas/UserPatch"
-                                }
-                            }
-                        },
-                        required: false
-                    },
-                    responses: {
-                        202: {
-                            description: "Updated User",
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        $ref: "#/components/schemas/AdminUser"
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    tags: ["User"]
-                }
-            },
-            "/user/{id}": {
-                get: {
-                    parameters: [
-                        {
-                            in: "path",
-                            name: "id",
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        type: "string",
-                                    }
-                                }
-                            },
-                            required: true
-                        }
-                    ],
-                    responses: {
-                        200: {
-                            description: "a specific admin user",
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        $ref: "#/components/schemas/AdminUser"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                patch: {
-                    parameters: [
-                        {
-                            in: "path",
-                            name: "id",
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        type: "string",
-                                    }
-                                }
-                            },
-                            required: true
-                        },
-                        {
-                            in: "query",
-                            name: "date",
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        type: "string",
-                                        format: "date"
-                                    }
-                                }
-                            },
-                            required: false
-                        }
-                    ],
-                    responses: {
-                        202: {
-                            description: "a modified admin user",
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        $ref: "#/components/schemas/Admin",
-                                    },
-                                }
-                            }
-                        }
-                    }
-                },
-                delete: {
-                    parameters: [
-                        {
-                            in: "path",
-                            name: "id",
-                            content: {
-                                "application/json": {
-                                    schema: {
-                                        type: "string",
-                                    }
-                                }
-                            },
-                            required: true
-                        }
-                    ],
-                    responses: {
-                        204: {
-                            description: "no content",
-                            content: {
-                                "application/json": {
-                                    example: {
-                                        $ref: "#/components/examples/NoContent"
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    tags: ["Admin", "Users"],
+                    tags: [
+                        "Admin"
+                    ]
                 }
             }
         });
