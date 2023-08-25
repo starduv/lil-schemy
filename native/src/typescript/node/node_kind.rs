@@ -1,8 +1,13 @@
 use std::fmt::Debug;
 use swc_ecma_ast::*;
 
-// #[derive(Debug)]
+#[derive(PartialEq)]
 pub enum NodeKind<'m> {
+    TsExprWithTypeArgs(&'m TsExprWithTypeArgs),
+    BindingIdent(&'m BindingIdent),
+    Constructor(&'m Constructor),
+    TsTypeParam(&'m TsTypeParam),
+    TsEntityName(&'m TsEntityName),
     TsTypeParamDecl(&'m TsTypeParamDecl),
     MemberProp(&'m MemberProp),
     TsModuleBlock(&'m TsModuleBlock),
@@ -26,7 +31,7 @@ pub enum NodeKind<'m> {
     NewExpr(&'m NewExpr),
     SeqExpr(&'m SeqExpr),
     Lit(&'m Lit),
-    Tpl(&'m Tpl),
+    TemplateLiteral(&'m Tpl),
     TaggedTpl(&'m TaggedTpl),
     YieldExpr(&'m YieldExpr),
     MetaPropExpr(&'m MetaPropExpr),
@@ -123,6 +128,17 @@ pub enum NodeKind<'m> {
     VarDeclarator(&'m VarDeclarator),
     WhileStmt(&'m WhileStmt),
     WithStmt(&'m WithStmt),
+    TsQualifiedName(&'m TsQualifiedName),
+    Str(&'m Str),
+    Bool(&'m Bool),
+    Null(&'m Null),
+    Num(&'m Number),
+    BigInt(&'m BigInt),
+    Regex(&'m Regex),
+    DefaultDecl(&'m DefaultDecl),
+    TsUnionType(&'m TsUnionType),
+    TsIntersectionType(&'m TsIntersectionType),
+    TsTplLit(&'m TsTplLitType),
 }
 
 impl<'n> Clone for NodeKind<'n> {
@@ -223,7 +239,7 @@ impl<'n> Clone for NodeKind<'n> {
             NodeKind::NewExpr(raw) => NodeKind::NewExpr(raw),
             NodeKind::SeqExpr(raw) => NodeKind::SeqExpr(raw),
             NodeKind::Lit(raw) => NodeKind::Lit(raw),
-            NodeKind::Tpl(raw) => NodeKind::Tpl(raw),
+            NodeKind::TemplateLiteral(raw) => NodeKind::TemplateLiteral(raw),
             NodeKind::TaggedTpl(raw) => NodeKind::TaggedTpl(raw),
             NodeKind::YieldExpr(raw) => NodeKind::YieldExpr(raw),
             NodeKind::MetaPropExpr(raw) => NodeKind::MetaPropExpr(raw),
@@ -248,6 +264,22 @@ impl<'n> Clone for NodeKind<'n> {
             NodeKind::TsNamespaceDecl(raw) => NodeKind::TsNamespaceDecl(raw),
             NodeKind::MemberProp(raw) => NodeKind::MemberProp(raw),
             NodeKind::TsTypeParamDecl(raw) => NodeKind::TsTypeParamDecl(raw),
+            NodeKind::TsEntityName(raw) => NodeKind::TsEntityName(raw),
+            NodeKind::TsQualifiedName(raw) => NodeKind::TsQualifiedName(raw),
+            NodeKind::Str(raw) => NodeKind::Str(raw),
+            NodeKind::Bool(raw) => NodeKind::Bool(raw),
+            NodeKind::Null(raw) => NodeKind::Null(raw),
+            NodeKind::Num(raw) => NodeKind::Num(raw),
+            NodeKind::BigInt(raw) => NodeKind::BigInt(raw),
+            NodeKind::Regex(raw) => NodeKind::Regex(raw),
+            NodeKind::TsTypeParam(raw) => NodeKind::TsTypeParam(raw),
+            NodeKind::DefaultDecl(raw) => NodeKind::DefaultDecl(raw),
+            NodeKind::Constructor(raw) => NodeKind::Constructor(raw),
+            NodeKind::BindingIdent(raw) => NodeKind::BindingIdent(raw),
+            NodeKind::TsExprWithTypeArgs(raw) => NodeKind::TsExprWithTypeArgs(raw),
+            NodeKind::TsUnionType(raw) => NodeKind::TsUnionType(raw),
+            NodeKind::TsIntersectionType(raw) => NodeKind::TsIntersectionType(raw),
+            NodeKind::TsTplLit(raw) => NodeKind::TsTplLit(raw),
         }
     }
 }
@@ -350,7 +382,7 @@ impl<'m> Debug for NodeKind<'m> {
             NodeKind::NewExpr(_) => f.debug_tuple("NewExpr").finish(),
             NodeKind::SeqExpr(_) => f.debug_tuple("SeqExpr").finish(),
             NodeKind::Lit(_) => f.debug_tuple("Lit").finish(),
-            NodeKind::Tpl(_) => f.debug_tuple("Tpl").finish(),
+            NodeKind::TemplateLiteral(_) => f.debug_tuple("Tpl").finish(),
             NodeKind::TaggedTpl(_) => f.debug_tuple("TaggedTpl").finish(),
             NodeKind::YieldExpr(_) => f.debug_tuple("YieldExpr").finish(),
             NodeKind::MetaPropExpr(_) => f.debug_tuple("MetaPropExpr").finish(),
@@ -375,6 +407,22 @@ impl<'m> Debug for NodeKind<'m> {
             NodeKind::TsNamespaceDecl(_) => f.debug_tuple("TsNamespaceDecl").finish(),
             NodeKind::MemberProp(_) => f.debug_tuple("MemberProp").finish(),
             NodeKind::TsTypeParamDecl(_) => f.debug_tuple("TsTypeParamDecl").finish(),
+            NodeKind::TsEntityName(_) => f.debug_tuple("TsEntityName").finish(),
+            NodeKind::TsQualifiedName(_) => f.debug_tuple("TsQualifiedName").finish(),
+            NodeKind::Str(_) => f.debug_tuple("Str").finish(),
+            NodeKind::Bool(_) => f.debug_tuple("Bool").finish(),
+            NodeKind::Null(_) => f.debug_tuple("Null").finish(),
+            NodeKind::Num(_) => f.debug_tuple("Num").finish(),
+            NodeKind::BigInt(_) => f.debug_tuple("BigInt").finish(),
+            NodeKind::Regex(_) => f.debug_tuple("Regex").finish(),
+            NodeKind::TsTypeParam(_) => f.debug_tuple("TsTypeParam").finish(),
+            NodeKind::DefaultDecl(_) => f.debug_tuple("DefaultDecl").finish(),
+            NodeKind::Constructor(_) => f.debug_tuple("Constructor").finish(),
+            NodeKind::BindingIdent(_) => f.debug_tuple("BindingIdent").finish(),
+            NodeKind::TsExprWithTypeArgs(_) => f.debug_tuple("TsExprWithTypeArgs").finish(),
+            NodeKind::TsUnionType(_) => f.debug_tuple("TsUnionType").finish(),
+            NodeKind::TsIntersectionType(_) => f.debug_tuple("TsIntersectionType").finish(),
+            NodeKind::TsTplLit(_) => f.debug_tuple("TsTplLit").finish(),
         }
     }
 }

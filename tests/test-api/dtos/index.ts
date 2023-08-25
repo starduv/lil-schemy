@@ -1,4 +1,4 @@
-import { Header, QueryParam, RouteParam } from '../../../src';
+import { LilHeader, LilQueryParam, LilRouteParam } from '../../../src';
 
 export { CreateUserRequest, default as UserPatch } from './requests';
 
@@ -15,8 +15,8 @@ class AdminUser {
     name!: string;
 }
 
-export interface GetUserRequest { lat: QueryParam<number, false>, long: QueryParam<number, false>; headers: { user: Header<User, true, "v1">; }; }
+export interface GetUserRequest { lat: LilQueryParam<number, false>, long: LilQueryParam<number, false>; headers: { user: LilHeader<User, true, "v1">; }; }
 
-export interface UserPatchRequest { id: RouteParam<string, true>; date: QueryParam<string, false, undefined, "date">; }
+export interface UserPatchRequest { id: LilRouteParam<string, true>; date: LilQueryParam<string, false, undefined, "date">; }
 
 export default AdminUser

@@ -24,7 +24,7 @@ impl<'m> ModuleCache {
 
     pub fn parse(&mut self, path: &str) -> Rc<SchemyNode> {
         self.cache.entry(path.to_string()).or_insert_with(|| {
-            let fm = self.cm.load_file(Path::new(path)).expect("failed to load test.js");
+            let fm = self.cm.load_file(Path::new(path)).expect(format!("Could not load file '{}'", path).as_str());
             let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(self.cm.clone()));
 
             let lexer = Lexer::new(
@@ -46,7 +46,7 @@ impl<'m> ModuleCache {
                     // Unrecoverable fatal error occurred
                     e.into_diagnostic(&handler).emit()
                 })
-                .expect("failed to parser module")
+                .expect(format!("Could not parse module '{}'", path).as_str())
         });
 
         SchemyNode::from_module(self.cache.get(path).unwrap())

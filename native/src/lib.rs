@@ -6,6 +6,8 @@ mod utils;
 use neon::{prelude::*, result::Throw};
 use open_api::generate_openapi;
 
+pub use open_api::generate_openapi_debug;
+
 fn generate_schemas(mut cx: FunctionContext) -> Result<Handle<JsObject>, Throw> {
     let schemas_result: Handle<JsObject> = cx.empty_object();
     let options_handle: Handle<JsObject> = cx.argument(0)?;

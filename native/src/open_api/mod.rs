@@ -1,3 +1,4 @@
+mod caching;
 mod deferred;
 mod factory;
 mod schema;
@@ -16,13 +17,10 @@ use self::{factory::OpenApiFactory, schema::OpenApi};
 
 fn merge_schemas(
     open_api: &OpenApi,
-    open_api_handle: Handle<JsObject>,
-    cx: &mut FunctionContext,
+    base_schema: serde_json::Value,
 ) -> Result<String, Throw> {
-    let base_handle: Handle<JsString> = open_api_handle.get(cx, "base")?;
-    let base = serde_json::from_str(&base_handle.value(cx)).expect("Could not deserialize base schema");
     let mut generated = json!(open_api);
-    merge(&mut generated, &base);
+    merge(&mut generated, &base_schema);
     Ok(generated.to_string())
 }
 
@@ -54,7 +52,26 @@ fn generate_schema(open_api_handle: Handle<JsObject>, cx: &mut FunctionContext) 
         factory.append_schema(&mut open_api, &path, &mut module_cache);
     }
 
-    merge_schemas(&mut open_api, open_api_handle, cx)
+    factory.append_deferred_schemas(&mut open_api, &mut module_cache);
+
+    let base_handle: Handle<JsString> = open_api_handle.get(cx, "base")?;
+    let base = serde_json::from_str(&base_handle.value(cx)).expect("Could not deserialize base schema");
+
+    merge_schemas(&mut open_api, base)
+}
+
+pub fn generate_openapi_debug(paths: Vec<String>) -> Result<String, Throw> {
+    let mut factory = OpenApiFactory::new();
+    let mut module_cache = ModuleCache::new();
+
+    let mut open_api = OpenApi::new();
+    for path in paths {
+        factory.append_schema(&mut open_api, &path, &mut module_cache);
+    }
+
+    factory.append_deferred_schemas(&mut open_api, &mut module_cache);
+
+    merge_schemas(&mut open_api, json!({}))
 }
 
 pub fn generate_openapi(

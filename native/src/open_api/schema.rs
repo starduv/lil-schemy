@@ -1,8 +1,12 @@
+use std::{cell::RefCell, rc::Rc, vec};
+
 use ahash::{HashMap, HashMapExt, HashSet, HashSetExt};
 use serde::{ser::SerializeStruct, Serialize, Serializer};
 
 #[derive(Serialize, Debug)]
 pub struct OpenApi {
+    #[serde(rename = "openapi")]
+    pub open_api: String,
     pub components: ApiComponents,
     pub paths: HashMap<String, ApiPath>,
 }
@@ -10,6 +14,7 @@ pub struct OpenApi {
 impl OpenApi {
     pub fn new() -> Self {
         OpenApi {
+            open_api: "3.0.1".to_string(),
             components: ApiComponents::new(),
             paths: HashMap::new(),
         }
@@ -40,6 +45,10 @@ impl ApiComponents {
     pub fn schema(&mut self, name: &str) -> &mut ApiSchema {
         self.schemas.entry(name.to_string()).or_insert(ApiSchema::new())
     }
+
+    pub(crate) fn contains_schema(&self, type_name: &str) -> bool {
+        self.schemas.contains_key(type_name)
+    }
 }
 
 #[derive(Serialize, Debug)]
@@ -51,25 +60,25 @@ pub struct ApiPath {
     #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    get: Option<ApiPathOperation>,
+    get: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    put: Option<ApiPathOperation>,
+    put: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    post: Option<ApiPathOperation>,
+    post: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    delete: Option<ApiPathOperation>,
+    delete: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    options: Option<ApiPathOperation>,
+    options: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    head: Option<ApiPathOperation>,
+    head: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    patch: Option<ApiPathOperation>,
+    patch: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    trace: Option<ApiPathOperation>,
+    trace: Option<Rc<RefCell<ApiPathOperation>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     servers: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    parameters: Option<ApiPathParameter>,
+    parameters: Option<Rc<RefCell<ApiPathParameter>>>,
 }
 
 impl<'v> ApiPath {
@@ -91,16 +100,16 @@ impl<'v> ApiPath {
         }
     }
 
-    pub fn add_operation(&mut self, method: &str) -> *mut ApiPathOperation {
+    pub fn add_operation(&mut self, method: &str) -> &Rc<RefCell<ApiPathOperation>> {
         match method.to_lowercase().as_str() {
-            "get" => self.get.insert(ApiPathOperation::new()),
-            "put" => self.put.insert(ApiPathOperation::new()),
-            "post" => self.post.insert(ApiPathOperation::new()),
-            "delete" => self.delete.insert(ApiPathOperation::new()),
-            "options" => self.options.insert(ApiPathOperation::new()),
-            "head" => self.head.insert(ApiPathOperation::new()),
-            "patch" => self.patch.insert(ApiPathOperation::new()),
-            "trace" => self.trace.insert(ApiPathOperation::new()),
+            "get" => self.get.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "put" => self.put.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "post" => self.post.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "delete" => self.delete.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "options" => self.options.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "head" => self.head.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "patch" => self.patch.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
+            "trace" => self.trace.insert(Rc::new(RefCell::new(ApiPathOperation::new()))),
             other => panic!("Unsupported http method '{}'", other),
         }
     }
@@ -136,33 +145,9 @@ impl ApiPathOperation {
         self
     }
 
-    pub(crate) fn response(
-        &mut self,
-        response_type: &Option<String>,
-        response_args: ResponseOptions,
-    ) -> &mut ApiResponse {
-        let status_code = response_args
-            .status_code
-            .expect("An ApiResponse must have a status code");
-
-        let description = response_args
-            .description
-            .expect("An ApiResponse must have a description");
-
-        let mut response = ApiResponse::new(description);
-
-        let content = response
-            .content()
-            .example(response_args.example, response_args.namespace.clone());
-
-        if response_type.is_some() {
-            content
-                .schema()
-                .reference(response_type.to_owned(), false)
-                .namespace(response_args.namespace);
-        }
-
-        self.responses.entry(status_code).or_insert(response)
+    pub(crate) fn response(&mut self, status_code: &str, description: &str) -> &mut ApiResponse {
+        let response = ApiResponse::new(description);
+        self.responses.entry(status_code.into()).or_insert(response)
     }
 
     pub(crate) fn param(&mut self, name: &str, location: &str) -> &mut ApiParam {
@@ -196,10 +181,10 @@ pub struct ApiResponse {
 }
 
 impl ApiResponse {
-    fn new(description: String) -> Self {
+    fn new(description: &str) -> Self {
         ApiResponse {
             content: None,
-            description,
+            description: description.to_string(),
             examples: None,
             headers: None,
             links: None,
@@ -234,10 +219,10 @@ impl ApiConent {
         self.schema.get_or_insert(ApiSchema::new())
     }
 
-    pub fn example(&mut self, example: Option<String>, namespace: Option<String>) -> &mut ApiConent {
+    pub fn example(&mut self, example: Option<String>) -> &mut ApiConent {
         if example.is_some() {
             let mut schema = ApiSchema::new();
-            schema.reference(example, true).namespace(namespace);
+            schema.reference(example, true);
             self.example = Some(Box::new(schema));
         }
         self
@@ -246,13 +231,15 @@ impl ApiConent {
 
 #[derive(Clone, Debug)]
 pub struct ApiSchema {
-    items: Option<Box<ApiSchema>>,
-    format: Option<String>,
+    any_of: Option<Vec<ApiSchema>>,
+    all_of: Option<Vec<ApiSchema>>,
     data_type: Option<String>,
-    reference: Option<String>,
-    namespace: Option<String>,
+    enums: Option<Vec<String>>,
+    format: Option<String>,
     is_example: bool,
+    items: Option<Box<ApiSchema>>,
     properties: Option<HashMap<String, ApiSchema>>,
+    reference: Option<String>,
     required: HashSet<String>,
 }
 
@@ -262,6 +249,16 @@ impl Serialize for ApiSchema {
         S: Serializer,
     {
         let mut state = serializer.serialize_struct("ApiSchema", 5)?;
+
+        if let Some(ref any_of) = self.any_of {
+            state.serialize_field("anyOf", any_of)?;
+        }
+        if let Some(ref all_of) = self.all_of {
+            state.serialize_field("allOf", all_of)?;
+        }
+        if let Some(ref enums) = self.enums {
+            state.serialize_field("enum", enums)?;
+        }
         if let Some(ref format) = self.format {
             state.serialize_field("format", format)?;
         }
@@ -283,14 +280,6 @@ impl Serialize for ApiSchema {
                 false => "#/components/schemas/",
             });
 
-            if let Some(ref namespace) = self.namespace {
-                path.push_str(namespace);
-                match self.is_example {
-                    true => path.push('.'),
-                    false => path.push_str("/properties/"),
-                }
-            }
-
             path.push_str(reference);
             state.serialize_field("$ref", &path)?;
         }
@@ -301,13 +290,15 @@ impl Serialize for ApiSchema {
 impl ApiSchema {
     pub fn new() -> Self {
         ApiSchema {
-            format: None,
+            any_of: None,
+            all_of: None,
             data_type: None,
-            reference: None,
-            namespace: None,
+            enums: None,
+            format: None,
             is_example: false,
             items: None,
             properties: None,
+            reference: None,
             required: HashSet::new(),
         }
     }
@@ -318,25 +309,22 @@ impl ApiSchema {
     }
 
     pub fn format(&mut self, format: Option<String>) -> &mut ApiSchema {
-        // TODO add format tests
         self.format = format;
-        self
-    }
-
-    pub fn namespace(&mut self, namespace: Option<String>) -> &mut ApiSchema {
-        self.namespace = namespace;
         self
     }
 
     pub fn reference(&mut self, reference: Option<String>, is_example: bool) -> &mut ApiSchema {
         self.is_example = is_example;
-        self.reference = reference;
+        self.reference = reference.clone();
+        self
+    }
+
+    pub fn required_field(&mut self, name: &str) -> &mut ApiSchema {
+        self.required.insert(name.to_string());
         self
     }
 
     pub fn property(&mut self, name_text: &str) -> &mut ApiSchema {
-        self.required.insert(name_text.to_string());
-
         self.properties
             .get_or_insert(HashMap::new())
             .entry(name_text.to_string())
@@ -350,6 +338,31 @@ impl ApiSchema {
 
     pub fn items(&mut self) -> &mut ApiSchema {
         self.items.get_or_insert(Box::new(ApiSchema::new()))
+    }
+
+    pub(crate) fn enum_value(&mut self, value: &str) {
+        self.enums.get_or_insert(Vec::new()).push(value.to_string());
+    }
+
+    pub(crate) fn any_of(&mut self) -> &mut Vec<ApiSchema> {
+        self.any_of.get_or_insert(vec![])
+    }
+
+    pub(crate) fn all_of(&mut self) -> &mut Vec<ApiSchema> {
+        self.all_of.get_or_insert(vec![])
+    }
+
+    fn append_enums(&mut self, enums: &Vec<String>) -> &mut ApiSchema {
+        self.enums.get_or_insert(Vec::new()).extend(enums.iter().cloned());
+        self
+    }
+
+    pub(crate) fn has_enums(&self) -> bool {
+        if let Some(enums) = &self.enums {
+            enums.len() > 0
+        } else {
+            false
+        }
     }
 }
 
@@ -388,7 +401,7 @@ impl ApiParam {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Default)]
 pub struct PathOptions {
     pub method: Option<String>,
     pub path: Option<String>,
@@ -409,7 +422,6 @@ impl PathOptions {
 pub struct ResponseOptions {
     pub description: Option<String>,
     pub example: Option<String>,
-    pub namespace: Option<String>,
     pub status_code: Option<String>,
 }
 impl ResponseOptions {
@@ -417,8 +429,13 @@ impl ResponseOptions {
         ResponseOptions {
             description: None,
             example: None,
-            namespace: None,
             status_code: None,
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct AllOf {
+    #[serde(rename = "allOf")]
+    all_of: Vec<ApiSchema>,
 }

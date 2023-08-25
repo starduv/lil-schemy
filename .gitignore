@@ -151,3 +151,5 @@ lib/
 
 # test generated files
 tests/**/schemy-config.js
+
+.envrc

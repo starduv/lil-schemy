@@ -1,5 +1,5 @@
 [package]
-name = "lil-schemy"
+name = "lil_schemy"
 version = "0.0.1"
 edition = "2021"
 authors = ["Joel C Rainear-Wills <starshiprdubb@gmail.com>"]
@@ -7,7 +7,7 @@ exclude = ["index.node"]
 rust-version = "1.66.0"
 
 [lib]
-crate-type=["cdylib"]
+crate-type=["cdylib", "lib"]
 
 [dependencies]
 lazy_static = "1.4.0"
@@ -15,9 +15,10 @@ url = "2.3.1"
 es_resolve = "0.4.2"
 ahash = "0.8.2"
 serde_json = { version = "1.0.89", features = ["preserve_order"] }
-serde = { version = "1.0.148", features = ["derive"] }
+serde = { version = "1.0.148", features = ["derive", "rc"] }
 neon = { version = "0.10.1", default-features = false, features = ["napi-1"] }
 swc_ecma_parser = "0.137.5"
 swc_atoms = "0.5.8"
 swc_common = { version = "0.31.18", features = ["tty-emitter"] }
 swc_ecma_ast = "0.107.2"
+case = "1.0.0"
