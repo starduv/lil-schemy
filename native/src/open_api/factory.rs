@@ -339,7 +339,7 @@ impl OpenApiFactory {
                         TsKeywordTypeKind::TsStringKeyword => {
                             operation_param.content().schema().data_type("string");
                         }
-                        _ => println!("found this while looking for param type: {:?}", raw_keyword.kind),
+                        _ => {},
                     },
                     TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
                         TsEntityName::Ident(identifier) => {
@@ -350,11 +350,11 @@ impl OpenApiFactory {
 
                             operation_param.content().schema().reference(root_name.into(), false);
                         }
-                        _ => println!("found some strang type ref"),
+                        _ => {},
                     },
                     _ => {}
                 },
-                _ => println!("found some abstraction around your type ref {:?}", param.kind),
+                _ => {},
             },
             None => {}
         }
@@ -684,7 +684,7 @@ impl OpenApiFactory {
                         is_required,
                     );
                 }
-                _ => println!("found some strang type ref"),
+                _ => {},
             },
             NodeKind::TsTypeAnnotation(_) => {
                 for child_index in root.children() {
