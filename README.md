@@ -18,8 +18,7 @@ Lil Schemy is a [Node addon]. The supported platforms/architectures are:
 - Apple - x86_64 | aarch64
 
 ### Roadmap
-__Add JSON Schema support__
-```
+- Add JSON Schema support
 
 ## [LICENSE](LICENSE)
 
