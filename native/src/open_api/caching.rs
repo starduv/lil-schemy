@@ -87,14 +87,16 @@ pub(in crate::open_api) fn store_declaration_maybe(
                         },
                     )
                 }
-                swc_ecma_ast::DefaultDecl::TsInterfaceDecl(raw_int) => symbol_tables.insert(
-                    file_path,
-                    "default".into(),
-                    Declaration::Alias {
-                        from: "default".into(),
-                        to: raw_int.id.sym.to_string(),
-                    },
-                ),
+                swc_ecma_ast::DefaultDecl::TsInterfaceDecl(raw_int) => {
+                    let interface = root.to_child(NodeKind::TsInterfaceDecl(&*raw_int));
+                    symbol_tables.insert(
+                        file_path,
+                        "default".into(),
+                        Declaration::Type {
+                            node: interface.index.clone(),
+                        },
+                    )
+                }
                 _ => {}
             };
         }
@@ -116,7 +118,7 @@ pub(in crate::open_api) fn store_declaration_maybe(
                                     },
                                 )
                             }
-                            Err(_) => {}, // TODO improve debugging
+                            Err(_) => {} // TODO improve debugging
                         }
                     }
                     NodeKind::ImportSpecifier(ImportSpecifier::Named(raw_specifier)) => {
@@ -133,7 +135,7 @@ pub(in crate::open_api) fn store_declaration_maybe(
                                     },
                                 )
                             }
-                            Err(_) => {}, // TODO improve debugging
+                            Err(_) => {} // TODO improve debugging
                         }
                     }
                     _ => {}
@@ -153,13 +155,13 @@ pub(in crate::open_api) fn store_declaration_maybe(
                                             ModuleExportName::Ident(identifier) => &identifier.sym,
                                             ModuleExportName::Str(identifier) => &identifier.value,
                                         };
-        
+
                                         if let Some(exported_name) = &named_specifier.exported {
                                             let exported_name = match exported_name {
                                                 ModuleExportName::Ident(id) => &id.sym,
                                                 ModuleExportName::Str(id) => &id.value,
                                             };
-        
+
                                             symbol_tables.insert(
                                                 file_path,
                                                 exported_name.to_string(),
@@ -183,9 +185,9 @@ pub(in crate::open_api) fn store_declaration_maybe(
                                 }
                             }
                         }
-                        Err(_) => {}, // TODO improve debugging
+                        Err(_) => {} // TODO improve debugging
                     }
-                },
+                }
                 None => {}
             }
         }
@@ -196,25 +198,24 @@ pub(in crate::open_api) fn store_declaration_maybe(
                     match &identifier.type_ann {
                         Some(type_annotation) => match &*type_annotation.type_ann {
                             TsType::TsTypeRef(type_ref) => match &type_ref.type_name {
-                                TsEntityName::Ident(identifier) => symbol_tables.insert(
-                                    file_path,
-                                    name.to_string(),
-                                    Declaration::Alias {
-                                        from: name,
-                                        to: identifier.sym.to_string(),
-                                    },
-                                ),
+                                TsEntityName::Ident(identifier) => {
+                                    symbol_tables.insert(
+                                        file_path,
+                                        name.to_string(),
+                                        Declaration::Alias {
+                                            to: identifier.sym.to_string(),
+                                        },
+                                    )
+                                },
                                 _ => {}
                             },
-                            TsType::TsTypeLit(raw_type) => {
-                                symbol_tables.insert(
-                                    file_path,
-                                    name.to_string(),
-                                    Declaration::Type {
-                                        node: root.to_child(NodeKind::TsTypeLit(raw_type)).index.clone(),
-                                    },
-                                )
-                            }
+                            TsType::TsTypeLit(raw_type) => symbol_tables.insert(
+                                file_path,
+                                name.to_string(),
+                                Declaration::Type {
+                                    node: root.to_child(NodeKind::TsTypeLit(raw_type)).index.clone(),
+                                },
+                            ),
                             _ => {}
                         },
                         None => match &raw.init {
@@ -241,7 +242,6 @@ fn store_default_declaration(root: Rc<SchemyNode>, file_path: &str, symbol_table
                     file_path,
                     "default".into(),
                     Declaration::Alias {
-                        from: "default".into(),
                         to: raw_ident.sym.to_string(),
                     },
                 ),
@@ -268,7 +268,6 @@ fn store_default_declaration(root: Rc<SchemyNode>, file_path: &str, symbol_table
                 file_path,
                 "default".into(),
                 Declaration::Alias {
-                    from: "default".into(),
                     to: raw_ident.sym.to_string(),
                 },
             ),
@@ -278,7 +277,6 @@ fn store_default_declaration(root: Rc<SchemyNode>, file_path: &str, symbol_table
             file_path,
             "default".into(),
             Declaration::Alias {
-                from: "default".into(),
                 to: raw_ident.sym.to_string(),
             },
         ),
@@ -290,7 +288,6 @@ fn store_default_declaration(root: Rc<SchemyNode>, file_path: &str, symbol_table
                 file_path,
                 "default".into(),
                 Declaration::Alias {
-                    from: "default".into(),
                     to: raw_ident.sym.to_string(),
                 },
             ),
@@ -302,7 +299,6 @@ fn store_default_declaration(root: Rc<SchemyNode>, file_path: &str, symbol_table
                     file_path,
                     "default".into(),
                     Declaration::Alias {
-                        from: "default".into(),
                         to: raw_ident.sym.to_string(),
                     },
                 ),
@@ -315,7 +311,6 @@ fn store_default_declaration(root: Rc<SchemyNode>, file_path: &str, symbol_table
                 file_path,
                 "default".into(),
                 Declaration::Alias {
-                    from: "default".into(),
                     to: raw_ident.sym.to_string(),
                 },
             ),
@@ -331,14 +326,7 @@ fn store_variable(name: &str, root: Rc<SchemyNode>, file_path: &str, symbol_tabl
         match child.kind {
             NodeKind::Ident(raw) => {
                 let type_name = raw.sym.to_string();
-                symbol_tables.insert(
-                    file_path,
-                    name.to_string(),
-                    Declaration::Alias {
-                        from: name.to_string(),
-                        to: type_name,
-                    },
-                )
+                symbol_tables.insert(file_path, name.to_string(), Declaration::Alias { to: type_name })
             }
             NodeKind::TsTypeRef(raw) => match &raw.type_name {
                 TsEntityName::Ident(identifier) => {
@@ -347,10 +335,9 @@ fn store_variable(name: &str, root: Rc<SchemyNode>, file_path: &str, symbol_tabl
                         file_path,
                         name.to_string(),
                         Declaration::Alias {
-                            from: name.to_string(),
-                            to: type_name,
+                            to: type_name.to_string(),
                         },
-                    )
+                    );
                 }
                 _ => {}
             },

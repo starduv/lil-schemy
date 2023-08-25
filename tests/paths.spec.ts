@@ -3,6 +3,8 @@ import deepEqual from 'deep-equal-in-any-order';
 import { OpenAPIV3 } from 'openapi-types';
 import { generateSchemas } from '../src/generator';
 import { getRootFiles } from '../src/utils';
+import { writeFileSync } from 'fs';
+import { resolve } from 'path';
 
 use(deepEqual);
 
@@ -18,24 +20,12 @@ describe('open api generator', () => {
         });
 
         schema = JSON.parse(result.openApi.schema || "");
+
+        writeFileSync(resolve(__dirname, "result.json"), JSON.stringify(schema, null, 2));
     });
 
     it('generates schemas', () => {
         expect(schema.components?.schemas).to.deep.equalInAnyOrder({
-            Animal: {
-                type: "object",
-                properties: {
-                    name: {
-                        type: "string"
-                    },
-                    shots: {
-                        type: "array",
-                        items: {
-                            type: "string"
-                        }
-                    }
-                },
-            },
             AnimalKind: {
                 enum: ["cat", "dog", "bird"],
                 type: "string",
@@ -102,6 +92,9 @@ describe('open api generator', () => {
                     }
                 },
             },
+            UserPatch: {
+                type: "object",
+            },
             CreateUserRequest: {
                 type: 'object',
                 properties: {
@@ -134,14 +127,6 @@ describe('open api generator', () => {
                         type: 'string'
                     }
                 },
-            },
-            PostAnimalsIdRegisterStatus: {
-                properties: {
-                    status: {
-                        type: "string"
-                    }
-                },
-                type: "object"
             },
             Registered: {
                 type: 'object',
@@ -210,7 +195,18 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        $ref: "#/components/schemas/Animal"
+                                        type: "object",
+                                        properties: {
+                                            name: {
+                                                type: "string"
+                                            },
+                                            shots: {
+                                                type: "array",
+                                                items: {
+                                                    type: "string"
+                                                }
+                                            }
+                                        },
                                     }
                                 }
                             }
@@ -247,7 +243,18 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        $ref: "#/components/schemas/Animal"
+                                        type: "object",
+                                        properties: {
+                                            name: {
+                                                type: "string"
+                                            },
+                                            shots: {
+                                                type: "array",
+                                                items: {
+                                                    type: "string"
+                                                }
+                                            }
+                                        },
                                     }
                                 }
                             },
@@ -313,7 +320,12 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        $ref: "#/components/schemas/PostAnimalsIdRegisterStatus"
+                                        properties: {
+                                            status: {
+                                                type: "string"
+                                            }
+                                        },
+                                        type: "object"
                                     }
                                 }
                             },
@@ -352,7 +364,18 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        "$ref": "#/components/schemas/Animal"
+                                        type: "object",
+                                        properties: {
+                                            name: {
+                                                type: "string"
+                                            },
+                                            shots: {
+                                                type: "array",
+                                                items: {
+                                                    type: "string"
+                                                }
+                                            }
+                                        },
                                     }
                                 }
                             },
@@ -568,7 +591,7 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        $ref: "#/components/schemas/AdminUser",
+                                        $ref: "#/components/schemas/Admin",
                                     },
                                 }
                             }

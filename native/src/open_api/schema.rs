@@ -401,7 +401,7 @@ impl ApiParam {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PathOptions {
     pub method: Option<String>,
     pub path: Option<String>,

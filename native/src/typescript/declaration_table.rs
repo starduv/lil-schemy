@@ -37,7 +37,7 @@ impl<'n> DeclarationTables {
             .parent_scope();
     }
 
-    pub fn get_root_declaration_name(&mut self, file_path: &str, reference: String) -> String {
+    pub fn get_root_declaration_name(&mut self, file_path: &str, reference: &str) -> String {
         self.tables
             .entry(file_path.to_owned())
             .or_insert_with(Default::default)
@@ -56,7 +56,7 @@ impl<'n> DeclarationTables {
         match table {
             Some(table) => {
                 table.debug(reference);
-            }, 
+            }
             None => println!("No table found for file path: {}", file_path),
         }
     }
@@ -64,9 +64,7 @@ impl<'n> DeclarationTables {
     pub fn has_key(&self, file_path: &str, reference: &str) -> bool {
         let table = self.tables.get(file_path);
         match table {
-            Some(table) => {
-                table.get_declaration(reference).is_some()
-            }, 
+            Some(table) => table.get_declaration(reference).is_some(),
             None => false,
         }
     }
@@ -102,27 +100,31 @@ impl DeclarationTable {
                 let scope = scope.borrow();
                 while references.len() > 0 {
                     let temp = references.pop().unwrap();
-                    match scope.symbols.get(&temp){
-                        Some(Declaration::Alias { from: _, to }) => {
+                    match scope.symbols.get(&temp) {
+                        Some(Declaration::Alias { to }) => {
                             println!("Alias: {} -> {}", temp, to);
                             references.push(to.clone());
-                        },
+                        }
                         _ => {}
                     }
                     last_reference = temp;
                 }
 
-                match scope.symbols.get(&last_reference){
+                match scope.symbols.get(&last_reference) {
                     Some(decl) => declaration = Some(decl.clone()),
-                    None => if let Some(parent) = &scope.parent {
-                        references.push(last_reference.clone());
-                        queue.push_back(Rc::clone(&parent));
-                    },
+                    None => {
+                        if let Some(parent) = &scope.parent {
+                            references.push(last_reference.clone());
+                            queue.push_back(Rc::clone(&parent));
+                        }
+                    }
                 }
             }
         }
 
-        declaration.iter().for_each(|d| println!("{} has the declaration: {:?}", reference, d));
+        declaration
+            .iter()
+            .for_each(|d| println!("{} has the declaration: {:?}", reference, d));
     }
 
     fn insert(&mut self, name: String, value: Declaration) -> () {
@@ -172,21 +174,23 @@ impl DeclarationTable {
                 let scope = scope.borrow();
                 while references.len() > 0 {
                     let temp = references.pop().unwrap();
-                    match scope.symbols.get(&temp){
-                        Some(Declaration::Alias { from: _, to }) => {
+                    match scope.symbols.get(&temp) {
+                        Some(Declaration::Alias { to }) => {
                             references.push(to.clone());
-                        },
+                        }
                         _ => {}
                     }
                     last_reference = temp;
                 }
 
-                match scope.symbols.get(&last_reference){
+                match scope.symbols.get(&last_reference) {
                     Some(decl) => declaration = Some(decl.clone()),
-                    None => if let Some(parent) = &scope.parent {
-                        references.push(last_reference.clone());
-                        queue.push_back(Rc::clone(&parent));
-                    },
+                    None => {
+                        if let Some(parent) = &scope.parent {
+                            references.push(last_reference.clone());
+                            queue.push_back(Rc::clone(&parent));
+                        }
+                    }
                 }
             }
         }
@@ -194,15 +198,15 @@ impl DeclarationTable {
         return declaration;
     }
 
-    fn get_root_declaration_name(&self, reference: String) -> String {
-        let mut current = reference.clone();
-        let mut previous = reference.clone();
+    fn get_root_declaration_name(&self, reference: &str) -> String {
+        let mut current = reference.to_string();
+        let mut previous = reference.to_string();
         let mut queue = VecDeque::from([Rc::clone(&self.current_scope)]);
         while !queue.is_empty() {
             if let Some(scope) = queue.pop_front() {
                 let scope = scope.borrow();
                 match scope.symbols.get(&current) {
-                    Some(Declaration::Alias { from: _, to }) => current = to.clone(),
+                    Some(Declaration::Alias { to }) => current = to.clone(),
                     Some(Declaration::Export {
                         name,
                         source_file_name: _,
@@ -249,7 +253,7 @@ impl DeclarationTable {
 }
 
 pub enum Declaration {
-    Alias { from: String, to: String },
+    Alias { to: String },
     Type { node: usize },
     Export { name: String, source_file_name: String },
     Import { name: String, source_file_name: String },
@@ -258,10 +262,7 @@ pub enum Declaration {
 impl Clone for Declaration {
     fn clone(&self) -> Self {
         match self {
-            Self::Alias { from, to } => Self::Alias {
-                from: from.clone(),
-                to: to.clone(),
-            },
+            Self::Alias { to } => Self::Alias { to: to.clone() },
             Self::Type { node } => Self::Type { node: node.clone() },
             Self::Export { name, source_file_name } => Self::Export {
                 name: name.clone(),
@@ -278,7 +279,7 @@ impl Clone for Declaration {
 impl fmt::Debug for Declaration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Alias { from, to } => f.debug_struct("Alias").field("from", from).field("to", to).finish(),
+            Self::Alias { to } => f.debug_struct("Alias").field("to", to).finish(),
             Self::Export { name, source_file_name } => f
                 .debug_struct("Export")
                 .field("name", name)
