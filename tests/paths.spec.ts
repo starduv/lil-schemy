@@ -3,8 +3,6 @@ import deepEqual from 'deep-equal-in-any-order';
 import { OpenAPIV3 } from 'openapi-types';
 import { generateSchemas } from '../src/generator';
 import { getRootFiles } from '../src/utils';
-import { writeFileSync } from 'fs';
-import { resolve } from 'path';
 
 use(deepEqual);
 
@@ -20,8 +18,6 @@ describe('open api generator', () => {
         });
 
         schema = JSON.parse(result.openApi.schema || "");
-
-        writeFileSync(resolve(__dirname, "result.json"), JSON.stringify(schema, null, 2));
     });
 
     it('generates schemas', () => {
