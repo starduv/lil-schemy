@@ -1,44 +1,44 @@
-name: Release Candidate
+name: Release
 
 on:
+  release:
+    types: [published]
+    
   workflow_dispatch:
-  push:
-    branches:
-      - 'release/v*.*.*-rc.*'
 
 env:
   CARGO_INCREMENTAL: 0
 
 jobs:
-  check-version:
-    name: Compare branch to package version
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+  # check-version:
+  #   name: Compare branch to package version
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v3
 
-      - name: Get Branch Version
-        id: branch_version
-        uses: battila7/get-version-action@v2
+  #     - name: Get Branch Version
+  #       id: branch_version
+  #       uses: battila7/get-version-action@v2
 
-      - name: Get Package Version
-        id: package_version
-        uses: martinbeentjes/npm-get-version-action@main
+  #     - name: Get Package Version
+  #       id: package_version
+  #       uses: martinbeentjes/npm-get-version-action@main
 
-      - name: Version Check
-        env: 
-          BRANCH_VERSION: ${{ steps.branch_version.outputs.version-without-v }} 
-          PACKAGE_VERSION: ${{ steps.package_version.outputs.current-version }}
-        shell: bash
-        run: |
-          if [ "$BRANCH_VERSION" != "$PACKAGE_VERSION" ]; then
-            echo "Version mismatch! Package version is $PACKAGE_VERSION, but branch version is $BRANCH_VERSION."
-            exit 1
-          fi
+  #     - name: Version Check
+  #       env: 
+  #         BRANCH_VERSION: ${{ steps.branch_version.outputs.version-without-v }} 
+  #         PACKAGE_VERSION: ${{ steps.package_version.outputs.current-version }}
+  #       shell: bash
+  #       run: |
+  #         if [ "$BRANCH_VERSION" != "$PACKAGE_VERSION" ]; then
+  #           echo "Version mismatch! Package version is $PACKAGE_VERSION, but branch version is $BRANCH_VERSION."
+  #           exit 1
+  #         fi
 
   persist-binaries:
     name: Persist Binaries
-    needs: check-version
+    # needs: check-version
     runs-on: ${{ matrix.build.OS }}
     defaults:
       run:  
@@ -125,15 +125,16 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
-          node-version: "18"
+          cache: yarn
+          node-version: "16"
           registry-url: "https://registry.npmjs.org"
       
       - name: Build App
         shell: bash
         run: |
-          npm install
-          npm run build:app
-          npm run copy:config
+          yarn
+          yarn build:app
+          yarn copy:config
 
       - name: Download Binaries
         uses: actions/download-artifact@v3

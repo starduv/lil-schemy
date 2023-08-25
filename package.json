@@ -29,6 +29,7 @@
     "copy:config": "copyfiles --error --up 2 src/commands/default-config.txt lib/commands",
     "test": "mocha",
     "pretest": "npm run build:addon -- --debug",
+    "release": "release-it",
     "start": "node -r ts-node/register ./src/typeshift.ts"
   },
   "repository": {
@@ -67,6 +68,7 @@
     "copyfiles": "^2.4.1",
     "deep-equal-in-any-order": "^2.0.5",
     "mocha": "^10.2.0",
+    "release-it": "^16.1.5",
     "rimraf": "^3.0.2",
     "ts-node": "^10.9.1"
   }
