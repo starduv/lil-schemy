@@ -30,21 +30,23 @@
     "test": "mocha",
     "pretest": "npm run build:addon -- --debug",
     "release": "release-it",
-    "start": "node -r ts-node/register ./src/typeshift.ts"
+    "start": "node -r ts-node/register ./src/lil-schemy.ts"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/starduv/typeshift.git"
+    "url": "git+https://github.com/starduv/lil-schemy.git"
   },
   "keywords": [
     "code",
     "first",
-    "schema",
+    "generation",
     "generator",
+    "JsonSchema",
+    "Node",
     "OpenApi",
+    "schema",
     "Swagger",
-    "TypeScript",
-    "Node"
+    "TypeScript"
   ],
   "author": "Joel Rainear-Wills <starshiprdubb@gmail.com>",
   "license": "MIT",
