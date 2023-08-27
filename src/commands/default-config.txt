@@ -1,5 +1,4 @@
 module.exports = {
-    // Path to primary tsconfig.json
     openApi: {
         // All values in base take precedence over generated values.
         base: {
