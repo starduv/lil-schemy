@@ -133,7 +133,7 @@ impl OpenApiFactory {
                     "header",
                     find_parent_type_ref(root),
                     file_path,
-                    false,
+                    true,
                     path_options,
                 );
             }
@@ -964,7 +964,7 @@ impl OpenApiFactory {
             let params = root.params();
             let param = params.last().unwrap();
             self.define_schema_details(root_schema, &param.clone(), file_path, true, path_options);
-        } else if identifier.eq("LilRequiredField") {
+        } else if identifier.eq("LilRequiredProp") {
             let params = root.params();
             let param = params.first().unwrap();
             self.define_schema_details(root_schema, &param.clone(), file_path, true, path_options);

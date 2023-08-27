@@ -8,7 +8,6 @@ module.exports = {
                 title: "DEFAULT APPLICATION TITLE",
                 version: "0.0.0"
             },
-            paths: {}
         },
         // Glob patterns to modules declaring api paths.
         entry: [],

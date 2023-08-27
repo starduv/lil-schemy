@@ -12,7 +12,7 @@ const createConfiguration = (cwd: string) => {
 };
 
 export default new Command('init')
-    .description('Create default lil-schemy configuration')
+    .description('Create default lil-schemy configuration (schemy-config.js)')
     .action(async (_, command: Command) => {
         let parentOptions = command.parent?.opts();
         createConfiguration(parentOptions?.cwd);

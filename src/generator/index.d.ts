@@ -1,24 +1,24 @@
 import { OpenAPIV3 } from 'openapi-types';
 
 export interface LilSchemyOptions {
-    cwd: string;
     openApi?: OpenApiOptions;
 }
 
 interface OpenApiOptions {
-    base: Omit<OpenAPIV3.Document, "paths"> & {
+    base: Omit<OpenAPIV3.Document, "openapi"> & {
         openapi: "3.0.3";
-        paths?: OpenAPIV3.PathsObject;
     },
     output?: string;
     entry: string[];
 }
 
-export interface SchemasResult {
-    openApi: {
-        schema?: string;
-        filepath?: string;
-    };
+export interface LilSchemyResult {
+    openApi: OpenApiResult;
+}
+
+export interface OpenApiResult {
+    schema?: string;
+    filepath?: string;
 }
 
 interface GenerateSchemaArgs extends Omit<LilSchemyOptions, "cwd"> {
@@ -28,4 +28,4 @@ interface GenerateSchemaArgs extends Omit<LilSchemyOptions, "cwd"> {
     };
 }
 
-export function generateSchemas(options: GenerateSchemaArgs): SchemasResult;
+export function generateSchemas(options: GenerateSchemaArgs): LilSchemyResult;

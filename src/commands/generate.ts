@@ -1,30 +1,28 @@
 import { Command } from 'commander';
 import path from 'path';
-import { generateSchemas, LilSchemyOptions } from '../generator';
+import { generateSchemas, LilSchemyOptions as LilSchemyOptions, LilSchemyResult as LilSchemyResult } from '../generator';
 import { getRootFiles } from '../utils';
 
-export const generateOpenApi = (cwd: string, config: LilSchemyOptions) => {
-    if (config?.openApi) {
-        const { openApi } = config;
+export const generate = (cwd: string, options: LilSchemyOptions): LilSchemyResult => {
+    const { openApi } = options;
 
-        const files = getRootFiles(cwd, openApi.entry);
+    const files = getRootFiles(cwd, openApi?.entry ?? []);
 
-        console.debug("Searching for api paths in files %o", files);
+    console.debug("Searching for api paths in files %o", files);
 
-        const result = generateSchemas({
-            openApi: {
-                base: JSON.stringify(openApi.base),
-                entry: files,
-                output: openApi.output || undefined
-            }
-        });
-
-        if (result.openApi?.schema) {
-            console.info(result.openApi.schema);
-        } else if (result.openApi?.filepath) {
-            console.info("OpenApi schema written to %s", result.openApi.filepath);
+    const result = generateSchemas({
+        openApi: {
+            base: JSON.stringify(openApi?.base ?? {}),
+            entry: files,
+            output: openApi?.output
         }
+    });
+
+    if (result.openApi?.filepath) {
+        console.info("OpenApi schema written to %s", result.openApi.filepath);
     }
+
+    return result;
 };
 
 export default new Command('generate')
@@ -33,5 +31,5 @@ export default new Command('generate')
     .action(async (_, command: Command) => {
         let parentOptions = command.parent?.opts();
         const config = await import(path.resolve(parentOptions?.cwd, command.getOptionValue('config')));
-        generateOpenApi(parentOptions?.cwd, config.default ?? config);
+        generate(parentOptions?.cwd, config.default ?? config);
     });
