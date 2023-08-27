@@ -42,7 +42,9 @@ app.get('/', LilPath((request, reply): void => {
     path: '/',
 }));
 ```
-The second argument defines path properties, like `method` and `path`. LilSchemy isn't able to detect such things from your framework of choice. Instead is asks youf for a lil' help. This is an open source project, maybe someone will add method and path detection for your framework, who knows. There are other types to learn about int the API section, that allow to specify parameters, responses, and data types for your schema paths.
+The second argument defines path properties, like `method` and `path`. LilSchemy isn't able to detect such things from your framework of choice. Instead is asks youf for a lil' help. This is an open source project, maybe someone will add method and path detection for your framework, who knows. There are other functions and types to learn about in the API section that allow you to specify parameters, responses, and data types for your schema paths.
+
+### API
 
 ### Supported Platforms
 This is a [Node addon]. The supported platforms/architectures are:
