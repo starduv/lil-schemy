@@ -55,7 +55,4 @@ This is a [Node addon]. The supported platforms/architectures are:
 
 ## [LICENSE](LICENSE)
 
-### Notes
----
-
 [Node addon]:(https://github.com/neon-bindings/neon)
