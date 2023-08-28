@@ -10,6 +10,7 @@
 
 - [What is it?](#what-is-it)
 - [How It Works](#how-it-works)
+- [Examples](#examples)
 - [CLI](#cli)
 - [API](#api)
   - [LilPath\<Func\>(fn: Func, options: PathItemOptions) : Func](#lilpathfuncfn-func-options-pathitemoptions--func)
@@ -68,6 +69,9 @@ app.get('/', LilPath((request, reply): void => {
 ```
 The second argument defines path properties, like `method` and route `path`. Lil' Schemy isn't able to detect such things from your framework of choice. Instead it asks you for a lil' help. This is an open source project, maybe someone will add method and route path detection for your framework, who knows. There are other functions and types to learn about in the API section that allow you to specify parameters, responses, and data types for your schema paths.
 
+## Examples
+There are several examples found in the [mock api](tests/test-api/routes/user.ts) used for testing.
+
 ## CLI
 Here is the top level documentation. Run the CLI in a terminal to learn more.
 ```
@@ -88,28 +92,28 @@ Commands:
 
 ## API
 ### LilPath\<Func>(fn: Func, options: PathItemOptions) : Func
-`LilPath` is a function that returns its first argument. It has two parameters:
+`LilPath` identifies an OpenApi path that needs documentation. All of the other Lil functions and types are used inside of this. It has two parameters:
 - **fn**: A function that serves as a route handler in your application.
 - **options**: An instance of the interface, `PathItemOptions`.
 
 ### PathItemOptions
-`PathItemOptions` is an interface that represents options for a path item. It has the following properties:
+`PathItemOptions` is an interface that represents options for an OpenApi path. It has the following properties:
 - **method**: An instance of the enumeration type, `OperationMethod`.
-- **path**: A string representing the path.
-- **tags** (optional): An array of strings representing tags.
+- **path**: A string representing the route path.
+- **tags** (optional): An array of strings. Tags are a way to categorize your paths. UI tools often group your paths together by tag.
 
 ### OperationMethod
 `OperationMethod` is an enumeration type that represents an HTTP method. It can be one of the following: `'GET' | 'PUT' | 'POST' | 'DELETE' | 'OPTIONS' | 'HEAD' | 'PATCH' | 'TRACE'.
 
 ### LilResponse\<T>(response: T, options: ResponseOptions) : T
-`LilResponse` is a function that returns its first argument. It has two parameters:
-- **response**: A response object.
+`LilResponse` tells Schemy where to begin searching for the response type returned by your route handler. It has two parameters:
+- **response**: A response value, object, or null.
 - **options**: An instance of the interface, `ResponseOptions`.
 
 ### ResponseOptions
 `ResponseOptions` is an interface that represents options for a response. It has the following properties:
 - **description**: A string representing the description.
-- **example** (optional): A string representing an example.
+- **example** (optional): A string that Schemy converts into a reference like, `#/components/examples/<your string here>`. Schemy assumes you placed the corresponding example in `schemy-config.js`.
 - **statusCode**: A number representing the status code.
   
 ### LilBodyParam<Param, Required>
@@ -229,7 +233,6 @@ console.log("The OpenApi schema was written here: ", result.openApi?.filepath);
 console.log("I'll write it to standard output for your convenience...");
 console.log(result.openApi?.schema);
 ```
-
 
 ### Supported Platforms
 This is a [Node addon]. The supported platforms/architectures are:
