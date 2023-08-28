@@ -1,6 +1,6 @@
 [package]
 name = "lil_schemy"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 authors = ["Joel C Rainear-Wills <starshiprdubb@gmail.com>"]
 exclude = ["index.node"]
