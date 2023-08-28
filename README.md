@@ -32,7 +32,6 @@
   - [OpenApiOptions](#openapioptions)
   - [LilSchemyResult](#lilschemyresult)
   - [OpenApiResult](#openapiresult)
-  - [](#)
   - [Programmatic Use](#programmatic-use)
   - [Supported Platforms](#supported-platforms)
   - [Roadmap](#roadmap)
@@ -180,8 +179,6 @@ Commands:
 `OpenApiResult` contains the resultant schema and a filepath where the schema was written
 - **schema**: The schema as a string
 - **filepath**: The filepath where the schema was written
-
-###
 
 ### Programmatic Use
 You can use Lil-Schemy from your own module by calling the `generate` function. Here's an example:
