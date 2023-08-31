@@ -173,7 +173,7 @@ pub struct ApiResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     headers: Option<HashMap<String, ApiParam>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    content: Option<HashMap<String, ApiConent>>,
+    content: Option<HashMap<String, ApiContent>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     links: Option<Vec<ApiSchema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -191,25 +191,24 @@ impl ApiResponse {
         }
     }
 
-    pub(crate) fn content(&mut self) -> &mut ApiConent {
-        let key = "application/json";
+    pub(crate) fn content(&mut self, media_type: Option<&str>) -> &mut ApiContent {
         self.content
             .get_or_insert_with(Default::default)
-            .entry(key.to_owned())
-            .or_insert(ApiConent::new())
+            .entry(media_type.unwrap_or("application/json").to_string())
+            .or_insert(ApiContent::new())
     }
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct ApiConent {
+pub struct ApiContent {
     #[serde(skip_serializing_if = "Option::is_none")]
     schema: Option<ApiSchema>,
     #[serde(skip_serializing_if = "Option::is_none")]
     example: Option<Box<ApiSchema>>,
 }
-impl ApiConent {
+impl ApiContent {
     pub fn new() -> Self {
-        ApiConent {
+        ApiContent {
             schema: None,
             example: None,
         }
@@ -219,7 +218,7 @@ impl ApiConent {
         self.schema.get_or_insert(ApiSchema::new())
     }
 
-    pub fn example(&mut self, example: Option<String>) -> &mut ApiConent {
+    pub fn example(&mut self, example: Option<String>) -> &mut ApiContent {
         if example.is_some() {
             let mut schema = ApiSchema::new();
             schema.reference(example, true);
@@ -373,7 +372,7 @@ pub struct ApiParam {
     #[serde(rename = "in", skip_serializing_if = "Option::is_none")]
     location: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    content: Option<HashMap<String, ApiConent>>,
+    content: Option<HashMap<String, ApiContent>>,
     required: bool,
 }
 
@@ -387,12 +386,11 @@ impl ApiParam {
         }
     }
 
-    pub(crate) fn content(&mut self) -> &mut ApiConent {
-        let key = "application/json";
+    pub(crate) fn content(&mut self, media_type: Option<&str>) -> &mut ApiContent {
         self.content
             .get_or_insert(HashMap::new())
-            .entry(key.to_owned())
-            .or_insert(ApiConent::new())
+            .entry(media_type.unwrap_or("application/json").to_string())
+            .or_insert(ApiContent::new())
     }
 
     pub(crate) fn required(&mut self, required: bool) -> &mut ApiParam {
@@ -423,6 +421,7 @@ pub struct ResponseOptions {
     pub description: Option<String>,
     pub example: Option<String>,
     pub status_code: Option<String>,
+    pub media_type: Option<String>,
 }
 impl ResponseOptions {
     pub(crate) fn new() -> Self {
@@ -430,6 +429,7 @@ impl ResponseOptions {
             description: None,
             example: None,
             status_code: None,
+            media_type: None,
         }
     }
 }

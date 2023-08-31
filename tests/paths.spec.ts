@@ -196,7 +196,7 @@ describe('open api generator', () => {
                 post: {
                     requestBody: {
                         content: {
-                            "application/json": {
+                            "multipart/form-data": {
                                 schema: {
                                     properties: {
                                         freindliness: {
@@ -204,19 +204,23 @@ describe('open api generator', () => {
                                         },
                                         name: {
                                             type: "string"
+                                        },
+                                        photo: {
+                                            type: "string",
+                                            format: "binary"
                                         }
                                     },
                                     type: "object"
                                 }
                             }
                         },
-                        required: false
+                        required: true
                     },
                     responses: {
                         200: {
                             description: "Status of animal registration",
                             content: {
-                                "application/json": {
+                                "application/xml": {
                                     schema: {
                                         properties: {
                                             status: {

@@ -125,7 +125,7 @@ impl OpenApiFactory {
     ) {
         match root.kind {
             NodeKind::Ident(identifier) if identifier.sym.eq("LilBodyParam") => {
-                self.add_body_param_details(operation, find_parent_type_ref(root), file_path);
+                self.add_body_param_details(operation, find_parent_type_ref(root), file_path, path_options);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("LilHeader") => {
                 self.add_param_details(
@@ -192,7 +192,7 @@ impl OpenApiFactory {
 
         let type_params = root.params();
         if let Some(type_param) = type_params.get(0) {
-            let param_schema = operation_param.content().schema();
+            let param_schema = operation_param.content(None).schema();
             self.define_schema_details(param_schema, &type_param, file_path, false, path_options);
         }
 
@@ -220,7 +220,7 @@ impl OpenApiFactory {
                     TsType::TsLitType(raw_lit) => match &raw_lit.lit {
                         TsLit::Str(raw_str) => {
                             operation_param
-                                .content()
+                                .content(None)
                                 .schema()
                                 .format(Some(raw_str.value.to_string()));
                         }
@@ -291,10 +291,11 @@ impl OpenApiFactory {
     ) {
         let status_code = options.status_code.as_ref().unwrap();
         let description = options.description.as_ref().unwrap();
+        let media_type = options.media_type.as_ref().map(|s| s.as_str());
 
         let mut operation = (**operation).borrow_mut();
         let response = operation.response(&status_code, &description);
-        let content = response.content();
+        let content = response.content(media_type);
 
         self.define_schema_details(content.schema(), root, file_path, true, path_options);
 
@@ -306,10 +307,27 @@ impl OpenApiFactory {
         operation: &Rc<RefCell<ApiPathOperation>>,
         root: Rc<SchemyNode>,
         file_path: &str,
+        path_options: &PathOptions,
     ) -> () {
         let mut operation = (**operation).borrow_mut();
         let operation_param = operation.body();
         let type_params = root.params();
+
+        let content: Option<&str> = match type_params.get(2) {
+            Some(param) => match &param.kind {
+                NodeKind::TsType(media_type) => match media_type {
+                    TsType::TsLitType(raw) => match &raw.lit {
+                        TsLit::Str(raw_str) => {
+                            Some(&raw_str.value)
+                        }
+                        _ => None
+                    },
+                    _ => None
+                },
+                _ => None
+            },
+            None => None
+        };
 
         match type_params.get(0) {
             Some(param) => match param.kind {
@@ -317,7 +335,7 @@ impl OpenApiFactory {
                     TsType::TsTypeLit(raw_lit) => {
                         let child = root.to_child(NodeKind::TsTypeLit(raw_lit));
                         self.define_schema_details(
-                            operation_param.content().schema(),
+                            operation_param.content(content).schema(),
                             &child,
                             file_path,
                             false,
@@ -326,25 +344,37 @@ impl OpenApiFactory {
                     }
                     TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
                         TsKeywordTypeKind::TsNumberKeyword => {
-                            operation_param.content().schema().data_type("number");
+                            operation_param.content(None).schema().data_type("number");
                         }
                         TsKeywordTypeKind::TsBooleanKeyword => {
-                            operation_param.content().schema().data_type("boolean");
+                            operation_param.content(None).schema().data_type("boolean");
                         }
                         TsKeywordTypeKind::TsStringKeyword => {
-                            operation_param.content().schema().data_type("string");
+                            operation_param.content(None).schema().data_type("string");
                         }
                         _ => {}
                     },
                     TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
                         TsEntityName::Ident(identifier) => {
-                            let root_name = self.symbol_tables.get_root_declaration_name(file_path, &identifier.sym);
-
-                            self.deferred_schemas
-                                .defer_local_type(file_path, &root_name, &root_name, param.index);
-
-                            operation_param.content().schema().reference(root_name.into(), false);
+                            let identifier = identifier.sym.to_string();
+                            let root_schema = operation_param.content(None).schema();
+                            self.define_schema_from_identifier(
+                                &identifier,
+                                root_schema,
+                                file_path,
+                                path_options,
+                                &root,
+                                true,
+                            );
                         }
+                        // {
+                        //     let root_name = self.symbol_tables.get_root_declaration_name(file_path, &identifier.sym);
+
+                        //     self.deferred_schemas
+                        //         .defer_local_type(file_path, &root_name, &root_name, param.index);
+
+                        //     operation_param.content().schema().reference(root_name.into(), false);
+                        // }
                         _ => {}
                     },
                     _ => {}
@@ -1096,6 +1126,7 @@ fn get_response_options(options: &ObjectLit) -> ResponseOptions {
                         Some(k) if k.eq("description") => response_options.description = value,
                         Some(k) if k.eq("example") => response_options.example = value,
                         Some(k) if k.eq("statusCode") => response_options.status_code = value,
+                        Some(k) if k.eq("mediaType") => response_options.media_type = value,
                         _ => {}
                     }
                 }

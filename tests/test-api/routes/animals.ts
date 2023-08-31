@@ -65,13 +65,14 @@ Router.get("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUp
     tags: ['Animals'],
 }));
 
-Router.post("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<{ name: string, freindliness: number }> }>, reply: any): Promise<void> => {
+Router.post("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<{ name: string, freindliness: number, photo: Uint8Array }, true, "multipart/form-data"> }>, reply: any): Promise<void> => {
     const status: { status: string } = { status: "processing" }
 
     if (status.status === "processing") {
         await reply.send(LilResponse(status, {
             statusCode: 200,
             description: "Status of animal registration",
+            mediaType: "application/xml"
         }));
     } else {
         reply.code(LilResponse(404, { statusCode: 404, description: "animal not found" })).send();
