@@ -1,6 +1,6 @@
 {
   "name": "@starduv/lil-schemy",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Lil' Schemy is a cli tool that enables code first schema generation from TypeScript",
   "main": "lib/index.js",
   "bin": {
