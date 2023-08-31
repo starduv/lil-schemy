@@ -344,20 +344,20 @@ impl OpenApiFactory {
                     }
                     TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
                         TsKeywordTypeKind::TsNumberKeyword => {
-                            operation_param.content(None).schema().data_type("number");
+                            operation_param.content(content).schema().data_type("number");
                         }
                         TsKeywordTypeKind::TsBooleanKeyword => {
-                            operation_param.content(None).schema().data_type("boolean");
+                            operation_param.content(content).schema().data_type("boolean");
                         }
                         TsKeywordTypeKind::TsStringKeyword => {
-                            operation_param.content(None).schema().data_type("string");
+                            operation_param.content(content).schema().data_type("string");
                         }
                         _ => {}
                     },
                     TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
                         TsEntityName::Ident(identifier) => {
                             let identifier = identifier.sym.to_string();
-                            let root_schema = operation_param.content(None).schema();
+                            let root_schema = operation_param.content(content).schema();
                             self.define_schema_from_identifier(
                                 &identifier,
                                 root_schema,
@@ -367,14 +367,6 @@ impl OpenApiFactory {
                                 true,
                             );
                         }
-                        // {
-                        //     let root_name = self.symbol_tables.get_root_declaration_name(file_path, &identifier.sym);
-
-                        //     self.deferred_schemas
-                        //         .defer_local_type(file_path, &root_name, &root_name, param.index);
-
-                        //     operation_param.content().schema().reference(root_name.into(), false);
-                        // }
                         _ => {}
                     },
                     _ => {}
