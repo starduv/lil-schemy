@@ -32,9 +32,9 @@
   - [OpenApiOptions](#openapioptions)
   - [LilSchemyResult](#lilschemyresult)
   - [OpenApiResult](#openapiresult)
-  - [Programmatic Use](#programmatic-use)
-  - [Supported Platforms](#supported-platforms)
-  - [Roadmap](#roadmap)
+- [Programmatic Use](#programmatic-use)
+- [Supported Platforms](#supported-platforms)
+- [Roadmap](#roadmap)
 - [MIT](#mit)
 
 
@@ -180,7 +180,7 @@ Commands:
 - **schema**: The schema as a string
 - **filepath**: The filepath where the schema was written
 
-### Programmatic Use
+## Programmatic Use
 You can use Lil-Schemy from your own module by calling the `generate` function. Here's an example:
 ```TS
 const config = {
@@ -231,13 +231,13 @@ console.log("I'll write it to standard output for your convenience...");
 console.log(result.openApi?.schema);
 ```
 
-### Supported Platforms
+## Supported Platforms
 This is a [Node addon]. The supported platforms/architectures are:
 - Linux - x86_64 | aarch64
 - Windows - x86_64 | aarch64
 - Apple - x86_64 | aarch64
 
-### Roadmap
+## Roadmap
 - Add JSON Schema support
 
 ## [MIT](LICENSE)
