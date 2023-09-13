@@ -143,9 +143,28 @@ Commands:
 - **T**: The type of the parameter whose name is listed as a required property.
 
 ### LilSub<From, To>
-`LilSub` is a type that represents an object with some properties replaced by another object's properties.
+`LilSub` replaces your design time type with a desired schema type:
 - **From**: The type used during design time of your application.
-- **To**: The type used to generate an OpenApi schema.
+- **To**: The type used to generate an OpenApi schema.  
+"Why?" Let's say you have a request handler that returns a type that directly or indirectly references a type from a module that Schemy can't resolve. In that case, you can tell Schemy to use a different type that Schemy can resolve. In the example below, Schemy will not discover that the TS module `node:events` lives in the file `events.d.ts`.
+```TS
+// events.d.ts
+declare module 'node:events' {
+    import events = require('events');
+    export = events;
+}
+
+// stream.d.ts
+declare module stream {
+    import { EventEmitter, Abortable } from 'node:events';
+    // ...
+}
+
+// return type of route handler
+export interface Resolvable {
+    stream: LilSub<stream, Uint8Array>
+}
+```
 
 ### format
 `format` is a type that represents a format. It can be either a `StringFormat` or a `NumberFormat`.
