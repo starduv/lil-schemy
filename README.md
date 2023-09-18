@@ -39,7 +39,7 @@
 
 
 ## What is it?
-Lil' Schemy is a cli tool that enables "code first" schema generation. Use it to generate an OpenApi v3.0 schema from your TypeScript project. Focus on building a well tested, functionally correct product, then tack on a schema.
+Lil' Schemy is a cli tool that enables "code first" schema generation. Use it to generate an OpenApi v3.1.x schema from your TypeScript project. Focus on building a well tested, functionally correct product, then tack on a schema.
 
 ## How It Works
 Lil' Schemy works by finding Lil' functions and types, generating schemas from relevant symbols found or referenced within them. By the way, you can use the CLI to generate a default `schemy-config.js`. First, you need to indicate which files contain your route handlers by updating `schemy-config.js` like this...
@@ -186,7 +186,7 @@ export interface Resolvable {
 
 ### OpenApiOptions
 `OpenApiOptions` tells Lil' Schemy to generate an OpenApi schema
-- **base**: A user defined OpenApi schema that will overlay the generated schema. The only required field is `openapi`, which is always version "3.0.3" (for now)
+- **base**: A user defined OpenApi schema that will overlay the generated schema. The only required field is `openapi`, which is always version "3.1.0" (for now)
 - **output** (optional): The filepath where Lil' Schemy should write the schema. It will not write the schema without this.
 - **entry**: an array of blob patterns describing the files containing http paths that need schemas.
 
@@ -206,8 +206,6 @@ const config = {
     openApi: {
         // All values in base take precedence over generated values.
         base: {
-            // The only supported version.
-            openapi: "3.0.3",
             info: {
                 title: "My Application",
                 version: "1.0.0"

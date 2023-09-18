@@ -23,7 +23,7 @@ describe('cli', function () {
 
         const config: LilSchemyOptions = (await import(rootConfigPath)).default;
 
-        expect(config.openApi?.base.openapi).to.eq("3.0.3");
+        expect(config.openApi?.base.info.version).to.eq("0.0.0");
     })
 
     it('writes configuration to user defined directory', async () => {
@@ -33,6 +33,6 @@ describe('cli', function () {
 
         const config: LilSchemyOptions = (await import(customConfigPath)).default;
 
-        expect(config.openApi?.base.openapi).to.eq("3.0.3");
+        expect(config.openApi?.base.info.version).to.eq("0.0.0");
     })
 })

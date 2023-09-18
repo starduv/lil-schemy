@@ -20,6 +20,10 @@ describe('open api generator', () => {
         schema = JSON.parse(result.openApi.schema || "");
     });
 
+    it('sets OpenApi version', () => {
+        expect(schema.openapi).to.eq("3.1.0");
+    });
+
     it('generates schemas', () => {
         expect(schema.components?.schemas).to.deep.equalInAnyOrder({
             Account: {

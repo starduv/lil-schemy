@@ -14,7 +14,7 @@ pub struct OpenApi {
 impl OpenApi {
     pub fn new() -> Self {
         OpenApi {
-            open_api: "3.0.1".to_string(),
+            open_api: "3.1.0".to_string(),
             components: ApiComponents::new(),
             paths: HashMap::new(),
         }
