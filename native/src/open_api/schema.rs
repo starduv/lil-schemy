@@ -14,7 +14,7 @@ pub struct OpenApi {
 impl OpenApi {
     pub fn new() -> Self {
         OpenApi {
-            open_api: "3.0.1".to_string(),
+            open_api: "3.1.0".to_string(),
             components: ApiComponents::new(),
             paths: HashMap::new(),
         }
@@ -44,6 +44,10 @@ impl ApiComponents {
 
     pub fn schema(&mut self, name: &str) -> &mut ApiSchema {
         self.schemas.entry(name.to_string()).or_insert(ApiSchema::new())
+    }
+
+    pub fn schema_with_id(&mut self, name: &str) -> &mut ApiSchema {
+        self.schemas.entry(name.to_string()).or_insert(ApiSchema::with_id(name))
     }
 
     pub(crate) fn contains_schema(&self, type_name: &str) -> bool {
@@ -235,6 +239,7 @@ pub struct ApiSchema {
     data_type: Option<String>,
     enums: Option<Vec<String>>,
     format: Option<String>,
+    id: Option<String>,
     is_example: bool,
     items: Option<Box<ApiSchema>>,
     properties: Option<HashMap<String, ApiSchema>>,
@@ -247,7 +252,7 @@ impl Serialize for ApiSchema {
     where
         S: Serializer,
     {
-        let mut state = serializer.serialize_struct("ApiSchema", 5)?;
+        let mut state = serializer.serialize_struct("ApiSchema", 10)?;
 
         if let Some(ref any_of) = self.any_of {
             state.serialize_field("anyOf", any_of)?;
@@ -260,6 +265,9 @@ impl Serialize for ApiSchema {
         }
         if let Some(ref format) = self.format {
             state.serialize_field("format", format)?;
+        }
+        if let Some(ref id) = self.id {
+            state.serialize_field("$id", &format!("#/components/schemas/{id}"))?;
         }
         if let Some(ref items) = self.items {
             state.serialize_field("items", items)?;
@@ -289,6 +297,23 @@ impl Serialize for ApiSchema {
 impl ApiSchema {
     pub fn new() -> Self {
         ApiSchema {
+            any_of: None,
+            all_of: None,
+            data_type: None,
+            enums: None,
+            format: None,
+            id: None,
+            is_example: false,
+            items: None,
+            properties: None,
+            reference: None,
+            required: HashSet::new(),
+        }
+    }
+
+    pub fn with_id(id: &str) -> Self {
+        ApiSchema {
+            id: Some(id.to_string()),
             any_of: None,
             all_of: None,
             data_type: None,

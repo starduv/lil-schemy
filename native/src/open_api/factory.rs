@@ -421,7 +421,7 @@ impl OpenApiFactory {
                     .defer_external_type(&source_file_name, schema_name.into(), &type_name);
             }
             Some(Declaration::Type { node: node_index }) => {
-                let schema = open_api.components.schema(schema_name);
+                let schema = open_api.components.schema_with_id(schema_name);
 
                 if let Some(node) = type_node.get(node_index) {
                     self.define_schema_details(schema, &node, file_path, false, &PathOptions::default());
@@ -548,7 +548,7 @@ impl OpenApiFactory {
         if let Some(deferred_type) = self.deferred_schemas.recognize_external_type(type_name, file_path) {
             match self.symbol_tables.get_root_declaration(file_path, &type_name) {
                 Some(Declaration::Type { node }) => {
-                    let schema = open_api.components.schema(&deferred_type.schema_name);
+                    let schema = open_api.components.schema_with_id(&deferred_type.schema_name);
 
                     let node = root.get(node).unwrap();
 

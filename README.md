@@ -39,7 +39,7 @@
 
 
 ## What is it?
-Lil' Schemy is a cli tool that enables "code first" schema generation. Use it to generate an OpenApi v3.0 schema from your TypeScript project. Focus on building a well tested, functionally correct product, then tack on a schema.
+Lil' Schemy is a cli tool that enables "code first" schema generation. Use it to generate an OpenApi v3.1.x schema from your TypeScript project. Focus on building a well tested, functionally correct product, then tack on a schema.
 
 ## How It Works
 Lil' Schemy works by finding Lil' functions and types, generating schemas from relevant symbols found or referenced within them. By the way, you can use the CLI to generate a default `schemy-config.js`. First, you need to indicate which files contain your route handlers by updating `schemy-config.js` like this...
@@ -143,9 +143,28 @@ Commands:
 - **T**: The type of the parameter whose name is listed as a required property.
 
 ### LilSub<From, To>
-`LilSub` is a type that represents an object with some properties replaced by another object's properties.
+`LilSub` replaces your design time type with a desired schema type:
 - **From**: The type used during design time of your application.
-- **To**: The type used to generate an OpenApi schema.
+- **To**: The type used to generate an OpenApi schema.  
+"Why?" Let's say you have a request handler that returns a type that directly or indirectly references a type from a module that Schemy can't resolve. In that case, you can tell Schemy to use a different type that Schemy can resolve. In the example below, Schemy will not discover that the TS module `node:events` lives in the file `events.d.ts`.
+```TS
+// events.d.ts
+declare module 'node:events' {
+    import events = require('events');
+    export = events;
+}
+
+// stream.d.ts
+declare module stream {
+    import { EventEmitter, Abortable } from 'node:events';
+    // ...
+}
+
+// return type of route handler
+export interface Resolvable {
+    stream: LilSub<stream, Uint8Array>
+}
+```
 
 ### format
 `format` is a type that represents a format. It can be either a `StringFormat` or a `NumberFormat`.
@@ -167,7 +186,7 @@ Commands:
 
 ### OpenApiOptions
 `OpenApiOptions` tells Lil' Schemy to generate an OpenApi schema
-- **base**: A user defined OpenApi schema that will overlay the generated schema. The only required field is `openapi`, which is always version "3.0.3" (for now)
+- **base**: A user defined OpenApi schema that will overlay the generated schema. The only required field is `openapi`, which is always version "3.1.0" (for now)
 - **output** (optional): The filepath where Lil' Schemy should write the schema. It will not write the schema without this.
 - **entry**: an array of blob patterns describing the files containing http paths that need schemas.
 
@@ -187,8 +206,6 @@ const config = {
     openApi: {
         // All values in base take precedence over generated values.
         base: {
-            // The only supported version.
-            openapi: "3.0.3",
             info: {
                 title: "My Application",
                 version: "1.0.0"

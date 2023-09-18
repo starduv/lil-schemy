@@ -2,8 +2,6 @@ module.exports = {
     openApi: {
         // All values in base take precedence over generated values.
         base: {
-            // The only supported version.
-            openapi: "3.0.3",
             info: {
                 title: "DEFAULT APPLICATION TITLE",
                 version: "0.0.0"

@@ -20,9 +20,14 @@ describe('open api generator', () => {
         schema = JSON.parse(result.openApi.schema || "");
     });
 
+    it('sets OpenApi version', () => {
+        expect(schema.openapi).to.eq("3.1.0");
+    });
+
     it('generates schemas', () => {
         expect(schema.components?.schemas).to.deep.equalInAnyOrder({
             Account: {
+                $id: "#/components/schemas/Account",
                 properties: {
                     number: {
                         type: "string"
@@ -31,6 +36,7 @@ describe('open api generator', () => {
                 type: "object"
             },
             AdminUser: {
+                $id: "#/components/schemas/AdminUser",
                 properties: {
                     name: {
                         type: "string"
@@ -45,6 +51,7 @@ describe('open api generator', () => {
                 type: "object"
             },
             Registration: {
+                $id: "#/components/schemas/Registration",
                 properties: {
                     date: {
                         type: "string"
@@ -53,6 +60,7 @@ describe('open api generator', () => {
                 type: "object"
             },
             CreateUserRequest: {
+                $id: "#/components/schemas/CreateUserRequest",
                 properties: {
                     name: {
                         type: "string"
@@ -61,6 +69,7 @@ describe('open api generator', () => {
                 type: "object"
             },
             AnimalKind: {
+                $id: "#/components/schemas/AnimalKind",
                 enum: [
                     "dog",
                     "cat",
@@ -69,6 +78,7 @@ describe('open api generator', () => {
                 type: "string"
             },
             User: {
+                $id: "#/components/schemas/User",
                 properties: {
                     name: {
                         type: "string"
@@ -77,6 +87,7 @@ describe('open api generator', () => {
                 type: "object"
             },
             AnimalUpdate: {
+                $id: "#/components/schemas/AnimalUpdate",
                 allOf: [
                     {
                         $ref: "#/components/schemas/Registered"
@@ -95,6 +106,7 @@ describe('open api generator', () => {
                 ]
             },
             Registered: {
+                $id: "#/components/schemas/Registered",
                 properties: {
                     serialNumber: {
                         type: "string"
@@ -106,12 +118,15 @@ describe('open api generator', () => {
                 type: "object"
             },
             UserPatch: {
+                $id: "#/components/schemas/UserPatch",
                 type: "object"
             },
             AdjacentLicense: {
+                $id: "#/components/schemas/AdjacentLicense",
                 $ref: "#/components/schemas/AnimalLicense"
             },
             AnimalLicense: {
+                $id: "#/components/schemas/AnimalLicense",
                 properties: {
                     exp: {
                         type: "string"
@@ -129,6 +144,7 @@ describe('open api generator', () => {
                 type: "object"
             },
             AnimalMood: {
+                $id: "#/components/schemas/AnimalMood",
                 anyOf: [
                     {
                         properties: {
