@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
-use super::SchemyNode;
+use super::Node;
 
 #[derive(Debug, Default)]
 pub struct Context<'m> {
-    pub(in crate::typescript) nodes: Vec<Rc<SchemyNode<'m>>>,
+    pub(in crate::typescript) nodes: Vec<Rc<Node<'m>>>,
 }
 impl<'m> Context<'m> {
     pub(crate) fn new() -> Context<'m> {

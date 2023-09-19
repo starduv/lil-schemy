@@ -2,9 +2,9 @@ use std::rc::Rc;
 
 use swc_ecma_ast::*;
 
-use super::{NodeKind, SchemyNode};
+use super::{NodeKind, Node};
 
-impl<'n> SchemyNode<'n> {
+impl<'n> Node<'n> {
     pub fn children(&self) -> Vec<usize> {
         let mut children = vec![];
         match self.kind {
@@ -101,7 +101,7 @@ impl<'n> SchemyNode<'n> {
             TsLit::Number(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::Num(raw),
@@ -113,7 +113,7 @@ impl<'n> SchemyNode<'n> {
             TsLit::Str(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::Str(raw),
@@ -125,7 +125,7 @@ impl<'n> SchemyNode<'n> {
             TsLit::Tpl(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsTplLit(raw),
@@ -137,7 +137,7 @@ impl<'n> SchemyNode<'n> {
             TsLit::Bool(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::Bool(raw),
@@ -149,7 +149,7 @@ impl<'n> SchemyNode<'n> {
             TsLit::BigInt(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::BigInt(raw),
@@ -178,7 +178,7 @@ impl<'n> SchemyNode<'n> {
             TsUnionOrIntersectionType::TsUnionType(raw_union) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsUnionType(raw_union),
@@ -190,7 +190,7 @@ impl<'n> SchemyNode<'n> {
             TsUnionOrIntersectionType::TsIntersectionType(raw_intersection) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsIntersectionType(raw_intersection),
@@ -231,7 +231,7 @@ impl<'n> SchemyNode<'n> {
             Lit::Str(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::Str(raw),
@@ -243,7 +243,7 @@ impl<'n> SchemyNode<'n> {
             Lit::Bool(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::Bool(raw),
@@ -255,7 +255,7 @@ impl<'n> SchemyNode<'n> {
             Lit::Null(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::Null(raw),
@@ -267,7 +267,7 @@ impl<'n> SchemyNode<'n> {
             Lit::Num(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::Num(raw),
@@ -279,7 +279,7 @@ impl<'n> SchemyNode<'n> {
             Lit::BigInt(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::BigInt(raw),
@@ -291,7 +291,7 @@ impl<'n> SchemyNode<'n> {
             Lit::Regex(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::Regex(raw),
@@ -314,7 +314,7 @@ impl<'n> SchemyNode<'n> {
             TsEntityName::Ident(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::Ident(raw),
@@ -326,7 +326,7 @@ impl<'n> SchemyNode<'n> {
             TsEntityName::TsQualifiedName(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsQualifiedName(raw),
@@ -342,7 +342,7 @@ impl<'n> SchemyNode<'n> {
         let mut borrow = self.context.borrow_mut();
         let child_index = borrow.nodes.len();
 
-        let child_node = SchemyNode {
+        let child_node = Node {
             index: child_index,
             parent_index: Some(self.index.clone()),
             kind: NodeKind::TsEntityName(&type_ref.type_name),
@@ -353,7 +353,7 @@ impl<'n> SchemyNode<'n> {
 
         if let Some(type_params) = &type_ref.type_params {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::TsTypeParamInstantiation(type_params),
@@ -369,7 +369,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsKeywordType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -381,7 +381,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsThisType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -393,7 +393,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsFnOrConstructorType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -405,7 +405,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeRef(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -417,7 +417,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeQuery(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -429,7 +429,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeLit(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -441,7 +441,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsArrayType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -453,7 +453,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTupleType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -465,7 +465,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsOptionalType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -477,7 +477,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsRestType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -489,7 +489,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsUnionOrIntersectionType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -501,7 +501,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsConditionalType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -513,7 +513,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsInferType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -525,7 +525,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsParenthesizedType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -537,7 +537,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeOperator(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -549,7 +549,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsIndexedAccessType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -561,7 +561,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsMappedType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -573,7 +573,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsLitType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -585,7 +585,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypePredicate(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -597,7 +597,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsImportType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -618,7 +618,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsKeywordType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -630,7 +630,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsThisType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -642,7 +642,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsFnOrConstructorType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -654,7 +654,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeRef(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -666,7 +666,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeQuery(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -678,7 +678,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeLit(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -690,7 +690,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsArrayType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -702,7 +702,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTupleType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -714,7 +714,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsOptionalType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -726,7 +726,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsRestType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -738,7 +738,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsUnionOrIntersectionType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -750,7 +750,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsConditionalType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -762,7 +762,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsInferType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -774,7 +774,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsParenthesizedType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -786,7 +786,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeOperator(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -798,7 +798,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsIndexedAccessType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -810,7 +810,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsMappedType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -822,7 +822,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsLitType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -834,7 +834,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypePredicate(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -846,7 +846,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsImportType(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     context: self.context.clone(),
@@ -878,7 +878,7 @@ impl<'n> SchemyNode<'n> {
         let mut borrow = self.context.borrow_mut();
         if let Some(init) = &var_declarator.init {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::Expr(init),
@@ -894,7 +894,7 @@ impl<'n> SchemyNode<'n> {
             MemberProp::Ident(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::Ident(raw),
@@ -910,7 +910,7 @@ impl<'n> SchemyNode<'n> {
     fn get_member_expr_children(&self, expr: &'n MemberExpr, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         let child_index = borrow.nodes.len();
-        let child_node = SchemyNode {
+        let child_node = Node {
             index: child_index,
             parent_index: Some(self.index.clone()),
             kind: NodeKind::Expr(&expr.obj),
@@ -920,7 +920,7 @@ impl<'n> SchemyNode<'n> {
         children.push(child_index);
 
         let child_index = borrow.nodes.len();
-        let child_node = SchemyNode {
+        let child_node = Node {
             index: child_index,
             parent_index: Some(self.index.clone()),
             kind: NodeKind::MemberProp(&expr.prop),
@@ -942,7 +942,7 @@ impl<'n> SchemyNode<'n> {
             Decl::Class(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::ClassDecl(raw),
@@ -954,7 +954,7 @@ impl<'n> SchemyNode<'n> {
             Decl::Fn(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::FnDecl(raw),
@@ -966,7 +966,7 @@ impl<'n> SchemyNode<'n> {
             Decl::TsEnum(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsEnumDecl(raw),
@@ -978,7 +978,7 @@ impl<'n> SchemyNode<'n> {
             Decl::TsInterface(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsInterfaceDecl(raw),
@@ -990,7 +990,7 @@ impl<'n> SchemyNode<'n> {
             Decl::TsModule(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsModuleDecl(raw),
@@ -1002,7 +1002,7 @@ impl<'n> SchemyNode<'n> {
             Decl::Var(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::VarDecl(raw),
@@ -1014,7 +1014,7 @@ impl<'n> SchemyNode<'n> {
             Decl::TsTypeAlias(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     kind: NodeKind::TsTypeAliasDecl(raw),
                     parent_index: Some(self.index.clone()),
@@ -1046,7 +1046,7 @@ impl<'n> SchemyNode<'n> {
         let mut borrow = self.context.borrow_mut();
         block.body.iter().for_each(|item| {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::ModuleItem(item),
@@ -1061,7 +1061,7 @@ impl<'n> SchemyNode<'n> {
         let mut borrow = self.context.borrow_mut();
         decl.class.body.iter().for_each(|member| {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::ClassMember(member),
@@ -1075,7 +1075,7 @@ impl<'n> SchemyNode<'n> {
         let mut borrow = self.context.borrow_mut();
         decl.function.body.iter().for_each(|member| {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::BlockStmt(member),
@@ -1089,7 +1089,7 @@ impl<'n> SchemyNode<'n> {
         let mut borrow = self.context.borrow_mut();
         decl.members.iter().for_each(|member| {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::TsEnumMember(member),
@@ -1104,7 +1104,7 @@ impl<'n> SchemyNode<'n> {
         if let Some(type_params) = &decl.type_params {
             for param in &type_params.params {
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsTypeParam(&param),
@@ -1117,7 +1117,7 @@ impl<'n> SchemyNode<'n> {
 
         decl.body.body.iter().for_each(|member| {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::TsTypeElement(member),
@@ -1131,7 +1131,7 @@ impl<'n> SchemyNode<'n> {
     fn get_ts_type_alias_declaration(&self, decl: &'n TsTypeAliasDecl, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         let child_index = borrow.nodes.len();
-        let child_node = SchemyNode {
+        let child_node = Node {
             index: child_index,
             parent_index: Some(self.index.clone()),
             kind: NodeKind::TsType(&decl.type_ann),
@@ -1156,7 +1156,7 @@ impl<'n> SchemyNode<'n> {
         let mut borrow = self.context.borrow_mut();
         for specifier in &named_export.specifiers {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::ExportSpecifier(specifier),
@@ -1186,7 +1186,7 @@ impl<'n> SchemyNode<'n> {
             let mut borrow = self.context.borrow_mut();
             let child_index = borrow.nodes.len();
             for param in &thing.params {
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsFnParam(param),
@@ -1206,7 +1206,7 @@ impl<'n> SchemyNode<'n> {
             let mut borrow = self.context.borrow_mut();
             let child_index = borrow.nodes.len();
             for param in &thing.params {
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsFnParam(param),
@@ -1226,7 +1226,7 @@ impl<'n> SchemyNode<'n> {
             let mut borrow = self.context.borrow_mut();
             let child_index = borrow.nodes.len();
             for param in &thing.params {
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsFnParam(param),
@@ -1246,7 +1246,7 @@ impl<'n> SchemyNode<'n> {
             let mut borrow = self.context.borrow_mut();
             let child_index = borrow.nodes.len();
             for param in &thing.params {
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsFnParam(param),
@@ -1267,7 +1267,7 @@ impl<'n> SchemyNode<'n> {
             let child_index = borrow.nodes.len();
 
             for param in &signature.params {
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsFnParam(param),
@@ -1292,7 +1292,7 @@ impl<'n> SchemyNode<'n> {
         let mut borrow = self.context.borrow_mut();
         for member in &type_lit.members {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::TsTypeElement(member),
@@ -1306,7 +1306,7 @@ impl<'n> SchemyNode<'n> {
     fn get_call_expr_children(&self, expr: &'n CallExpr, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         let child_index = borrow.nodes.len();
-        let child_node = SchemyNode {
+        let child_node = Node {
             index: child_index,
             parent_index: Some(self.index.clone()),
             kind: NodeKind::Callee(&expr.callee),
@@ -1317,7 +1317,7 @@ impl<'n> SchemyNode<'n> {
 
         expr.args.iter().for_each(|arg| {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::ExprOrSpread(arg),
@@ -1333,7 +1333,7 @@ impl<'n> SchemyNode<'n> {
             Expr::This(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::ThisExpr(raw),
@@ -1345,7 +1345,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Array(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::ArrayLit(raw),
@@ -1357,7 +1357,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Object(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::ObjectLit(raw),
@@ -1369,7 +1369,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Fn(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::FnExpr(raw),
@@ -1381,7 +1381,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Unary(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::UnaryExpr(raw),
@@ -1393,7 +1393,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Update(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::UpdateExpr(raw),
@@ -1405,7 +1405,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Bin(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::BinExpr(raw),
@@ -1417,7 +1417,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Assign(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::AssignExpr(raw),
@@ -1429,7 +1429,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Member(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::MemberExpr(raw),
@@ -1441,7 +1441,7 @@ impl<'n> SchemyNode<'n> {
             Expr::SuperProp(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::SuperPropExpr(raw),
@@ -1453,7 +1453,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Cond(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::CondExpr(raw),
@@ -1465,7 +1465,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Call(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::CallExpr(raw),
@@ -1477,7 +1477,7 @@ impl<'n> SchemyNode<'n> {
             Expr::New(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::NewExpr(raw),
@@ -1489,7 +1489,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Seq(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::SeqExpr(raw),
@@ -1501,7 +1501,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Ident(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::Ident(raw),
@@ -1513,7 +1513,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Lit(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::Lit(raw),
@@ -1525,7 +1525,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Tpl(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::TemplateLiteral(raw),
@@ -1537,7 +1537,7 @@ impl<'n> SchemyNode<'n> {
             Expr::TaggedTpl(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::TaggedTpl(raw),
@@ -1549,7 +1549,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Arrow(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::ArrowExpr(raw),
@@ -1561,7 +1561,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Class(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::ClassExpr(raw),
@@ -1573,7 +1573,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Yield(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::YieldExpr(raw),
@@ -1585,7 +1585,7 @@ impl<'n> SchemyNode<'n> {
             Expr::MetaProp(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::MetaPropExpr(raw),
@@ -1597,7 +1597,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Await(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::AwaitExpr(raw),
@@ -1609,7 +1609,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Paren(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::ParenExpr(raw),
@@ -1621,7 +1621,7 @@ impl<'n> SchemyNode<'n> {
             Expr::TsTypeAssertion(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::TsTypeAssertionExpr(raw),
@@ -1633,7 +1633,7 @@ impl<'n> SchemyNode<'n> {
             Expr::TsConstAssertion(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::TsConstAssertionExpr(raw),
@@ -1645,7 +1645,7 @@ impl<'n> SchemyNode<'n> {
             Expr::TsNonNull(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::TsNonNullExpr(raw),
@@ -1657,7 +1657,7 @@ impl<'n> SchemyNode<'n> {
             Expr::TsAs(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::TsAsExpr(raw),
@@ -1669,7 +1669,7 @@ impl<'n> SchemyNode<'n> {
             Expr::TsInstantiation(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::TsInstantiationExpr(raw),
@@ -1681,7 +1681,7 @@ impl<'n> SchemyNode<'n> {
             Expr::TsSatisfies(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::TsSatisfiesExpr(raw),
@@ -1693,7 +1693,7 @@ impl<'n> SchemyNode<'n> {
             Expr::PrivateName(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::PrivateNameExpr(raw),
@@ -1705,7 +1705,7 @@ impl<'n> SchemyNode<'n> {
             Expr::OptChain(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::OptChainExpr(raw),
@@ -1717,7 +1717,7 @@ impl<'n> SchemyNode<'n> {
             Expr::Invalid(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: (Some(self.index.clone())),
                     kind: NodeKind::InvalidExpr(raw),
@@ -1733,7 +1733,7 @@ impl<'n> SchemyNode<'n> {
     fn get_arrow_expr_children(&self, expr: &'n ArrowExpr, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         let child_index = borrow.nodes.len();
-        let child_node = SchemyNode {
+        let child_node = Node {
             index: child_index,
             parent_index: Some(self.index.clone()),
             kind: NodeKind::BlockStmtOrExpr(&*expr.body),
@@ -1744,7 +1744,7 @@ impl<'n> SchemyNode<'n> {
 
         expr.params.iter().for_each(|param| {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::Pat(param),
@@ -1759,7 +1759,7 @@ impl<'n> SchemyNode<'n> {
         let mut borrow = self.context.borrow_mut();
         for item in &module.body {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 index: child_index,
                 parent_index: Some(self.index.clone()),
                 kind: NodeKind::ModuleItem(item),
@@ -1775,7 +1775,7 @@ impl<'n> SchemyNode<'n> {
             Decl::Class(declaration) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::ClassDecl(declaration),
@@ -1787,7 +1787,7 @@ impl<'n> SchemyNode<'n> {
             Decl::Fn(declaration) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::FnDecl(declaration),
@@ -1799,7 +1799,7 @@ impl<'n> SchemyNode<'n> {
             Decl::Var(declaration) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::VarDecl(declaration),
@@ -1811,7 +1811,7 @@ impl<'n> SchemyNode<'n> {
             Decl::TsInterface(declaration) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsInterfaceDecl(declaration),
@@ -1823,7 +1823,7 @@ impl<'n> SchemyNode<'n> {
             Decl::TsTypeAlias(declaration) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsTypeAliasDecl(declaration),
@@ -1835,7 +1835,7 @@ impl<'n> SchemyNode<'n> {
             Decl::TsEnum(declaration) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsEnumDecl(declaration),
@@ -1847,7 +1847,7 @@ impl<'n> SchemyNode<'n> {
             Decl::TsModule(declaration) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     index: child_index,
                     parent_index: Some(self.index.clone()),
                     kind: NodeKind::TsModuleDecl(declaration),
@@ -1869,7 +1869,7 @@ impl<'n> SchemyNode<'n> {
             DefaultDecl::Class(declaration) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::ClassExpr(&declaration),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -1881,7 +1881,7 @@ impl<'n> SchemyNode<'n> {
             DefaultDecl::TsInterfaceDecl(declaration) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsInterfaceDecl(&declaration),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -1898,7 +1898,7 @@ impl<'n> SchemyNode<'n> {
         let mut borrow = self.context.borrow_mut();
         for specifier in &import_declaration.specifiers {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 kind: NodeKind::ImportSpecifier(&specifier),
                 index: child_index,
                 parent_index: Some(self.index.clone()),
@@ -1915,7 +1915,7 @@ impl<'n> SchemyNode<'n> {
                 ModuleDecl::Import(declaration) => {
                     let mut borrow = self.context.borrow_mut();
                     let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
+                    let child_node = Node {
                         kind: NodeKind::ImportDecl(&declaration),
                         index: child_index,
                         parent_index: Some(self.index.clone()),
@@ -1927,7 +1927,7 @@ impl<'n> SchemyNode<'n> {
                 ModuleDecl::ExportDecl(declaration) => {
                     let mut borrow = self.context.borrow_mut();
                     let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
+                    let child_node = Node {
                         kind: NodeKind::ExportDecl(&declaration),
                         index: child_index,
                         parent_index: Some(self.index.clone()),
@@ -1939,7 +1939,7 @@ impl<'n> SchemyNode<'n> {
                 ModuleDecl::ExportNamed(declaration) => {
                     let mut borrow = self.context.borrow_mut();
                     let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
+                    let child_node = Node {
                         kind: NodeKind::NamedExport(&declaration),
                         index: child_index,
                         parent_index: Some(self.index.clone()),
@@ -1951,7 +1951,7 @@ impl<'n> SchemyNode<'n> {
                 ModuleDecl::ExportDefaultDecl(declaration) => {
                     let mut borrow = self.context.borrow_mut();
                     let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
+                    let child_node = Node {
                         kind: NodeKind::ExportDefaultDecl(&declaration),
                         index: child_index,
                         parent_index: Some(self.index.clone()),
@@ -1963,7 +1963,7 @@ impl<'n> SchemyNode<'n> {
                 ModuleDecl::ExportDefaultExpr(declaration) => {
                     let mut borrow = self.context.borrow_mut();
                     let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
+                    let child_node = Node {
                         kind: NodeKind::ExportDefaultExpr(&declaration),
                         index: child_index,
                         parent_index: Some(self.index.clone()),
@@ -1975,7 +1975,7 @@ impl<'n> SchemyNode<'n> {
                 ModuleDecl::ExportAll(declaration) => {
                     let mut borrow = self.context.borrow_mut();
                     let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
+                    let child_node = Node {
                         kind: NodeKind::ExportAll(&declaration),
                         index: child_index,
                         parent_index: Some(self.index.clone()),
@@ -1987,7 +1987,7 @@ impl<'n> SchemyNode<'n> {
                 ModuleDecl::TsImportEquals(declaration) => {
                     let mut borrow = self.context.borrow_mut();
                     let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
+                    let child_node = Node {
                         kind: NodeKind::TsImportEquals(&declaration),
                         index: child_index,
                         parent_index: Some(self.index.clone()),
@@ -1999,7 +1999,7 @@ impl<'n> SchemyNode<'n> {
                 ModuleDecl::TsExportAssignment(declaration) => {
                     let mut borrow = self.context.borrow_mut();
                     let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
+                    let child_node = Node {
                         kind: NodeKind::TsExportAssignment(&declaration),
                         index: child_index,
                         parent_index: Some(self.index.clone()),
@@ -2011,7 +2011,7 @@ impl<'n> SchemyNode<'n> {
                 ModuleDecl::TsNamespaceExport(declaration) => {
                     let mut borrow = self.context.borrow_mut();
                     let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
+                    let child_node = Node {
                         kind: NodeKind::TsNamespaceExport(&declaration),
                         index: child_index,
                         parent_index: Some(self.index.clone()),
@@ -2030,7 +2030,7 @@ impl<'n> SchemyNode<'n> {
             Pat::Ident(ident) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsTypeAnnotation(ident.type_ann.as_ref().unwrap()),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2042,7 +2042,7 @@ impl<'n> SchemyNode<'n> {
             Pat::Array(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::ArrayPat(raw),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2054,7 +2054,7 @@ impl<'n> SchemyNode<'n> {
             Pat::Rest(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::RestPat(raw),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2066,7 +2066,7 @@ impl<'n> SchemyNode<'n> {
             Pat::Object(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::ObjectPat(raw),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2078,7 +2078,7 @@ impl<'n> SchemyNode<'n> {
             Pat::Assign(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::AssignPat(raw),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2090,7 +2090,7 @@ impl<'n> SchemyNode<'n> {
             Pat::Expr(raw) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::Expr(raw),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2108,7 +2108,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Block(block_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::BlockStmt(block_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2120,7 +2120,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Empty(empty_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::EmptyStmt(empty_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2132,7 +2132,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Debugger(debugger_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::DebuggerStmt(debugger_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2144,7 +2144,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::With(with_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::WithStmt(with_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2156,7 +2156,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Return(return_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::ReturnStmt(return_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2168,7 +2168,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Labeled(labeled_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::LabeledStmt(labeled_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2180,7 +2180,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Break(break_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::BreakStmt(break_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2192,7 +2192,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Continue(continue_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::ContinueStmt(continue_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2204,7 +2204,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::If(if_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::IfStmt(if_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2216,7 +2216,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Switch(switch_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::SwitchStmt(switch_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2228,7 +2228,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Throw(throw_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::ThrowStmt(throw_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2240,7 +2240,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Try(try_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TryStmt(try_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2252,7 +2252,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::While(while_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::WhileStmt(while_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2264,7 +2264,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::DoWhile(do_while_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::DoWhileStmt(do_while_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2276,7 +2276,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::For(for_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::ForStmt(for_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2288,7 +2288,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::ForIn(for_in_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::ForInStmt(for_in_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2300,7 +2300,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::ForOf(for_of_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::ForOfStmt(for_of_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2312,7 +2312,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Decl(decl_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::Decl(decl_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2324,7 +2324,7 @@ impl<'n> SchemyNode<'n> {
             Stmt::Expr(expr_stmt) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::ExprStmt(expr_stmt),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2348,7 +2348,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsKeywordType(ts_keyword_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsKeywordType(&ts_keyword_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2360,7 +2360,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsThisType(ts_this_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsThisType(&ts_this_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2372,7 +2372,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsFnOrConstructorType(ts_fn_or_constructor_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsFnOrConstructorType(&ts_fn_or_constructor_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2384,7 +2384,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeRef(ts_type_ref) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsTypeRef(&ts_type_ref),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2396,7 +2396,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeQuery(ts_type_query) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsTypeQuery(&ts_type_query),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2408,7 +2408,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeLit(ts_type_lit) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsTypeLit(&ts_type_lit),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2420,7 +2420,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsArrayType(ts_array_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsArrayType(&ts_array_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2432,7 +2432,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTupleType(ts_tuple_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsTupleType(&ts_tuple_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2444,7 +2444,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsOptionalType(ts_optional_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsOptionalType(&ts_optional_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2456,7 +2456,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsRestType(ts_rest_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsRestType(&ts_rest_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2468,7 +2468,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsUnionOrIntersectionType(ts_union_or_intersection_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsUnionOrIntersectionType(&ts_union_or_intersection_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2480,7 +2480,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsConditionalType(ts_conditional_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsConditionalType(&ts_conditional_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2492,7 +2492,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsInferType(ts_infer_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsInferType(&ts_infer_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2504,7 +2504,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsParenthesizedType(ts_parenthesized_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsParenthesizedType(&ts_parenthesized_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2516,7 +2516,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypeOperator(ts_type_operator) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsTypeOperator(&ts_type_operator),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2528,7 +2528,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsIndexedAccessType(ts_indexed_access_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsIndexedAccessType(&ts_indexed_access_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2540,7 +2540,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsMappedType(ts_mapped_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsMappedType(&ts_mapped_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2552,7 +2552,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsLitType(ts_lit_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsLitType(&ts_lit_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2564,7 +2564,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsTypePredicate(ts_type_predicate) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsTypePredicate(&ts_type_predicate),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2576,7 +2576,7 @@ impl<'n> SchemyNode<'n> {
             TsType::TsImportType(ts_import_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
+                let child_node = Node {
                     kind: NodeKind::TsImportType(&ts_import_type),
                     index: child_index,
                     parent_index: Some(self.index.clone()),
@@ -2592,7 +2592,7 @@ impl<'n> SchemyNode<'n> {
         let mut borrow = self.context.borrow_mut();
         variable_declaration.decls.iter().for_each(|decl| {
             let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
+            let child_node = Node {
                 kind: NodeKind::VarDeclarator(decl),
                 index: child_index,
                 parent_index: Some(self.index.clone()),

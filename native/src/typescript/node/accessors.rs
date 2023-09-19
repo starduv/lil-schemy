@@ -2,10 +2,10 @@ use std::{cell::RefCell, rc::Rc, vec};
 
 use swc_ecma_ast::{Expr, TsTypeElement};
 
-use super::{Context, NodeKind, SchemyNode};
+use super::{Context, NodeKind, Node};
 
-impl<'m> SchemyNode<'m> {
-    pub fn args(&self) -> Vec<Rc<SchemyNode<'m>>> {
+impl<'m> Node<'m> {
+    pub fn args(&self) -> Vec<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::CallExpr(expr) => {
                 let mut borrow = self.context.borrow_mut();
@@ -13,7 +13,7 @@ impl<'m> SchemyNode<'m> {
                     .iter()
                     .map(|arg| {
                         let args_index = borrow.nodes.len();
-                        borrow.nodes.push(Rc::new(SchemyNode {
+                        borrow.nodes.push(Rc::new(Node {
                             index: args_index,
                             parent_index: Some(self.index),
                             kind: NodeKind::ExprOrSpread(arg),
@@ -27,7 +27,7 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn body(&self) -> Vec<Rc<SchemyNode<'m>>> {
+    pub fn body(&self) -> Vec<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::Class(class) => {
                 let mut borrow = self.context.borrow_mut();
@@ -36,7 +36,7 @@ impl<'m> SchemyNode<'m> {
                     .iter()
                     .map(|statement| {
                         let args_index = borrow.nodes.len();
-                        borrow.nodes.push(Rc::new(SchemyNode {
+                        borrow.nodes.push(Rc::new(Node {
                             index: args_index,
                             parent_index: Some(self.index),
                             kind: NodeKind::ClassMember(statement),
@@ -52,7 +52,7 @@ impl<'m> SchemyNode<'m> {
                     .iter()
                     .map(|statement| {
                         let args_index = borrow.nodes.len();
-                        borrow.nodes.push(Rc::new(SchemyNode {
+                        borrow.nodes.push(Rc::new(Node {
                             index: args_index,
                             parent_index: Some(self.index),
                             kind: NodeKind::TsTypeElement(statement),
@@ -66,13 +66,13 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn callee(&self) -> Option<Rc<SchemyNode<'m>>> {
+    pub fn callee(&self) -> Option<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::CallExpr(expr) => {
                 let mut borrow = self.context.borrow_mut();
                 let callee = &expr.callee;
                 let callee_index = borrow.nodes.len();
-                borrow.nodes.push(Rc::new(SchemyNode {
+                borrow.nodes.push(Rc::new(Node {
                     index: callee_index,
                     parent_index: Some(self.index),
                     kind: NodeKind::Callee(callee),
@@ -84,12 +84,12 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn class(&self) -> Option<Rc<SchemyNode<'m>>> {
+    pub fn class(&self) -> Option<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::ClassExpr(raw_expr) => {
                 let mut borrow = self.context.borrow_mut();
                 let class_index = borrow.nodes.len();
-                borrow.nodes.push(Rc::new(SchemyNode {
+                borrow.nodes.push(Rc::new(Node {
                     index: class_index,
                     parent_index: Some(self.index),
                     kind: NodeKind::Class(&*raw_expr.class),
@@ -100,7 +100,7 @@ impl<'m> SchemyNode<'m> {
             NodeKind::ClassDecl(raw_decl) => {
                 let mut borrow = self.context.borrow_mut();
                 let class_index = borrow.nodes.len();
-                borrow.nodes.push(Rc::new(SchemyNode {
+                borrow.nodes.push(Rc::new(Node {
                     index: class_index,
                     parent_index: Some(self.index),
                     kind: NodeKind::Class(&*raw_decl.class),
@@ -112,12 +112,12 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn decl(&self) -> Option<Rc<SchemyNode<'m>>> {
+    pub fn decl(&self) -> Option<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::ExportDecl(export_decl) => {
                 let mut borrow = self.context.borrow_mut();
                 let class_index = borrow.nodes.len();
-                borrow.nodes.push(Rc::new(SchemyNode {
+                borrow.nodes.push(Rc::new(Node {
                     index: class_index,
                     parent_index: Some(self.index),
                     kind: NodeKind::Decl(&export_decl.decl),
@@ -129,12 +129,12 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn elem_type(&self) -> Option<Rc<SchemyNode<'m>>> {
+    pub fn elem_type(&self) -> Option<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::TsArrayType(array_type) => {
                 let mut borrow = self.context.borrow_mut();
                 let class_index = borrow.nodes.len();
-                borrow.nodes.push(Rc::new(SchemyNode {
+                borrow.nodes.push(Rc::new(Node {
                     index: class_index,
                     parent_index: Some(self.index),
                     kind: NodeKind::TsType(&*array_type.elem_type),
@@ -146,7 +146,7 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn get(&self, index: usize) -> Option<Rc<SchemyNode<'m>>> {
+    pub fn get(&self, index: usize) -> Option<Rc<Node<'m>>> {
         let borrow = self.context.borrow();
         match borrow.nodes.get(index) {
             Some(node) => Some(node.clone()),
@@ -154,7 +154,7 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn extends(&self) -> Vec<Rc<SchemyNode<'m>>> {
+    pub fn extends(&self) -> Vec<Rc<Node<'m>>> {
         let mut borrow = self.context.borrow_mut();
         match self.kind {
             NodeKind::TsInterfaceDecl(raw_decl) => raw_decl
@@ -162,7 +162,7 @@ impl<'m> SchemyNode<'m> {
             .iter()
             .map(|raw_extend| {
                 let child_index = borrow.nodes.len();
-                borrow.nodes.push(Rc::new(SchemyNode {
+                borrow.nodes.push(Rc::new(Node {
                     index: child_index,
                     parent_index: Some(self.index),
                     kind: NodeKind::TsExprWithTypeArgs(raw_extend),
@@ -179,12 +179,12 @@ impl<'m> SchemyNode<'m> {
         self.context.clone()
     }
 
-    pub fn interface_body(&self) -> Option<Rc<SchemyNode<'m>>> {
+    pub fn interface_body(&self) -> Option<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::TsInterfaceDecl(decl) => {
                 let mut borrow = self.context.borrow_mut();
                 let callee_index = borrow.nodes.len();
-                borrow.nodes.push(Rc::new(SchemyNode {
+                borrow.nodes.push(Rc::new(Node {
                     index: callee_index,
                     parent_index: Some(self.index),
                     kind: NodeKind::TsInterfaceBody(&decl.body),
@@ -196,7 +196,7 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn members(&self) -> Vec<Rc<SchemyNode<'m>>> {
+    pub fn members(&self) -> Vec<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::TsEnumDecl(raw_decl) => {
                 let mut borrow = self.context.borrow_mut();
@@ -205,7 +205,7 @@ impl<'m> SchemyNode<'m> {
                     .iter()
                     .map(|raw_member| {
                         let child_index = borrow.nodes.len();
-                        borrow.nodes.push(Rc::new(SchemyNode {
+                        borrow.nodes.push(Rc::new(Node {
                             index: child_index,
                             parent_index: Some(self.index),
                             kind: NodeKind::TsEnumMember(raw_member),
@@ -222,7 +222,7 @@ impl<'m> SchemyNode<'m> {
                     .iter()
                     .map(|type_element| {
                         let params_index = borrow.nodes.len();
-                        borrow.nodes.push(Rc::new(SchemyNode {
+                        borrow.nodes.push(Rc::new(Node {
                             index: params_index,
                             parent_index: Some(self.index),
                             kind: NodeKind::TsTypeElement(type_element),
@@ -236,12 +236,12 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn type_params(&self) -> Option<Rc<SchemyNode<'m>>> {
+    pub fn type_params(&self) -> Option<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::TsTypeRef(raw) => raw.type_params.as_ref().map(|type_params| {
                 let mut borrow = self.context.borrow_mut();
                 let params_index = borrow.nodes.len();
-                borrow.nodes.push(Rc::new(SchemyNode {
+                borrow.nodes.push(Rc::new(Node {
                     index: params_index,
                     parent_index: Some(self.index),
                     kind: NodeKind::TsTypeParamInstantiation(&*type_params),
@@ -253,7 +253,7 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn params(&self) -> Vec<Rc<SchemyNode<'m>>> {
+    pub fn params(&self) -> Vec<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::TsExprWithTypeArgs(raw_expr) => {
                 if let Some(raw_args) = &raw_expr.type_args {
@@ -263,7 +263,7 @@ impl<'m> SchemyNode<'m> {
                         .iter()
                         .map(|param| {
                             let params_index = borrow.nodes.len();
-                            borrow.nodes.push(Rc::new(SchemyNode {
+                            borrow.nodes.push(Rc::new(Node {
                                 index: params_index,
                                 parent_index: Some(self.index),
                                 kind: NodeKind::TsType(&*param),
@@ -282,7 +282,7 @@ impl<'m> SchemyNode<'m> {
                     let mut borrow = self.context.borrow_mut();
                     raw_params.params.iter().for_each(|param| {
                         let child_index = borrow.nodes.len();
-                        borrow.nodes.push(Rc::new(SchemyNode {
+                        borrow.nodes.push(Rc::new(Node {
                             index: child_index,
                             parent_index: Some(self.index),
                             kind: NodeKind::TsType(&*param),
@@ -299,7 +299,7 @@ impl<'m> SchemyNode<'m> {
                 .map(|param| {
                     let mut borrow = self.context.borrow_mut();
                     let params_index = borrow.nodes.len();
-                    borrow.nodes.push(Rc::new(SchemyNode {
+                    borrow.nodes.push(Rc::new(Node {
                         index: params_index,
                         parent_index: Some(self.index),
                         kind: NodeKind::Pat(param),
@@ -312,7 +312,7 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn parent(&self) -> Option<Rc<SchemyNode<'m>>> {
+    pub fn parent(&self) -> Option<Rc<Node<'m>>> {
         let borrow = self.context.borrow();
         match self.parent_index {
             Some(index) => borrow.nodes.get(index).map(|n| n.clone()),
@@ -320,7 +320,7 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn specifiers(&self) -> Vec<Rc<SchemyNode<'m>>> {
+    pub fn specifiers(&self) -> Vec<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::NamedExport(named_export) => {
                 let mut borrow = self.context.borrow_mut();
@@ -329,7 +329,7 @@ impl<'m> SchemyNode<'m> {
                     .iter()
                     .map(|type_element| {
                         let params_index = borrow.nodes.len();
-                        borrow.nodes.push(Rc::new(SchemyNode {
+                        borrow.nodes.push(Rc::new(Node {
                             index: params_index,
                             parent_index: Some(self.index),
                             kind: NodeKind::ExportSpecifier(type_element),
@@ -343,7 +343,7 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn class_props(&self) -> Vec<Rc<SchemyNode<'m>>> {
+    pub fn class_props(&self) -> Vec<Rc<Node<'m>>> {
         let mut props = vec![];
         match self.kind {
             NodeKind::Class(raw_class) => {
@@ -356,7 +356,7 @@ impl<'m> SchemyNode<'m> {
                                         swc_ecma_ast::TsParamPropParam::Ident(raw_ident) => {
                                             let mut borrow = self.context.borrow_mut();
                                             let class_index = borrow.nodes.len();
-                                            borrow.nodes.push(Rc::new(SchemyNode {
+                                            borrow.nodes.push(Rc::new(Node {
                                                 index: class_index,
                                                 parent_index: Some(self.index),
                                                 kind: NodeKind::BindingIdent(&raw_ident),
@@ -373,7 +373,7 @@ impl<'m> SchemyNode<'m> {
                         swc_ecma_ast::ClassMember::ClassProp(class_prop) => {
                             let mut borrow = self.context.borrow_mut();
                             let class_index = borrow.nodes.len();
-                            borrow.nodes.push(Rc::new(SchemyNode {
+                            borrow.nodes.push(Rc::new(Node {
                                 index: class_index,
                                 parent_index: Some(self.index),
                                 kind: NodeKind::ClassProp(&class_prop),
@@ -396,13 +396,13 @@ impl<'m> SchemyNode<'m> {
         props
     }
 
-    pub fn type_ann(&self) -> Option<Rc<SchemyNode<'m>>> {
+    pub fn type_ann(&self) -> Option<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::BindingIdent(raw_ident) => {
                 if let Some(raw_ann) = &raw_ident.type_ann {
                     let mut borrow = self.context.borrow_mut();
                     let class_index = borrow.nodes.len();
-                    borrow.nodes.push(Rc::new(SchemyNode {
+                    borrow.nodes.push(Rc::new(Node {
                         index: class_index,
                         parent_index: Some(self.index),
                         kind: NodeKind::TsTypeAnnotation(&raw_ann),
@@ -416,7 +416,7 @@ impl<'m> SchemyNode<'m> {
             NodeKind::TsTypeAliasDecl(raw_decl) => {
                 let mut borrow = self.context.borrow_mut();
                 let class_index = borrow.nodes.len();
-                borrow.nodes.push(Rc::new(SchemyNode {
+                borrow.nodes.push(Rc::new(Node {
                     index: class_index,
                     parent_index: Some(self.index),
                     kind: NodeKind::TsType(&*raw_decl.type_ann),
@@ -428,7 +428,7 @@ impl<'m> SchemyNode<'m> {
                 Some(type_ann) => {
                     let mut borrow = self.context.borrow_mut();
                     let class_index = borrow.nodes.len();
-                    borrow.nodes.push(Rc::new(SchemyNode {
+                    borrow.nodes.push(Rc::new(Node {
                         index: class_index,
                         parent_index: Some(self.index),
                         kind: NodeKind::TsTypeAnnotation(&*type_ann),
@@ -442,7 +442,7 @@ impl<'m> SchemyNode<'m> {
                 Some(type_ann) => {
                     let mut borrow = self.context.borrow_mut();
                     let class_index = borrow.nodes.len();
-                    borrow.nodes.push(Rc::new(SchemyNode {
+                    borrow.nodes.push(Rc::new(Node {
                         index: class_index,
                         parent_index: Some(self.index),
                         kind: NodeKind::TsTypeAnnotation(&*type_ann),
@@ -456,13 +456,13 @@ impl<'m> SchemyNode<'m> {
         }
     }
 
-    pub fn as_arrow_expr(&self) -> Option<Rc<SchemyNode<'m>>> {
+    pub fn as_arrow_expr(&self) -> Option<Rc<Node<'m>>> {
         match self.kind {
             NodeKind::ExprOrSpread(raw) => match &*raw.expr {
                 Expr::Arrow(raw_arrow) => {
                     let mut borrow = self.context.borrow_mut();
                     let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
+                    let child_node = Node {
                         kind: NodeKind::ArrowExpr(&*raw_arrow),
                         index: child_index,
                         parent_index: Some(self.index),

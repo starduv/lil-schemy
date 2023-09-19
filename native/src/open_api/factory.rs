@@ -1,10 +1,10 @@
 use std::{cell::RefCell, rc::Rc};
 
 use lazy_static::__Deref;
+use swc_ecma_ast::{TsType, TsLit, Expr, TsKeywordTypeKind, TsEntityName, ModuleItem, ModuleDecl, Decl, ExportSpecifier, ModuleExportName, Stmt, PropName, TsTypeElement, Lit, Prop, ObjectLit, PropOrSpread};
 
-use swc_ecma_ast::*;
 
-use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode};
+use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, Node};
 
 use super::{
     caching::store_declaration_maybe,
@@ -48,7 +48,7 @@ impl OpenApiFactory {
         }
     }
 
-    fn define_local_schemas(&mut self, file_path: &str, root: &Rc<SchemyNode>, open_api: &mut OpenApi) {
+    fn define_local_schemas(&mut self, file_path: &str, root: &Rc<Node>, open_api: &mut OpenApi) {
         for local_type in self.deferred_schemas.recognize_local_types(file_path) {
             let root = root.get(local_type.index).unwrap();
             self.define_local_schema(
@@ -61,7 +61,7 @@ impl OpenApiFactory {
         }
     }
 
-    fn find_paths<'m>(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode<'m>>, file_path: &str) {
+    fn find_paths<'m>(&mut self, open_api: &mut OpenApi, root: Rc<Node<'m>>, file_path: &str) {
         store_declaration_maybe(root.clone(), file_path, &mut self.symbol_tables);
 
         for child_index in root.children() {
@@ -78,7 +78,7 @@ impl OpenApiFactory {
         }
     }
 
-    fn add_path(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode>, file_path: &str) -> () {
+    fn add_path(&mut self, open_api: &mut OpenApi, root: Rc<Node>, file_path: &str) -> () {
         let args = root.args();
         let route_handler = args.first().unwrap().as_arrow_expr().unwrap();
         let route_options = args.last().unwrap();
@@ -101,7 +101,7 @@ impl OpenApiFactory {
     fn add_request_details(
         &mut self,
         operation: &Rc<RefCell<ApiPathOperation>>,
-        route_handler: Rc<SchemyNode>,
+        route_handler: Rc<Node>,
         file_path: &str,
         path_options: &PathOptions,
     ) -> () {
@@ -119,7 +119,7 @@ impl OpenApiFactory {
     fn add_request_params(
         &mut self,
         operation: &Rc<RefCell<ApiPathOperation>>,
-        root: Rc<SchemyNode>,
+        root: Rc<Node>,
         file_path: &str,
         path_options: &PathOptions,
     ) {
@@ -181,7 +181,7 @@ impl OpenApiFactory {
         &mut self,
         operation: &Rc<RefCell<ApiPathOperation>>,
         location: &str,
-        root: Rc<SchemyNode>,
+        root: Rc<Node>,
         file_path: &str,
         required_default: bool,
         path_options: &PathOptions,
@@ -237,7 +237,7 @@ impl OpenApiFactory {
     fn find_response(
         &mut self,
         operation: &Rc<RefCell<ApiPathOperation>>,
-        root: Rc<SchemyNode>,
+        root: Rc<Node>,
         file_path: &str,
         path_options: &PathOptions,
         depth: &mut String,
@@ -257,7 +257,7 @@ impl OpenApiFactory {
     fn add_response(
         &mut self,
         operation: &Rc<RefCell<ApiPathOperation>>,
-        root: Rc<SchemyNode>,
+        root: Rc<Node>,
         file_path: &str,
         path_options: &PathOptions,
     ) -> () {
@@ -283,7 +283,7 @@ impl OpenApiFactory {
 
     fn add_response_details(
         &mut self,
-        root: &Rc<SchemyNode>,
+        root: &Rc<Node>,
         options: &ResponseOptions,
         file_path: &str,
         operation: &Rc<RefCell<ApiPathOperation>>,
@@ -305,7 +305,7 @@ impl OpenApiFactory {
     fn add_body_param_details(
         &mut self,
         operation: &Rc<RefCell<ApiPathOperation>>,
-        root: Rc<SchemyNode>,
+        root: Rc<Node>,
         file_path: &str,
         path_options: &PathOptions,
     ) -> () {
@@ -395,7 +395,7 @@ impl OpenApiFactory {
 
     fn define_local_schema(
         &mut self,
-        type_node: Rc<SchemyNode>,
+        type_node: Rc<Node>,
         type_name: &str,
         schema_name: &str,
         open_api: &mut OpenApi,
@@ -431,7 +431,7 @@ impl OpenApiFactory {
         };
     }
 
-    fn define_external_schema(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode>, file_path: &str) -> () {
+    fn define_external_schema(&mut self, open_api: &mut OpenApi, root: Rc<Node>, file_path: &str) -> () {
         store_declaration_maybe(root.clone(), file_path, &mut self.symbol_tables);
         match &root.kind {
             NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(_))) => {
@@ -511,7 +511,7 @@ impl OpenApiFactory {
 
     fn define_external_schema_maybe(
         &mut self,
-        root: &Rc<SchemyNode>,
+        root: &Rc<Node>,
         open_api: &mut OpenApi,
         type_name: &str,
         file_path: &str,
@@ -569,7 +569,7 @@ impl OpenApiFactory {
     fn define_schema_details(
         &mut self,
         root_schema: &mut ApiSchema,
-        root: &Rc<SchemyNode>,
+        root: &Rc<Node>,
         file_path: &str,
         is_required: bool,
         path_options: &PathOptions,
@@ -979,7 +979,7 @@ impl OpenApiFactory {
         root_schema: &mut ApiSchema,
         file_path: &str,
         path_options: &PathOptions,
-        root: &Rc<SchemyNode>,
+        root: &Rc<Node>,
         is_required: bool,
     ) -> () {
         if identifier.eq("LilSub") {
@@ -1024,13 +1024,13 @@ impl OpenApiFactory {
     }
 }
 
-fn get_path_options(options: Rc<SchemyNode>) -> PathOptions {
+fn get_path_options(options: Rc<Node>) -> PathOptions {
     let mut path_options = PathOptions::new();
     load_options(&mut path_options, options);
     path_options
 }
 
-fn load_options(path_options: &mut PathOptions, root: Rc<SchemyNode>) {
+fn load_options(path_options: &mut PathOptions, root: Rc<Node>) {
     if let NodeKind::ExprOrSpread(raw_expr) = root.kind {
         match &*raw_expr.expr {
             Expr::Object(raw_literal) => {
@@ -1083,7 +1083,7 @@ fn load_options(path_options: &mut PathOptions, root: Rc<SchemyNode>) {
     }
 }
 
-fn get_parameter_name(root: Rc<SchemyNode>) -> String {
+fn get_parameter_name(root: Rc<Node>) -> String {
     match &root.kind {
         NodeKind::TsTypeElement(TsTypeElement::TsPropertySignature(raw)) if raw.key.is_ident() => {
             let identifier = raw.key.as_ident().unwrap();
@@ -1131,7 +1131,7 @@ fn get_response_options(options: &ObjectLit) -> ResponseOptions {
     response_options
 }
 
-fn find_parent_type_ref<'m>(root: Rc<SchemyNode<'m>>) -> Rc<SchemyNode<'m>> {
+fn find_parent_type_ref<'m>(root: Rc<Node<'m>>) -> Rc<Node<'m>> {
     match &root.kind {
         NodeKind::TsTypeRef(_) => root.clone(),
         _ => find_parent_type_ref(root.parent().unwrap()),

@@ -3,10 +3,10 @@ use std::{path::PathBuf, rc::Rc};
 use es_resolve::{EsResolver, TargetEnv};
 use swc_ecma_ast::{Callee, ExportSpecifier, Expr, ImportSpecifier, ModuleExportName, Pat, TsEntityName, TsType};
 
-use crate::typescript::{Declaration, DeclarationTables, NodeKind, SchemyNode};
+use crate::typescript::{Declaration, DeclarationTables, NodeKind, Node};
 
 pub(in crate::open_api) fn store_declaration_maybe(
-    root: Rc<SchemyNode>,
+    root: Rc<Node>,
     file_path: &str,
     symbol_tables: &mut DeclarationTables,
 ) -> () {
@@ -234,7 +234,7 @@ pub(in crate::open_api) fn store_declaration_maybe(
     }
 }
 
-fn store_default_declaration(root: Rc<SchemyNode>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
+fn store_default_declaration(root: Rc<Node>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
     match root.kind {
         NodeKind::CallExpr(raw_call) => match &raw_call.callee {
             Callee::Expr(raw_callee) => match &**raw_callee {
@@ -320,7 +320,7 @@ fn store_default_declaration(root: Rc<SchemyNode>, file_path: &str, symbol_table
     }
 }
 
-fn store_variable(name: &str, root: Rc<SchemyNode>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
+fn store_variable(name: &str, root: Rc<Node>, file_path: &str, symbol_tables: &mut DeclarationTables) -> () {
     for child_index in root.children() {
         let child = root.get(child_index).unwrap();
         match child.kind {

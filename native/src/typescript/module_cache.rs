@@ -7,7 +7,7 @@ use swc_common::{
 use swc_ecma_ast::Module;
 use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax};
 
-use super::SchemyNode;
+use super::Node;
 
 pub struct ModuleCache {
     cm: Lrc<SourceMap>,
@@ -22,7 +22,7 @@ impl<'m> ModuleCache {
         }
     }
 
-    pub fn parse(&mut self, path: &str) -> Rc<SchemyNode> {
+    pub fn parse(&mut self, path: &str) -> Rc<Node> {
         self.cache.entry(path.to_string()).or_insert_with(|| {
             let fm = self.cm.load_file(Path::new(path)).expect(format!("Could not load file '{}'", path).as_str());
             let handler = Handler::with_tty_emitter(ColorConfig::Auto, true, false, Some(self.cm.clone()));
@@ -49,6 +49,6 @@ impl<'m> ModuleCache {
                 .expect(format!("Could not parse module '{}'", path).as_str())
         });
 
-        SchemyNode::from_module(self.cache.get(path).unwrap())
+        Node::from_module(self.cache.get(path).unwrap())
     }
 }
