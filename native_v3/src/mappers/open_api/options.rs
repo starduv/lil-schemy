@@ -2,8 +2,9 @@ use neon::{
     prelude::{FunctionContext, Handle, Object},
     types::{JsArray, JsObject, JsString},
 };
+use serde::Deserialize;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct OpenApiOptions {
     pub base: String,
     pub output: Option<String>,

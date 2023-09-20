@@ -6,7 +6,17 @@ mod writer;
 
 use mappers::{open_api::OpenApiResult, Mapper};
 use neon::{prelude::*, result::Throw};
-use serde_json::json;
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+struct GenerateSchemaOptions {
+    pub open_api: Option<mappers::open_api::OpenApiOptions>,
+}
+
+#[derive(Default, Serialize)]
+struct GenerateSchemaResult {
+    pub open_api: Option<OpenApiResult>,
+}
 
 pub fn generate_schemas_debug(open_api_options: mappers::open_api::OpenApiOptions) -> Option<OpenApiResult> {
     let (request_module, on_module_requested) = crossbeam::channel::unbounded();
@@ -21,30 +31,22 @@ pub fn generate_schemas_debug(open_api_options: mappers::open_api::OpenApiOption
     None
 }
 
-fn generate_schemas(mut cx: FunctionContext) -> Result<Handle<JsObject>, Throw> {
-    let schemas_result: Handle<JsObject> = cx.empty_object();
-    let options_handle: Handle<JsObject> = cx.argument(0)?;
-    let (request_module, on_module_requested) = crossbeam::channel::unbounded();
-    let (send_node, on_node_sent) = crossbeam::channel::unbounded();
+fn generate_schemas(mut cx: FunctionContext) -> Result<Handle<JsString>, Throw> {
+    let mut result = GenerateSchemaResult::default();
+    let string_options = cx.argument::<JsString>(0)?.value(&mut cx);
+    let options = serde_json::from_str::<GenerateSchemaOptions>(&string_options).unwrap();
 
-    let open_api_handle: Option<Handle<JsObject>> = options_handle.get_opt(&mut cx, "open_api")?;
-    let options = mappers::open_api::OpenApiOptions::from_js_object(&mut cx, open_api_handle);
-    let handle = mappers::open_api::OpenApiMapper::run(options, request_module, on_node_sent);
+    let (request_module, on_request_module) = crossbeam::channel::unbounded();
+    let (send_node, on_send_node) = crossbeam::channel::unbounded();
 
-    if let Some(handle) = handle {
-        let open_api = handle.join().unwrap();
-        let open_api_result = cx.empty_object();
-        if let Some(filepath) = open_api.filepath {
-            let filepath = cx.string(filepath);
-            open_api_result.set(&mut cx, "filepath", filepath)?;
-        }
+    let open_api_handle =
+        mappers::open_api::OpenApiMapper::run(options.open_api, request_module.clone(), on_send_node.clone());
 
-        let schema = cx.string(json!(open_api.schema).to_string());
-        open_api_result.set(&mut cx, "schema", schema)?;
-        schemas_result.set(&mut cx, "openApi", open_api_result)?;
+    if let Some(handle) = open_api_handle {
+        result.open_api = Some(handle.join().unwrap());
     }
 
-    Ok(schemas_result)
+    Ok(cx.string(serde_json::to_string(&result).unwrap()))
 }
 
 #[neon::main]
@@ -55,10 +57,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        generate_schemas_debug,
-        mappers::open_api::OpenApiOptions,
-    };
+    use crate::{generate_schemas_debug, mappers::open_api::OpenApiOptions};
 
     #[test]
     fn sends_open_api_options_to_open_api_mapper() {

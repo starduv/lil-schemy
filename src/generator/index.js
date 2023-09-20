@@ -1,7 +1,6 @@
 const process = require('process');
-
-const nativeModule = `./lil-schemy-${process.arch}-${process.platform}.node`;
+const { generateSchemas } = require(`./lil-schemy-${process.arch}-${process.platform}.node`);
 
 module.exports = {
-    ...require(nativeModule)
+    generateSchemas: (options) => JSON.parse(generateSchemas(JSON.stringify(options)) ?? "{}")
 };
