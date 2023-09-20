@@ -1,0 +1,19 @@
+[package]
+name = "lil_schemy"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type=["cdylib", "lib"]
+
+[dependencies]
+case = "1.0.0"
+crossbeam = "0.8.2"
+es_resolve = "0.4.3"
+neon = { version = "0.10.1", default-features = false, features = ["napi-1"] }
+serde = { version = "1.0.188", features = ["derive", "rc"] }
+serde_json = { version = "1.0.107", features = ["preserve_order"] }
+swc_common = { version = "0.32.1", features = ["tty-emitter"] }
+swc_ecma_ast = "0.109.1"
+swc_ecma_parser = "0.140.0"
+url = "2.4.1"
