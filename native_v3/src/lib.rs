@@ -1,12 +1,17 @@
 #![allow(dead_code)]
 
 mod mappers;
+mod messaging;
 mod typescript;
 mod writer;
 
-use mappers::{open_api::OpenApiResult, Mapper};
-use neon::{prelude::*, result::Throw};
+use mappers::{
+    open_api::{OpenApiMapper, OpenApiResult},
+    Mapper, MessageBus,
+};
+use messaging::{Message, Reply};
 use serde::{Deserialize, Serialize};
+use typescript::Application;
 
 #[derive(Deserialize)]
 struct GenerateSchemaOptions {
@@ -14,46 +19,68 @@ struct GenerateSchemaOptions {
 }
 
 #[derive(Default, Serialize)]
-struct GenerateSchemaResult {
+pub struct GenerateSchemaResult {
     pub open_api: Option<OpenApiResult>,
 }
 
-pub fn generate_schemas_debug(open_api_options: mappers::open_api::OpenApiOptions) -> Option<OpenApiResult> {
-    let (request_module, on_module_requested) = crossbeam::channel::unbounded();
-    let (send_node, on_node_sent) = crossbeam::channel::unbounded();
-    let handle = mappers::open_api::OpenApiMapper::run(Some(open_api_options), request_module, on_node_sent);
+pub fn generate_schemas_debug(open_api_options: mappers::open_api::OpenApiOptions) -> GenerateSchemaResult {
+    let mut result = GenerateSchemaResult::default();
+    let application = Application::<'static>::default();
+    let (message, on_message) = crossbeam::channel::unbounded::<Message>();
+    let (reply, on_reply) = crossbeam::channel::unbounded::<Reply>();
+    let handle = OpenApiMapper::run(Some(open_api_options), MessageBus::new(message, on_reply));
+
+    for m in on_message.iter() {
+        match m {
+            Message::RequestModule(id, path) => {
+                let module = application.get_module(&path);
+                reply.send(Reply::SendModule(id, module)).unwrap();
+            },
+            Message::RequestChildren(id, node_id) => {
+                let children = application.get_children(node_id);
+                reply.send(Reply::SendChildren(id, children)).unwrap();
+            },
+            _ => {}
+        }
+    }
 
     if let Some(handle) = handle {
         let open_api = handle.join().unwrap();
-        return Some(open_api);
+        result.open_api = Some(open_api);
     }
 
-    None
+    return result;
 }
 
-fn generate_schemas(mut cx: FunctionContext) -> Result<Handle<JsString>, Throw> {
-    let mut result = GenerateSchemaResult::default();
-    let string_options = cx.argument::<JsString>(0)?.value(&mut cx);
-    let options = serde_json::from_str::<GenerateSchemaOptions>(&string_options).unwrap();
+// fn generate_schemas(mut cx: FunctionContext) -> Result<Handle<JsString>, Throw> {
+//     let mut application = Application::default();
+//     let (request_module, on_request_module) = crossbeam::channel::unbounded::<String>();
+//     let (send_module, on_send_module) = crossbeam::channel::unbounded();
 
-    let (request_module, on_request_module) = crossbeam::channel::unbounded();
-    let (send_node, on_send_node) = crossbeam::channel::unbounded();
+//     let mut result = GenerateSchemaResult::default();
+//     let string_options = cx.argument::<JsString>(0)?.value(&mut cx);
+//     let options = serde_json::from_str::<GenerateSchemaOptions>(&string_options).unwrap();
 
-    let open_api_handle =
-        mappers::open_api::OpenApiMapper::run(options.open_api, request_module.clone(), on_send_node.clone());
+//     on_request_module.iter().for_each(|p| {
+//         let module = application.get_module(&p);
+//         send_module.send((p, module)).unwrap();
+//     });
 
-    if let Some(handle) = open_api_handle {
-        result.open_api = Some(handle.join().unwrap());
-    }
+//     let open_api_handle =
+//         mappers::open_api::OpenApiMapper::run(options.open_api, request_module, on_send_module);
 
-    Ok(cx.string(serde_json::to_string(&result).unwrap()))
-}
+//     if let Some(handle) = open_api_handle {
+//         result.open_api = Some(handle.join().unwrap());
+//     }
 
-#[neon::main]
-fn main(mut cx: ModuleContext) -> NeonResult<()> {
-    cx.export_function("generateSchemas", generate_schemas)?;
-    Ok(())
-}
+//     Ok(cx.string(serde_json::to_string(&result).unwrap()))
+// }
+
+// #[neon::main]
+// fn main(mut cx: ModuleContext) -> NeonResult<()> {
+//     cx.export_function("generateSchemas", generate_schemas)?;
+//     Ok(())
+// }
 
 #[cfg(test)]
 mod tests {
@@ -64,7 +91,10 @@ mod tests {
         generate_schemas_debug(OpenApiOptions {
             output: None,
             base: String::from("{}"),
-            paths: vec!["./test/fixtures/".to_string()],
+            filepaths: vec![
+                "../src/commands/generate.ts".to_string(),
+                "../src/commands/init.ts".to_string(),
+            ],
         });
     }
 }

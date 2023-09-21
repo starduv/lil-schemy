@@ -8,7 +8,7 @@ use serde::Deserialize;
 pub struct OpenApiOptions {
     pub base: String,
     pub output: Option<String>,
-    pub paths: Vec<String>,
+    pub filepaths: Vec<String>,
 }
 
 impl OpenApiOptions {
@@ -23,7 +23,7 @@ impl OpenApiOptions {
                     Ok(Some(output_handle)) => Some(output_handle.value(cx)),
                     _ => None,
                 },
-                paths: match open_api_handle.get_opt::<JsArray, FunctionContext, &str>(cx, "entry") {
+                filepaths: match open_api_handle.get_opt::<JsArray, FunctionContext, &str>(cx, "entry") {
                     Ok(Some(entry_handle)) => entry_handle
                         .to_vec(cx)
                         .unwrap_or(Vec::new())

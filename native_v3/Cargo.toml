@@ -8,7 +8,7 @@ crate-type=["cdylib", "lib"]
 
 [dependencies]
 case = "1.0.0"
-crossbeam = "0.8.2"
+crossbeam = { version = "0.8.2", features = ["crossbeam-channel"] }
 es_resolve = "0.4.3"
 neon = { version = "0.10.1", default-features = false, features = ["napi-1"] }
 serde = { version = "1.0.188", features = ["derive", "rc"] }

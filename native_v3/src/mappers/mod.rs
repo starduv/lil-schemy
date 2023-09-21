@@ -1,11 +1,10 @@
 use std::thread::JoinHandle;
 
-use crossbeam::channel::{Sender, Receiver};
-
-use crate::typescript::Node;
+mod mapper_bus;
 
 pub mod open_api;
+pub use mapper_bus::MessageBus;
 
 pub trait Mapper<TOptions, TResult> {
-    fn run(options: Option<TOptions>, request_module: Sender<String>, on_node: Receiver<(String, Node)>) -> Option<JoinHandle<TResult>>;
+    fn run(options: Option<TOptions>, mapper_bus: MessageBus) -> Option<JoinHandle<TResult>>;
 }
