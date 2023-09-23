@@ -25,22 +25,35 @@ pub struct GenerateSchemaResult {
 
 pub fn generate_schemas_debug(open_api_options: mappers::open_api::OpenApiOptions) -> GenerateSchemaResult {
     let mut result = GenerateSchemaResult::default();
-    let application = Application::<'static>::default();
     let (message, on_message) = crossbeam::channel::unbounded::<Message>();
     let (reply, on_reply) = crossbeam::channel::unbounded::<Reply>();
-    let handle = OpenApiMapper::run(Some(open_api_options), MessageBus::new(message, on_reply));
+    let mut application = Application::<'static>::default();
+    let handle = OpenApiMapper::run(Some(open_api_options), MessageBus::new(message.clone(), on_reply));
 
-    for m in on_message.iter() {
-        match m {
-            Message::RequestModule(id, path) => {
-                let module = application.get_module(&path);
+    loop {
+        match on_message.recv() {
+            Ok(Message::RequestModule(id, path)) => {
+                let module = application.get_module(&path, message.clone());
                 reply.send(Reply::SendModule(id, module)).unwrap();
-            },
-            Message::RequestChildren(id, node_id) => {
-                let children = application.get_children(node_id);
-                reply.send(Reply::SendChildren(id, children)).unwrap();
-            },
+            }
+            Ok(Message::RegisterNode(node)) => {
+                application.register_node(node);
+            }
+            Ok(Message::RegisterSender(id)) => {
+                application.register_sender(id);
+            }
+            Ok(Message::UnregisterSender(ref id)) => {
+                application.unregister_sender(id);
+            }
+            Err(err) => {
+                println!("Error: {}", err);
+                break;
+            }
             _ => {}
+        }
+
+        if !application.has_senders() {
+            break;
         }
     }
 
@@ -84,17 +97,19 @@ pub fn generate_schemas_debug(open_api_options: mappers::open_api::OpenApiOption
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+
     use crate::{generate_schemas_debug, mappers::open_api::OpenApiOptions};
 
     #[test]
     fn sends_open_api_options_to_open_api_mapper() {
+        let filepaths = env::var_os("API_PATHS").unwrap();
+        let filepaths = serde_json::from_str::<Vec<String>>(filepaths.to_str().unwrap()).unwrap();
+
         generate_schemas_debug(OpenApiOptions {
             output: None,
             base: String::from("{}"),
-            filepaths: vec![
-                "../src/commands/generate.ts".to_string(),
-                "../src/commands/init.ts".to_string(),
-            ],
+            filepaths,
         });
     }
 }

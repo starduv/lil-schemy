@@ -1,5 +1,8 @@
 use std::{
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 
@@ -10,7 +13,7 @@ use crate::{
     typescript::Node,
 };
 
-static IDENTITY: Mutex<u8> = Mutex::new(0);
+static IDENTITY: AtomicU8 = AtomicU8::new(0);
 
 pub struct MessageBus {
     id: u8,
@@ -18,30 +21,26 @@ pub struct MessageBus {
     reply: Receiver<Reply>,
 }
 
+impl Drop for MessageBus {
+    fn drop(&mut self) {
+        self.message.send(Message::UnregisterSender(self.id)).unwrap();
+    }
+}
+
 impl MessageBus {
     pub fn new(send_message: Sender<Message>, on_send_response: Receiver<Reply>) -> Self {
-        let mut id = IDENTITY.lock().unwrap();
-        *id += 1;
+        let id = IDENTITY.fetch_add(1, Ordering::AcqRel);
+
+        send_message.send(Message::RegisterSender(id)).unwrap();
 
         Self {
-            id: *id,
+            id,
             message: send_message,
             reply: on_send_response,
         }
     }
 
-    pub(crate) fn request_children(&self, node_id: usize) -> Vec<Arc<Node<'_>>> {
-        self.message.send(Message::RequestChildren(self.id, node_id));
-        loop {
-            match self.reply.recv_timeout(Duration::from_secs(20)) {
-                Ok(Reply::SendChildren(ref id, children)) if self.id.eq(id) => return children,
-                Err(err) => panic!("Error receiving reply: {}", err),
-                _ => continue,
-            }
-        }
-    }
-
-    pub(crate) fn request_module(&self, filepath: String) -> Arc<Node<'_>> {
+    pub(crate) fn request_module(&self, filepath: String) -> Arc<Node<'static>> {
         self.message.send(Message::RequestModule(self.id, filepath)).unwrap();
         loop {
             match self.reply.recv_timeout(Duration::from_secs(20)) {

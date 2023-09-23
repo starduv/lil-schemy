@@ -21,7 +21,7 @@ impl Mapper<OpenApiOptions, OpenApiResult> for OpenApiMapper {
                 let open_api = OpenApi::default();
                 for filepath in options.filepaths {
                     let module = mapper_bus.request_module(filepath);
-                    open_api.add_paths(module, &mapper_bus);
+                    open_api.add_paths(module);
                 }
 
                 OpenApiResult {
@@ -37,12 +37,16 @@ impl Mapper<OpenApiOptions, OpenApiResult> for OpenApiMapper {
 #[derive(Serialize, Debug, Default)]
 pub struct OpenApi {}
 impl OpenApi {
-    fn add_paths(&self, node: Arc<Node<'_>>, mapper_bus: &MessageBus) -> () {
+    fn add_paths(&self, node: Arc<Node<'static>>) -> () {
         match node.is_path() {
             true => {
                 println!("Found path: {:?}", node);
             }
-            false => for child in mapper_bus.request_children(node.id()) {},
+            false => {
+                for child in node.children() {
+                    self.add_paths(child);
+                }
+            }
         }
     }
 }

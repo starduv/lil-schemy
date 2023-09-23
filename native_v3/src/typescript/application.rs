@@ -1,3 +1,4 @@
+use crossbeam::channel::Sender;
 use swc_common::{
     errors::{ColorConfig, Handler},
     sync::Lrc,
@@ -5,22 +6,27 @@ use swc_common::{
 };
 use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax};
 
-use std::{collections::BTreeMap, path::Path, sync::Arc, cell::RefCell, vec};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    path::Path,
+    sync::Arc,
+};
+
+use crate::messaging::Message;
 
 use super::{node_kind::NodeKind, Node};
 
 #[derive(Default)]
 pub struct Application<'m> {
+    context: HashMap<u8, Arc<Node<'m>>>,
+    modules: BTreeMap<String, u8>,
     source_map: Lrc<SourceMap>,
-    modules: RefCell<BTreeMap<String, usize>>,
-    context: RefCell<Vec<Arc<Node<'m>>>>,
+    senders: HashSet<u8>,
 }
 
 impl<'m> Application<'m> {
-    pub(crate) fn get_module(&self, path: &str) -> Arc<Node<'m>> {
-        let context = &mut self.context.borrow_mut();
-        let modules = &mut self.modules.borrow_mut();
-        if !modules.contains_key(path) {
+    pub(crate) fn get_module(&mut self, path: &str, message: Sender<Message>) -> Arc<Node<'m>> {
+        if !self.modules.contains_key(path) {
             let fm = self
                 .source_map
                 .load_file(Path::new(path))
@@ -49,17 +55,28 @@ impl<'m> Application<'m> {
                 })
                 .expect(format!("Could not parse module '{}'", path).as_str());
 
-            let node_index = context.len();
-            context.push(Arc::new(Node::new(node_index, NodeKind::Module(module))));
-            modules.insert(path.to_string(), node_index);
+            let node = Arc::new(Node::new(NodeKind::Module(module), None, message));
+            self.modules.insert(path.to_string(), node.id());
+            self.context.insert(node.id(), node);
         }
 
-        let index = modules.get(path).unwrap();
-        return context[*index].clone();
+        let id = self.modules.get(path).unwrap();
+        self.context.get(id).unwrap().clone()
     }
 
-    pub(crate) fn get_children(&self, node_id: usize) -> Vec<Arc<Node<'m>>> {
-        // TODO: implement this
-        vec![]
+    pub(crate) fn register_node(&mut self, node: Arc<Node<'m>>) -> () {
+        self.context.insert(node.id(), node.clone());
+    }
+
+    pub(crate) fn register_sender(&mut self, id: u8) -> () {
+        self.senders.insert(id);
+    }
+
+    pub(crate) fn unregister_sender(&mut self, id: &u8) -> () {
+        self.senders.remove(id);
+    }
+
+    pub(crate) fn has_senders(&self) -> bool {
+        self.senders.len() > 0
     }
 }
