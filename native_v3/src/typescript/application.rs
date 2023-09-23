@@ -12,20 +12,38 @@ use std::{
     sync::Arc,
 };
 
-use crate::messaging::Message;
+use crate::messaging::{Message, Reply};
 
 use super::{node_kind::NodeKind, Node};
 
-#[derive(Default)]
-pub struct Application<'m> {
-    context: HashMap<u8, Arc<Node<'m>>>,
+pub struct Application {
+    context: HashMap<u8, Arc<Node<'static>>>,
     modules: BTreeMap<String, u8>,
     source_map: Lrc<SourceMap>,
     senders: HashSet<u8>,
+    message: Sender<Message>,
+    on_message: crossbeam::channel::Receiver<Message>,
+    reply: Sender<Reply>,
 }
 
-impl<'m> Application<'m> {
-    pub(crate) fn get_module(&mut self, path: &str, message: Sender<Message>) -> Arc<Node<'m>> {
+impl Application {
+    pub(crate) fn new(
+        message: Sender<Message>,
+        on_message: crossbeam::channel::Receiver<Message>,
+        reply: Sender<Reply>,
+    ) -> Self {
+        Application {
+            context: Default::default(),
+            modules: Default::default(),
+            source_map: Default::default(),
+            senders: Default::default(),
+            message,
+            on_message,
+            reply,
+        }
+    }
+
+    pub(crate) fn get_module(&mut self, path: &str, message: Sender<Message>) -> Arc<Node<'static>> {
         if !self.modules.contains_key(path) {
             let fm = self
                 .source_map
@@ -64,7 +82,7 @@ impl<'m> Application<'m> {
         self.context.get(id).unwrap().clone()
     }
 
-    pub(crate) fn register_node(&mut self, node: Arc<Node<'m>>) -> () {
+    pub(crate) fn register_node(&mut self, node: Arc<Node<'static>>) -> () {
         self.context.insert(node.id(), node.clone());
     }
 
@@ -78,5 +96,34 @@ impl<'m> Application<'m> {
 
     pub(crate) fn has_senders(&self) -> bool {
         self.senders.len() > 0
+    }
+
+    pub(crate) fn run(&mut self) -> () {
+        loop {
+            match self.on_message.recv() {
+                Ok(Message::RequestModule(id, path)) => {
+                    let module = self.get_module(&path, self.message.clone());
+                    self.reply.send(Reply::SendModule(id, module)).unwrap();
+                }
+                Ok(Message::RegisterNode(node)) => {
+                    self.register_node(node);
+                }
+                Ok(Message::RegisterSender(id)) => {
+                    self.register_sender(id);
+                }
+                Ok(Message::UnregisterSender(ref id)) => {
+                    self.unregister_sender(id);
+                }
+                Err(err) => {
+                    println!("Error: {}", err);
+                    break;
+                }
+                _ => {}
+            }
+
+            if !self.has_senders() {
+                break;
+            }
+        }
     }
 }

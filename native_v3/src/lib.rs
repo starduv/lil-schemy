@@ -27,35 +27,10 @@ pub fn generate_schemas_debug(open_api_options: mappers::open_api::OpenApiOption
     let mut result = GenerateSchemaResult::default();
     let (message, on_message) = crossbeam::channel::unbounded::<Message>();
     let (reply, on_reply) = crossbeam::channel::unbounded::<Reply>();
-    let mut application = Application::<'static>::default();
+    let mut application = Application::new(message.clone(), on_message, reply);
     let handle = OpenApiMapper::run(Some(open_api_options), MessageBus::new(message.clone(), on_reply));
 
-    loop {
-        match on_message.recv() {
-            Ok(Message::RequestModule(id, path)) => {
-                let module = application.get_module(&path, message.clone());
-                reply.send(Reply::SendModule(id, module)).unwrap();
-            }
-            Ok(Message::RegisterNode(node)) => {
-                application.register_node(node);
-            }
-            Ok(Message::RegisterSender(id)) => {
-                application.register_sender(id);
-            }
-            Ok(Message::UnregisterSender(ref id)) => {
-                application.unregister_sender(id);
-            }
-            Err(err) => {
-                println!("Error: {}", err);
-                break;
-            }
-            _ => {}
-        }
-
-        if !application.has_senders() {
-            break;
-        }
-    }
+    application.run();
 
     if let Some(handle) = handle {
         let open_api = handle.join().unwrap();
