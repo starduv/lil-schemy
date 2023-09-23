@@ -78,6 +78,8 @@ mod tests {
 
     #[test]
     fn sends_open_api_options_to_open_api_mapper() {
+        let timer = std::time::Instant::now();
+
         let filepaths = env::var_os("API_PATHS").unwrap();
         let filepaths = serde_json::from_str::<Vec<String>>(filepaths.to_str().unwrap()).unwrap();
 
@@ -86,5 +88,6 @@ mod tests {
             base: String::from("{}"),
             filepaths,
         });
+        println!("Elapsed: {:?}", timer.elapsed().as_secs());
     }
 }
