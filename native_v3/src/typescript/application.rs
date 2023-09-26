@@ -1,4 +1,3 @@
-use crossbeam::channel::Sender;
 use swc_common::{
     errors::{ColorConfig, Handler},
     sync::Lrc,
@@ -7,12 +6,12 @@ use swc_common::{
 use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax};
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     path::Path,
     sync::Arc,
 };
 
-use crate::messaging::{Message, Reply};
+use crate::messaging::{Message, MessageBus};
 
 use super::{node_kind::NodeKind, Node};
 
@@ -20,30 +19,18 @@ pub struct Application {
     context: HashMap<u8, Arc<Node<'static>>>,
     modules: BTreeMap<String, u8>,
     source_map: Lrc<SourceMap>,
-    senders: HashSet<u8>,
-    message: Sender<Message>,
-    on_message: crossbeam::channel::Receiver<Message>,
-    reply: Sender<Reply>,
 }
 
 impl Application {
-    pub(crate) fn new(
-        message: Sender<Message>,
-        on_message: crossbeam::channel::Receiver<Message>,
-        reply: Sender<Reply>,
-    ) -> Self {
+    pub(crate) fn new() -> Self {
         Application {
             context: Default::default(),
             modules: Default::default(),
             source_map: Default::default(),
-            senders: Default::default(),
-            message,
-            on_message,
-            reply,
         }
     }
 
-    pub(crate) fn get_module(&mut self, path: &str, message: Sender<Message>) -> Arc<Node<'static>> {
+    pub(crate) fn get_module(&mut self, path: &str, bus: MessageBus) -> Arc<Node<'static>> {
         if !self.modules.contains_key(path) {
             let fm = self
                 .source_map
@@ -73,7 +60,7 @@ impl Application {
                 })
                 .expect(format!("Could not parse module '{}'", path).as_str());
 
-            let node = Arc::new(Node::new(NodeKind::Module(module), None, message));
+            let node = Arc::new(Node::new(NodeKind::Module(module), None, bus));
             self.modules.insert(path.to_string(), node.id());
             self.context.insert(node.id(), node);
         }
@@ -86,43 +73,21 @@ impl Application {
         self.context.insert(node.id(), node.clone());
     }
 
-    pub(crate) fn register_sender(&mut self, id: u8) -> () {
-        self.senders.insert(id);
-    }
-
-    pub(crate) fn unregister_sender(&mut self, id: &u8) -> () {
-        self.senders.remove(id);
-    }
-
-    pub(crate) fn has_senders(&self) -> bool {
-        self.senders.len() > 0
-    }
-
-    pub(crate) fn run(&mut self) -> () {
-        loop {
-            match self.on_message.recv() {
-                Ok(Message::RequestModule(id, path)) => {
-                    let module = self.get_module(&path, self.message.clone());
-                    self.reply.send(Reply::SendModule(id, module)).unwrap();
+    pub(crate) fn run(&mut self, mut bus: MessageBus) -> () {
+        while let Some(message) = bus.next() {
+            match message {
+                Message::RequestModule(id, path) => {
+                    let module = self.get_module(&path, bus.for_node());
+                    bus.send_module(id, module);
                 }
-                Ok(Message::RegisterNode(node)) => {
+                Message::RequestNode(id, node_id) => {
+                    let node = self.context.get(&node_id).map(|n| n.clone());
+                    bus.send_node(id, node);
+                }
+                Message::RegisterNode(node) => {
                     self.register_node(node);
                 }
-                Ok(Message::RegisterSender(id)) => {
-                    self.register_sender(id);
-                }
-                Ok(Message::UnregisterSender(ref id)) => {
-                    self.unregister_sender(id);
-                }
-                Err(err) => {
-                    println!("Error: {}", err);
-                    break;
-                }
                 _ => {}
-            }
-
-            if !self.has_senders() {
-                break;
             }
         }
     }

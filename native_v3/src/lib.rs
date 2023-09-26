@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 
 mod mappers;
 mod messaging;
@@ -7,9 +9,9 @@ mod writer;
 
 use mappers::{
     open_api::{OpenApiMapper, OpenApiResult},
-    Mapper, MessageBus,
+    Mapper,
 };
-use messaging::{Message, Reply};
+use messaging::MessageBus;
 use serde::{Deserialize, Serialize};
 use typescript::Application;
 
@@ -25,12 +27,11 @@ pub struct GenerateSchemaResult {
 
 pub fn generate_schemas_debug(open_api_options: mappers::open_api::OpenApiOptions) -> GenerateSchemaResult {
     let mut result = GenerateSchemaResult::default();
-    let (message, on_message) = crossbeam::channel::unbounded::<Message>();
-    let (reply, on_reply) = crossbeam::channel::unbounded::<Reply>();
-    let mut application = Application::new(message.clone(), on_message, reply);
-    let handle = OpenApiMapper::run(Some(open_api_options), MessageBus::new(message.clone(), on_reply));
+    let bus = MessageBus::new();
+    let mut application = Application::new();
+    let handle = OpenApiMapper::run(Some(open_api_options), bus.for_mapper());
 
-    application.run();
+    application.run(bus);
 
     if let Some(handle) = handle {
         let open_api = handle.join().unwrap();
@@ -79,15 +80,14 @@ mod tests {
     #[test]
     fn sends_open_api_options_to_open_api_mapper() {
         let timer = std::time::Instant::now();
-
-        let filepaths = env::var_os("API_PATHS").unwrap();
-        let filepaths = serde_json::from_str::<Vec<String>>(filepaths.to_str().unwrap()).unwrap();
+        let filepaths = env::var_os("API_PATHS");
+        let filepaths = serde_json::from_str::<Vec<String>>(filepaths.unwrap().to_str().unwrap()).unwrap();
 
         generate_schemas_debug(OpenApiOptions {
             output: None,
             base: String::from("{}"),
             filepaths,
         });
-        println!("Elapsed: {:?}", timer.elapsed().as_secs());
+        println!("Elapsed: {:?} milliseconds", timer.elapsed().as_millis());
     }
 }

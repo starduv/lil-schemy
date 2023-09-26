@@ -5,9 +5,7 @@ use std::sync::{
     Arc, RwLock,
 };
 
-use crossbeam::channel::Sender;
-
-use crate::messaging::Message;
+use crate::messaging::MessageBus;
 
 use super::node_kind::NodeKind;
 
@@ -18,18 +16,18 @@ pub struct Node<'m> {
     id: u8,
     children: RwLock<Option<Vec<Arc<Node<'m>>>>>,
     parent: Option<u8>,
-    message: Sender<Message>,
+    bus: MessageBus,
     pub kind: NodeKind<'m>,
 }
 
 impl<'m> Node<'m> {
-    pub fn new(kind: NodeKind<'m>, parent: Option<u8>, message: Sender<Message>) -> Node<'m> {
+    pub fn new(kind: NodeKind<'m>, parent: Option<u8>, bus: MessageBus) -> Node<'m> {
         Self {
             id: IDENTITY.fetch_add(1, Ordering::AcqRel),
             kind,
             parent,
-            message,
             children: RwLock::new(None),
+            bus,
         }
     }
 
@@ -41,6 +39,16 @@ impl<'m> Node<'m> {
         match &self.kind {
             NodeKind::Ident(raw) => raw.sym.eq("LilPath"),
             _ => false,
+        }
+    }
+
+    pub fn parent(&self) -> Option<u8> {
+        self.parent
+    }
+
+    pub fn with_parent(&self, callback: impl FnOnce(Arc<Node>) -> ()) -> () {
+        if let Some(parent) = self.bus.request_node(self.parent) {
+            callback(parent);
         }
     }
 }

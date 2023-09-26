@@ -19,6 +19,14 @@
 			},
 			"command": "build",
 			"label": "rust: build native-debug",
+		},
+		{
+			"type": "cargo",
+			"options": {
+				"cwd": "${workspaceFolder}/native_v3"
+			},
+			"command": "build",
+			"label": "rust: build native_v3",
 		}
 	]
 }

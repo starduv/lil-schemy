@@ -1,9 +1,8 @@
 use std::{mem::transmute, sync::Arc};
 
-use crossbeam::channel::Sender;
 use swc_ecma_ast::*;
 
-use crate::messaging::Message;
+use crate::messaging::MessageBus;
 
 use super::{Node, NodeKind};
 
@@ -17,118 +16,118 @@ impl Node<'static> {
             let mut children = children.get_or_insert(vec![]);
             match self.kind {
                 NodeKind::AwaitExpr(raw_await) => {
-                    get_await_expr_children(raw_await, &mut children, parent_id, self.message.clone())
+                    get_await_expr_children(raw_await, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::ArrowExpr(arrow) => {
-                    get_arrow_expr_children(arrow, &mut children, parent_id, self.message.clone())
+                    get_arrow_expr_children(arrow, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::BlockStmt(raw) => {
-                    get_block_statement_children(raw, &mut children, parent_id, self.message.clone())
+                    get_block_statement_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::BlockStmtOrExpr(temp) => match temp {
                     BlockStmtOrExpr::BlockStmt(raw) => {
-                        get_block_statement_children(raw, &mut children, parent_id, self.message.clone())
+                        get_block_statement_children(raw, &mut children, parent_id, self.bus.for_node())
                     }
                     BlockStmtOrExpr::Expr(raw) => {
-                        get_expr_children(raw, &mut children, parent_id, self.message.clone())
+                        get_expr_children(raw, &mut children, parent_id, self.bus.for_node())
                     }
                 },
-                NodeKind::Callee(raw) => get_callee_children(raw, &mut children, parent_id, self.message.clone()),
-                NodeKind::CallExpr(raw) => get_call_expr_children(raw, &mut children, parent_id, self.message.clone()),
-                NodeKind::Decl(raw) => get_decl_children(raw, &mut children, parent_id, self.message.clone()),
+                NodeKind::Callee(raw) => get_callee_children(raw, &mut children, parent_id, self.bus.for_node()),
+                NodeKind::CallExpr(raw) => get_call_expr_children(raw, &mut children, parent_id, self.bus.for_node()),
+                NodeKind::Decl(raw) => get_decl_children(raw, &mut children, parent_id, self.bus.for_node()),
                 NodeKind::ExportDecl(raw) => {
-                    get_export_declartion_children(raw, &mut children, parent_id, self.message.clone())
+                    get_export_declartion_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::ExportDefaultDecl(raw) => {
-                    get_export_default_decl_children(raw, &mut children, parent_id, self.message.clone())
+                    get_export_default_decl_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::ExportDefaultExpr(raw) => {
-                    get_export_default_expr_children(raw, &mut children, parent_id, self.message.clone())
+                    get_export_default_expr_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
-                NodeKind::Expr(raw) => get_expr_children(raw, &mut children, parent_id, self.message.clone()),
+                NodeKind::Expr(raw) => get_expr_children(raw, &mut children, parent_id, self.bus.for_node()),
                 NodeKind::ExprOrSpread(raw) => {
-                    get_expr_children(&*raw.expr, &mut children, parent_id, self.message.clone())
+                    get_expr_children(&*raw.expr, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::ExprStmt(raw) => {
-                    get_expr_children(&*raw.expr, &mut children, parent_id, self.message.clone())
+                    get_expr_children(&*raw.expr, &mut children, parent_id, self.bus.for_node())
                 }
-                NodeKind::IfStmt(raw) => get_if_statement_children(raw, &mut children, parent_id, self.message.clone()),
+                NodeKind::IfStmt(raw) => get_if_statement_children(raw, &mut children, parent_id, self.bus.for_node()),
                 NodeKind::ImportDecl(raw) => {
-                    get_import_decl_children(raw, &mut children, parent_id, self.message.clone())
+                    get_import_decl_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
-                NodeKind::Lit(raw) => get_lit_children(raw, &mut children, parent_id, self.message.clone()),
+                NodeKind::Lit(raw) => get_lit_children(raw, &mut children, parent_id, self.bus.for_node()),
                 NodeKind::MemberExpr(raw) => {
-                    get_member_expr_children(raw, &mut children, parent_id, self.message.clone())
+                    get_member_expr_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::MemberProp(raw) => {
-                    get_member_prop_children(raw, &mut children, parent_id, self.message.clone())
+                    get_member_prop_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::Module(ref module) => get_module_children(
                     unsafe { transmute::<&Module, &'static Module>(module) },
                     &mut children,
                     parent_id,
-                    self.message.clone(),
+                    self.bus.for_node(),
                 ),
                 NodeKind::ModuleItem(raw) => {
-                    get_module_item_children(raw, &mut children, parent_id, self.message.clone())
+                    get_module_item_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
-                NodeKind::NewExpr(raw) => get_new_expr_children(raw, &mut children, parent_id, self.message.clone()),
-                NodeKind::Pat(raw) => get_pat_children(raw, &mut children, parent_id, self.message.clone()),
+                NodeKind::NewExpr(raw) => get_new_expr_children(raw, &mut children, parent_id, self.bus.for_node()),
+                NodeKind::Pat(raw) => get_pat_children(raw, &mut children, parent_id, self.bus.for_node()),
                 NodeKind::ReturnStmt(raw) => {
-                    get_return_statement_children(raw, &mut children, parent_id, self.message.clone())
+                    get_return_statement_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TryStmt(raw) => {
-                    get_try_statement_children(raw, &mut children, parent_id, self.message.clone())
+                    get_try_statement_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
-                NodeKind::TsAsExpr(raw) => get_ts_as_expr_children(raw, &mut children, parent_id, self.message.clone()),
+                NodeKind::TsAsExpr(raw) => get_ts_as_expr_children(raw, &mut children, parent_id, self.bus.for_node()),
                 NodeKind::TsEntityName(raw) => {
-                    get_ts_entity_name_children(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_entity_name_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TsInterfaceDecl(raw) => {
-                    get_ts_interface_decl_children(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_interface_decl_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TsIntersectionType(raw) => {
-                    get_ts_intersection_type_children(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_intersection_type_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TsLitType(raw) => {
-                    get_ts_lit_type_chilren(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_lit_type_chilren(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TsModuleDecl(raw) => {
-                    get_ts_module_decl_children(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_module_decl_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TsPropertySignature(raw) => {
-                    get_ts_property_signature_children(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_property_signature_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
-                NodeKind::TsType(raw) => get_ts_type_children(raw, &mut children, parent_id, self.message.clone()),
+                NodeKind::TsType(raw) => get_ts_type_children(raw, &mut children, parent_id, self.bus.for_node()),
                 NodeKind::TsTypeAliasDecl(raw) => {
-                    get_ts_type_alias_declaration(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_type_alias_declaration(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TsTypeAnnotation(raw) => {
-                    get_type_annotation_children(raw, &mut children, parent_id, self.message.clone())
+                    get_type_annotation_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TsTypeAssertionExpr(raw) => {
-                    get_ts_type_assertion_expr_children(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_type_assertion_expr_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TsTypeElement(raw) => {
-                    get_ts_type_element_children(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_type_element_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
-                NodeKind::TsTypeLit(raw) => get_type_lit_children(raw, &mut children, parent_id, self.message.clone()),
-                NodeKind::TsTypeParam(raw) => get_ts_type_param(raw, &mut children, parent_id, self.message.clone()),
+                NodeKind::TsTypeLit(raw) => get_type_lit_children(raw, &mut children, parent_id, self.bus.for_node()),
+                NodeKind::TsTypeParam(raw) => get_ts_type_param(raw, &mut children, parent_id, self.bus.for_node()),
                 NodeKind::TsTypeParamInstantiation(raw) => {
-                    get_ts_type_param_instantiation_children(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_type_param_instantiation_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TsUnionType(raw) => {
-                    get_ts_union_type_children(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_union_type_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TsUnionOrIntersectionType(raw) => {
-                    get_ts_union_or_intersection_children(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_union_or_intersection_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 NodeKind::TsTypeRef(raw) => {
-                    get_ts_type_ref_children(raw, &mut children, parent_id, self.message.clone())
+                    get_ts_type_ref_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
-                NodeKind::VarDecl(raw) => get_var_decl_children(raw, &mut children, parent_id, self.message.clone()),
+                NodeKind::VarDecl(raw) => get_var_decl_children(raw, &mut children, parent_id, self.bus.for_node()),
                 NodeKind::VarDeclarator(raw) => {
-                    get_var_declarator_children(raw, &mut children, parent_id, self.message.clone())
+                    get_var_declarator_children(raw, &mut children, parent_id, self.bus.for_node())
                 }
                 _ => {}
             }
@@ -141,10 +140,10 @@ fn push_child(
     kind: NodeKind<'static>,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    let child_node = Arc::new(Node::new(kind, Some(parent_id), message.clone()));
-    message.send(Message::RegisterNode(child_node.clone())).unwrap();
+    let child_node = Arc::new(Node::new(kind, Some(parent_id), bus.for_node()));
+    bus.register_node(child_node.clone());
     children.push(child_node);
 }
 
@@ -152,10 +151,10 @@ fn get_return_statement_children(
     raw: &'static ReturnStmt,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     if let Some(arg) = &raw.arg {
-        get_expr_children(arg, children, parent_id, message);
+        get_expr_children(arg, children, parent_id, bus);
     }
 }
 
@@ -163,12 +162,12 @@ fn get_if_statement_children(
     raw: &'static IfStmt,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    get_expr_children(&*raw.test, children, parent_id, message.clone());
-    get_statement_children(&*raw.cons, children, parent_id, message.clone());
+    get_expr_children(&*raw.test, children, parent_id, bus.for_node());
+    get_statement_children(&*raw.cons, children, parent_id, bus.for_node());
     if let Some(alt) = &raw.alt {
-        get_statement_children(alt, children, parent_id, message);
+        get_statement_children(alt, children, parent_id, bus);
     }
 }
 
@@ -176,16 +175,16 @@ fn get_try_statement_children(
     raw: &'static TryStmt,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    get_block_statement_children(&raw.block, children, parent_id, message.clone());
+    get_block_statement_children(&raw.block, children, parent_id, bus.for_node());
 
     if let Some(catch) = &raw.handler {
-        get_catch_clause_children(catch, children, parent_id, message.clone());
+        get_catch_clause_children(catch, children, parent_id, bus.for_node());
     }
 
     if let Some(finalizer) = &raw.finalizer {
-        get_block_statement_children(finalizer, children, parent_id, message);
+        get_block_statement_children(finalizer, children, parent_id, bus);
     }
 }
 
@@ -193,41 +192,41 @@ fn get_catch_clause_children(
     raw: &'static CatchClause,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    get_block_statement_children(&raw.body, children, parent_id, message);
+    get_block_statement_children(&raw.body, children, parent_id, bus);
 }
 
 fn get_ts_lit_type_chilren(
     raw: &'static TsLitType,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    get_ts_lit_children(&raw.lit, children, parent_id, message);
+    get_ts_lit_children(&raw.lit, children, parent_id, bus);
 }
 
 fn get_ts_lit_children(
     raw: &'static TsLit,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match raw {
         TsLit::Number(raw) => {
-            push_child(NodeKind::Num(raw), children, parent_id, message);
+            push_child(NodeKind::Num(raw), children, parent_id, bus);
         }
         TsLit::Str(raw) => {
-            push_child(NodeKind::Str(raw), children, parent_id, message);
+            push_child(NodeKind::Str(raw), children, parent_id, bus);
         }
         TsLit::Tpl(raw) => {
-            push_child(NodeKind::TsTplLit(raw), children, parent_id, message);
+            push_child(NodeKind::TsTplLit(raw), children, parent_id, bus);
         }
         TsLit::Bool(raw) => {
-            push_child(NodeKind::Bool(raw), children, parent_id, message);
+            push_child(NodeKind::Bool(raw), children, parent_id, bus);
         }
         TsLit::BigInt(raw) => {
-            push_child(NodeKind::BigInt(raw), children, parent_id, message);
+            push_child(NodeKind::BigInt(raw), children, parent_id, bus);
         }
     }
 }
@@ -236,10 +235,10 @@ fn get_ts_union_type_children(
     raw: &'static TsUnionType,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     for type_ann in &raw.types {
-        get_ts_type_children(type_ann, children, parent_id, message.clone());
+        get_ts_type_children(type_ann, children, parent_id, bus.for_node());
     }
 }
 
@@ -247,10 +246,10 @@ fn get_ts_intersection_type_children(
     raw: &'static TsIntersectionType,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     for type_ann in &raw.types {
-        get_ts_type_children(type_ann, children, parent_id, message.clone());
+        get_ts_type_children(type_ann, children, parent_id, bus.for_node());
     }
 }
 
@@ -258,18 +257,18 @@ fn get_ts_union_or_intersection_children(
     raw: &'static TsUnionOrIntersectionType,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match raw {
         TsUnionOrIntersectionType::TsUnionType(raw_union) => {
-            push_child(NodeKind::TsUnionType(raw_union), children, parent_id, message);
+            push_child(NodeKind::TsUnionType(raw_union), children, parent_id, bus);
         }
         TsUnionOrIntersectionType::TsIntersectionType(raw_intersection) => {
             push_child(
                 NodeKind::TsIntersectionType(raw_intersection),
                 children,
                 parent_id,
-                message,
+                bus,
             );
         }
     }
@@ -279,19 +278,19 @@ fn get_await_expr_children(
     raw_await: &'static AwaitExpr,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    get_expr_children(&*raw_await.arg, children, parent_id, message);
+    get_expr_children(&*raw_await.arg, children, parent_id, bus);
 }
 
 fn get_ts_type_param_instantiation_children(
     type_params: &'static TsTypeParamInstantiation,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     for param in &type_params.params {
-        get_ts_type_children(param, children, parent_id, message.clone());
+        get_ts_type_children(param, children, parent_id, bus.for_node());
     }
 }
 
@@ -299,14 +298,14 @@ fn get_ts_type_param(
     type_param: &'static TsTypeParam,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     if let Some(constraint) = &type_param.constraint {
-        get_ts_type_children(constraint, children, parent_id, message.clone());
+        get_ts_type_children(constraint, children, parent_id, bus.for_node());
     }
 
     if let Some(default) = &type_param.default {
-        get_ts_type_children(default, children, parent_id, message.clone());
+        get_ts_type_children(default, children, parent_id, bus.for_node());
     }
 }
 
@@ -314,26 +313,26 @@ fn get_lit_children(
     lit: &'static Lit,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match lit {
         Lit::Str(raw) => {
-            push_child(NodeKind::Str(raw), children, parent_id, message);
+            push_child(NodeKind::Str(raw), children, parent_id, bus);
         }
         Lit::Bool(raw) => {
-            push_child(NodeKind::Bool(raw), children, parent_id, message);
+            push_child(NodeKind::Bool(raw), children, parent_id, bus);
         }
         Lit::Null(raw) => {
-            push_child(NodeKind::Null(raw), children, parent_id, message);
+            push_child(NodeKind::Null(raw), children, parent_id, bus);
         }
         Lit::Num(raw) => {
-            push_child(NodeKind::Num(raw), children, parent_id, message);
+            push_child(NodeKind::Num(raw), children, parent_id, bus);
         }
         Lit::BigInt(raw) => {
-            push_child(NodeKind::BigInt(raw), children, parent_id, message);
+            push_child(NodeKind::BigInt(raw), children, parent_id, bus);
         }
         Lit::Regex(raw) => {
-            push_child(NodeKind::Regex(raw), children, parent_id, message);
+            push_child(NodeKind::Regex(raw), children, parent_id, bus);
         }
         _ => {}
     }
@@ -343,24 +342,24 @@ fn get_ts_type_assertion_expr_children(
     expr: &'static TsTypeAssertion,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    get_expr_children(&*expr.expr, children, parent_id, message.clone());
-    get_ts_type_children(&*expr.type_ann, children, parent_id, message);
+    get_expr_children(&*expr.expr, children, parent_id, bus.for_node());
+    get_ts_type_children(&*expr.type_ann, children, parent_id, bus);
 }
 
 fn get_ts_entity_name_children(
     entity_name: &'static TsEntityName,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match entity_name {
         TsEntityName::Ident(raw) => {
-            push_child(NodeKind::Ident(raw), children, parent_id, message);
+            push_child(NodeKind::Ident(raw), children, parent_id, bus);
         }
         TsEntityName::TsQualifiedName(raw) => {
-            push_child(NodeKind::TsQualifiedName(raw), children, parent_id, message);
+            push_child(NodeKind::TsQualifiedName(raw), children, parent_id, bus);
         }
     }
 }
@@ -369,13 +368,13 @@ fn get_ts_type_ref_children(
     type_ref: &'static TsTypeRef,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     push_child(
         NodeKind::TsEntityName(&type_ref.type_name),
         children,
         parent_id,
-        message.clone(),
+        bus.for_node(),
     );
 
     if let Some(type_params) = &type_ref.type_params {
@@ -383,7 +382,7 @@ fn get_ts_type_ref_children(
             NodeKind::TsTypeParamInstantiation(type_params),
             children,
             parent_id,
-            message,
+            bus,
         );
     }
 }
@@ -392,68 +391,68 @@ fn get_ts_type_children(
     ts_type: &'static TsType,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match ts_type {
         TsType::TsKeywordType(raw) => {
-            push_child(NodeKind::TsKeywordType(raw), children, parent_id, message);
+            push_child(NodeKind::TsKeywordType(raw), children, parent_id, bus);
         }
         TsType::TsThisType(raw) => {
-            push_child(NodeKind::TsThisType(raw), children, parent_id, message);
+            push_child(NodeKind::TsThisType(raw), children, parent_id, bus);
         }
         TsType::TsFnOrConstructorType(raw) => {
-            push_child(NodeKind::TsFnOrConstructorType(raw), children, parent_id, message);
+            push_child(NodeKind::TsFnOrConstructorType(raw), children, parent_id, bus);
         }
         TsType::TsTypeRef(raw) => {
-            push_child(NodeKind::TsTypeRef(raw), children, parent_id, message);
+            push_child(NodeKind::TsTypeRef(raw), children, parent_id, bus);
         }
         TsType::TsTypeQuery(raw) => {
-            push_child(NodeKind::TsTypeQuery(raw), children, parent_id, message);
+            push_child(NodeKind::TsTypeQuery(raw), children, parent_id, bus);
         }
         TsType::TsTypeLit(raw) => {
-            push_child(NodeKind::TsTypeLit(raw), children, parent_id, message);
+            push_child(NodeKind::TsTypeLit(raw), children, parent_id, bus);
         }
         TsType::TsArrayType(raw) => {
-            push_child(NodeKind::TsArrayType(raw), children, parent_id, message);
+            push_child(NodeKind::TsArrayType(raw), children, parent_id, bus);
         }
         TsType::TsTupleType(raw) => {
-            push_child(NodeKind::TsTupleType(raw), children, parent_id, message);
+            push_child(NodeKind::TsTupleType(raw), children, parent_id, bus);
         }
         TsType::TsOptionalType(raw) => {
-            push_child(NodeKind::TsOptionalType(raw), children, parent_id, message);
+            push_child(NodeKind::TsOptionalType(raw), children, parent_id, bus);
         }
         TsType::TsRestType(raw) => {
-            push_child(NodeKind::TsRestType(raw), children, parent_id, message);
+            push_child(NodeKind::TsRestType(raw), children, parent_id, bus);
         }
         TsType::TsUnionOrIntersectionType(raw) => {
-            push_child(NodeKind::TsUnionOrIntersectionType(raw), children, parent_id, message);
+            push_child(NodeKind::TsUnionOrIntersectionType(raw), children, parent_id, bus);
         }
         TsType::TsConditionalType(raw) => {
-            push_child(NodeKind::TsConditionalType(raw), children, parent_id, message);
+            push_child(NodeKind::TsConditionalType(raw), children, parent_id, bus);
         }
         TsType::TsInferType(raw) => {
-            push_child(NodeKind::TsInferType(raw), children, parent_id, message);
+            push_child(NodeKind::TsInferType(raw), children, parent_id, bus);
         }
         TsType::TsParenthesizedType(raw) => {
-            push_child(NodeKind::TsParenthesizedType(raw), children, parent_id, message);
+            push_child(NodeKind::TsParenthesizedType(raw), children, parent_id, bus);
         }
         TsType::TsTypeOperator(raw) => {
-            push_child(NodeKind::TsTypeOperator(raw), children, parent_id, message);
+            push_child(NodeKind::TsTypeOperator(raw), children, parent_id, bus);
         }
         TsType::TsIndexedAccessType(raw) => {
-            push_child(NodeKind::TsIndexedAccessType(raw), children, parent_id, message);
+            push_child(NodeKind::TsIndexedAccessType(raw), children, parent_id, bus);
         }
         TsType::TsMappedType(raw) => {
-            push_child(NodeKind::TsMappedType(raw), children, parent_id, message);
+            push_child(NodeKind::TsMappedType(raw), children, parent_id, bus);
         }
         TsType::TsLitType(raw) => {
-            push_child(NodeKind::TsLitType(raw), children, parent_id, message);
+            push_child(NodeKind::TsLitType(raw), children, parent_id, bus);
         }
         TsType::TsTypePredicate(raw) => {
-            push_child(NodeKind::TsTypePredicate(raw), children, parent_id, message);
+            push_child(NodeKind::TsTypePredicate(raw), children, parent_id, bus);
         }
         TsType::TsImportType(raw) => {
-            push_child(NodeKind::TsImportType(raw), children, parent_id, message);
+            push_child(NodeKind::TsImportType(raw), children, parent_id, bus);
         }
     }
 }
@@ -462,100 +461,100 @@ fn get_new_expr_children(
     expr: &'static NewExpr,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    get_expr_children(&expr.callee, children, parent_id, message);
+    get_expr_children(&expr.callee, children, parent_id, bus);
 }
 
 fn get_ts_as_expr_children(
     expr: &'static TsAsExpr,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match &*expr.type_ann {
         TsType::TsKeywordType(raw) => {
-            push_child(NodeKind::TsKeywordType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsKeywordType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsThisType(raw) => {
-            push_child(NodeKind::TsThisType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsThisType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsFnOrConstructorType(raw) => {
             push_child(
                 NodeKind::TsFnOrConstructorType(raw),
                 children,
                 parent_id,
-                message.clone(),
+                bus.for_node(),
             );
         }
         TsType::TsTypeRef(raw) => {
-            push_child(NodeKind::TsTypeRef(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsTypeRef(raw), children, parent_id, bus.for_node());
         }
         TsType::TsTypeQuery(raw) => {
-            push_child(NodeKind::TsTypeQuery(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsTypeQuery(raw), children, parent_id, bus.for_node());
         }
         TsType::TsTypeLit(raw) => {
-            push_child(NodeKind::TsTypeLit(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsTypeLit(raw), children, parent_id, bus.for_node());
         }
         TsType::TsArrayType(raw) => {
-            push_child(NodeKind::TsArrayType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsArrayType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsTupleType(raw) => {
-            push_child(NodeKind::TsTupleType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsTupleType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsOptionalType(raw) => {
-            push_child(NodeKind::TsOptionalType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsOptionalType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsRestType(raw) => {
-            push_child(NodeKind::TsRestType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsRestType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsUnionOrIntersectionType(raw) => {
             push_child(
                 NodeKind::TsUnionOrIntersectionType(raw),
                 children,
                 parent_id,
-                message.clone(),
+                bus.for_node(),
             );
         }
         TsType::TsConditionalType(raw) => {
-            push_child(NodeKind::TsConditionalType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsConditionalType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsInferType(raw) => {
-            push_child(NodeKind::TsInferType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsInferType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsParenthesizedType(raw) => {
-            push_child(NodeKind::TsParenthesizedType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsParenthesizedType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsTypeOperator(raw) => {
-            push_child(NodeKind::TsTypeOperator(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsTypeOperator(raw), children, parent_id, bus.for_node());
         }
         TsType::TsIndexedAccessType(raw) => {
-            push_child(NodeKind::TsIndexedAccessType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsIndexedAccessType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsMappedType(raw) => {
-            push_child(NodeKind::TsMappedType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsMappedType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsLitType(raw) => {
-            push_child(NodeKind::TsLitType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsLitType(raw), children, parent_id, bus.for_node());
         }
         TsType::TsTypePredicate(raw) => {
-            push_child(NodeKind::TsTypePredicate(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsTypePredicate(raw), children, parent_id, bus.for_node());
         }
         TsType::TsImportType(raw) => {
-            push_child(NodeKind::TsImportType(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsImportType(raw), children, parent_id, bus.for_node());
         }
     }
-    get_expr_children(&*expr.expr, children, parent_id, message);
+    get_expr_children(&*expr.expr, children, parent_id, bus);
 }
 
 fn get_var_declarator_children(
     var_declarator: &'static VarDeclarator,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     if let Some(init) = &var_declarator.init {
-        push_child(NodeKind::Expr(init), children, parent_id, message);
+        push_child(NodeKind::Expr(init), children, parent_id, bus);
     }
 }
 
@@ -563,11 +562,11 @@ fn get_member_prop_children(
     prop: &'static MemberProp,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match prop {
         MemberProp::Ident(raw) => {
-            push_child(NodeKind::Ident(raw), children, parent_id, message);
+            push_child(NodeKind::Ident(raw), children, parent_id, bus);
         }
         _ => {}
     }
@@ -577,21 +576,21 @@ fn get_member_expr_children(
     expr: &'static MemberExpr,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    push_child(NodeKind::Expr(&expr.obj), children, parent_id, message.clone());
+    push_child(NodeKind::Expr(&expr.obj), children, parent_id, bus.for_node());
 
-    push_child(NodeKind::MemberProp(&expr.prop), children, parent_id, message);
+    push_child(NodeKind::MemberProp(&expr.prop), children, parent_id, bus);
 }
 
 fn get_callee_children(
     callee: &'static Callee,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match callee {
-        Callee::Expr(expr) => get_expr_children(expr, children, parent_id, message),
+        Callee::Expr(expr) => get_expr_children(expr, children, parent_id, bus),
         _ => {}
     }
 }
@@ -600,29 +599,29 @@ fn get_decl_children(
     decl: &'static Decl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match decl {
         Decl::Class(raw) => {
-            push_child(NodeKind::ClassDecl(raw), children, parent_id, message);
+            push_child(NodeKind::ClassDecl(raw), children, parent_id, bus);
         }
         Decl::Fn(raw) => {
-            push_child(NodeKind::FnDecl(raw), children, parent_id, message);
+            push_child(NodeKind::FnDecl(raw), children, parent_id, bus);
         }
         Decl::TsEnum(raw) => {
-            push_child(NodeKind::TsEnumDecl(raw), children, parent_id, message);
+            push_child(NodeKind::TsEnumDecl(raw), children, parent_id, bus);
         }
         Decl::TsInterface(raw) => {
-            push_child(NodeKind::TsInterfaceDecl(raw), children, parent_id, message);
+            push_child(NodeKind::TsInterfaceDecl(raw), children, parent_id, bus);
         }
         Decl::TsModule(raw) => {
-            push_child(NodeKind::TsModuleDecl(raw), children, parent_id, message);
+            push_child(NodeKind::TsModuleDecl(raw), children, parent_id, bus);
         }
         Decl::Var(raw) => {
-            push_child(NodeKind::VarDecl(raw), children, parent_id, message);
+            push_child(NodeKind::VarDecl(raw), children, parent_id, bus);
         }
         Decl::TsTypeAlias(raw) => {
-            push_child(NodeKind::TsTypeAliasDecl(raw), children, parent_id, message);
+            push_child(NodeKind::TsTypeAliasDecl(raw), children, parent_id, bus);
         }
         _ => {}
     }
@@ -632,12 +631,12 @@ fn get_ts_module_decl_children(
     decl: &'static TsModuleDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match &decl.body {
-        Some(TsNamespaceBody::TsModuleBlock(raw)) => get_ts_module_block_children(raw, children, parent_id, message),
+        Some(TsNamespaceBody::TsModuleBlock(raw)) => get_ts_module_block_children(raw, children, parent_id, bus),
         Some(TsNamespaceBody::TsNamespaceDecl(raw)) => {
-            get_ts_namespace_decl_children(raw, children, parent_id, message)
+            get_ts_namespace_decl_children(raw, children, parent_id, bus)
         }
         _ => {}
     }
@@ -647,11 +646,11 @@ fn get_ts_namespace_decl_children(
     decl: &'static TsNamespaceDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match &*decl.body {
-        TsNamespaceBody::TsModuleBlock(raw) => get_ts_module_block_children(raw, children, parent_id, message),
-        TsNamespaceBody::TsNamespaceDecl(raw) => get_ts_namespace_decl_children(raw, children, parent_id, message),
+        TsNamespaceBody::TsModuleBlock(raw) => get_ts_module_block_children(raw, children, parent_id, bus),
+        TsNamespaceBody::TsNamespaceDecl(raw) => get_ts_namespace_decl_children(raw, children, parent_id, bus),
     }
 }
 
@@ -659,10 +658,10 @@ fn get_ts_module_block_children(
     block: &'static TsModuleBlock,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     block.body.iter().for_each(|item| {
-        push_child(NodeKind::ModuleItem(item), children, parent_id, message.clone());
+        push_child(NodeKind::ModuleItem(item), children, parent_id, bus.for_node());
     });
 }
 
@@ -670,46 +669,46 @@ fn get_class_decl_children(
     decl: &'static ClassDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     decl.class.body.iter().for_each(|member| {
-        push_child(NodeKind::ClassMember(member), children, parent_id, message.clone());
+        push_child(NodeKind::ClassMember(member), children, parent_id, bus.for_node());
     });
 }
 fn get_fn_decl_children(
     decl: &'static FnDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     decl.function.body.iter().for_each(|member| {
-        push_child(NodeKind::BlockStmt(member), children, parent_id, message.clone());
+        push_child(NodeKind::BlockStmt(member), children, parent_id, bus.for_node());
     });
 }
 fn get_ts_enum_decl_children(
     decl: &'static TsEnumDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     decl.members.iter().for_each(|member| {
-        push_child(NodeKind::TsEnumMember(member), children, parent_id, message.clone());
+        push_child(NodeKind::TsEnumMember(member), children, parent_id, bus.for_node());
     });
 }
 fn get_ts_interface_decl_children(
     decl: &'static TsInterfaceDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     if let Some(type_params) = &decl.type_params {
         for param in &type_params.params {
-            push_child(NodeKind::TsTypeParam(&param), children, parent_id, message.clone());
+            push_child(NodeKind::TsTypeParam(&param), children, parent_id, bus.for_node());
         }
     }
 
     decl.body.body.iter().for_each(|member| {
-        push_child(NodeKind::TsTypeElement(member), children, parent_id, message.clone());
+        push_child(NodeKind::TsTypeElement(member), children, parent_id, bus.for_node());
     });
 }
 
@@ -717,23 +716,23 @@ fn get_ts_type_alias_declaration(
     decl: &'static TsTypeAliasDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    push_child(NodeKind::TsType(&decl.type_ann), children, parent_id, message);
+    push_child(NodeKind::TsType(&decl.type_ann), children, parent_id, bus);
 }
 
 fn get_module_decl_children(
     decl: &'static ModuleDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match decl {
-        ModuleDecl::Import(raw) => get_import_decl_children(raw, children, parent_id, message),
-        ModuleDecl::ExportDecl(raw) => get_export_declartion_children(raw, children, parent_id, message),
-        ModuleDecl::ExportNamed(raw) => get_named_export_children(raw, children, parent_id, message),
-        ModuleDecl::ExportDefaultDecl(raw) => get_export_default_decl_children(raw, children, parent_id, message),
-        ModuleDecl::ExportDefaultExpr(raw) => get_export_default_expr_children(raw, children, parent_id, message),
+        ModuleDecl::Import(raw) => get_import_decl_children(raw, children, parent_id, bus),
+        ModuleDecl::ExportDecl(raw) => get_export_declartion_children(raw, children, parent_id, bus),
+        ModuleDecl::ExportNamed(raw) => get_named_export_children(raw, children, parent_id, bus),
+        ModuleDecl::ExportDefaultDecl(raw) => get_export_default_decl_children(raw, children, parent_id, bus),
+        ModuleDecl::ExportDefaultExpr(raw) => get_export_default_expr_children(raw, children, parent_id, bus),
         _ => {}
     }
 }
@@ -742,14 +741,14 @@ fn get_named_export_children(
     named_export: &'static NamedExport,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     for specifier in &named_export.specifiers {
         push_child(
             NodeKind::ExportSpecifier(specifier),
             children,
             parent_id,
-            message.clone(),
+            bus.for_node(),
         );
     }
 }
@@ -758,21 +757,21 @@ fn get_ts_type_element_children(
     type_element: &'static TsTypeElement,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match type_element {
         TsTypeElement::TsCallSignatureDecl(raw) => {
-            get_ts_call_signature_decl_children(raw, children, parent_id, message)
+            get_ts_call_signature_decl_children(raw, children, parent_id, bus)
         }
         TsTypeElement::TsConstructSignatureDecl(raw) => {
-            get_ts_construct_signature_decl_children(raw, children, parent_id, message)
+            get_ts_construct_signature_decl_children(raw, children, parent_id, bus)
         }
-        TsTypeElement::TsIndexSignature(raw) => get_ts_index_signature_children(raw, children, parent_id, message),
-        TsTypeElement::TsMethodSignature(raw) => get_ts_method_signature_children(raw, children, parent_id, message),
+        TsTypeElement::TsIndexSignature(raw) => get_ts_index_signature_children(raw, children, parent_id, bus),
+        TsTypeElement::TsMethodSignature(raw) => get_ts_method_signature_children(raw, children, parent_id, bus),
         TsTypeElement::TsPropertySignature(raw) => {
-            get_ts_property_signature_children(raw, children, parent_id, message)
+            get_ts_property_signature_children(raw, children, parent_id, bus)
         }
-        TsTypeElement::TsGetterSignature(raw) => get_ts_getter_signature_children(raw, children, parent_id, message),
+        TsTypeElement::TsGetterSignature(raw) => get_ts_getter_signature_children(raw, children, parent_id, bus),
         _ => {}
     }
 }
@@ -781,88 +780,88 @@ fn get_ts_call_signature_decl_children(
     thing: &'static TsCallSignatureDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     for param in &thing.params {
-        push_child(NodeKind::TsFnParam(param), children, parent_id, message.clone());
+        push_child(NodeKind::TsFnParam(param), children, parent_id, bus.for_node());
     }
 
     if let Some(type_ann) = &thing.type_ann {
-        get_type_annotation_children(type_ann, children, parent_id, message);
+        get_type_annotation_children(type_ann, children, parent_id, bus);
     }
 }
 fn get_ts_construct_signature_decl_children(
     thing: &'static TsConstructSignatureDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     {
         for param in &thing.params {
-            push_child(NodeKind::TsFnParam(param), children, parent_id, message.clone());
+            push_child(NodeKind::TsFnParam(param), children, parent_id, bus.for_node());
         }
     }
 
     if let Some(type_ann) = &thing.type_ann {
-        get_type_annotation_children(type_ann, children, parent_id, message);
+        get_type_annotation_children(type_ann, children, parent_id, bus);
     }
 }
 fn get_ts_index_signature_children(
     thing: &'static TsIndexSignature,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     {
         for param in &thing.params {
-            push_child(NodeKind::TsFnParam(param), children, parent_id, message.clone());
+            push_child(NodeKind::TsFnParam(param), children, parent_id, bus.for_node());
         }
     }
 
     if let Some(type_ann) = &thing.type_ann {
-        get_type_annotation_children(type_ann, children, parent_id, message);
+        get_type_annotation_children(type_ann, children, parent_id, bus);
     }
 }
 fn get_ts_method_signature_children(
     thing: &'static TsMethodSignature,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     {
         for param in &thing.params {
-            push_child(NodeKind::TsFnParam(param), children, parent_id, message.clone());
+            push_child(NodeKind::TsFnParam(param), children, parent_id, bus.for_node());
         }
     }
 
     if let Some(type_ann) = &thing.type_ann {
-        get_type_annotation_children(type_ann, children, parent_id, message);
+        get_type_annotation_children(type_ann, children, parent_id, bus);
     }
 }
 fn get_ts_property_signature_children(
     signature: &'static TsPropertySignature,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     {
         for param in &signature.params {
-            push_child(NodeKind::TsFnParam(param), children, parent_id, message.clone());
+            push_child(NodeKind::TsFnParam(param), children, parent_id, bus.for_node());
         }
     }
 
     if let Some(type_ann) = &signature.type_ann {
-        get_type_annotation_children(type_ann, children, parent_id, message);
+        get_type_annotation_children(type_ann, children, parent_id, bus);
     }
 }
 fn get_ts_getter_signature_children(
     thing: &'static TsGetterSignature,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     if let Some(type_ann) = &thing.type_ann {
-        get_type_annotation_children(type_ann, children, parent_id, message);
+        get_type_annotation_children(type_ann, children, parent_id, bus);
     }
 }
 
@@ -870,10 +869,10 @@ fn get_type_lit_children(
     type_lit: &'static TsTypeLit,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     for member in &type_lit.members {
-        push_child(NodeKind::TsTypeElement(member), children, parent_id, message.clone());
+        push_child(NodeKind::TsTypeElement(member), children, parent_id, bus.for_node());
     }
 }
 
@@ -881,12 +880,12 @@ fn get_call_expr_children(
     expr: &'static CallExpr,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    push_child(NodeKind::Callee(&expr.callee), children, parent_id, message.clone());
+    push_child(NodeKind::Callee(&expr.callee), children, parent_id, bus.for_node());
 
     expr.args.iter().for_each(|arg| {
-        push_child(NodeKind::ExprOrSpread(arg), children, parent_id, message.clone());
+        push_child(NodeKind::ExprOrSpread(arg), children, parent_id, bus.for_node());
     });
 }
 
@@ -894,107 +893,107 @@ fn get_expr_children(
     expr: &'static Expr,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match expr {
         Expr::This(raw) => {
-            push_child(NodeKind::ThisExpr(raw), children, parent_id, message);
+            push_child(NodeKind::ThisExpr(raw), children, parent_id, bus);
         }
         Expr::Array(raw) => {
-            push_child(NodeKind::ArrayLit(raw), children, parent_id, message);
+            push_child(NodeKind::ArrayLit(raw), children, parent_id, bus);
         }
         Expr::Object(raw) => {
-            push_child(NodeKind::ObjectLit(raw), children, parent_id, message);
+            push_child(NodeKind::ObjectLit(raw), children, parent_id, bus);
         }
         Expr::Fn(raw) => {
-            push_child(NodeKind::FnExpr(raw), children, parent_id, message);
+            push_child(NodeKind::FnExpr(raw), children, parent_id, bus);
         }
         Expr::Unary(raw) => {
-            push_child(NodeKind::UnaryExpr(raw), children, parent_id, message);
+            push_child(NodeKind::UnaryExpr(raw), children, parent_id, bus);
         }
         Expr::Update(raw) => {
-            push_child(NodeKind::UpdateExpr(raw), children, parent_id, message);
+            push_child(NodeKind::UpdateExpr(raw), children, parent_id, bus);
         }
         Expr::Bin(raw) => {
-            push_child(NodeKind::BinExpr(raw), children, parent_id, message);
+            push_child(NodeKind::BinExpr(raw), children, parent_id, bus);
         }
         Expr::Assign(raw) => {
-            push_child(NodeKind::AssignExpr(raw), children, parent_id, message);
+            push_child(NodeKind::AssignExpr(raw), children, parent_id, bus);
         }
         Expr::Member(raw) => {
-            push_child(NodeKind::MemberExpr(raw), children, parent_id, message);
+            push_child(NodeKind::MemberExpr(raw), children, parent_id, bus);
         }
         Expr::SuperProp(raw) => {
-            push_child(NodeKind::SuperPropExpr(raw), children, parent_id, message);
+            push_child(NodeKind::SuperPropExpr(raw), children, parent_id, bus);
         }
         Expr::Cond(raw) => {
-            push_child(NodeKind::CondExpr(raw), children, parent_id, message);
+            push_child(NodeKind::CondExpr(raw), children, parent_id, bus);
         }
         Expr::Call(raw) => {
-            push_child(NodeKind::CallExpr(raw), children, parent_id, message);
+            push_child(NodeKind::CallExpr(raw), children, parent_id, bus);
         }
         Expr::New(raw) => {
-            push_child(NodeKind::NewExpr(raw), children, parent_id, message);
+            push_child(NodeKind::NewExpr(raw), children, parent_id, bus);
         }
         Expr::Seq(raw) => {
-            push_child(NodeKind::SeqExpr(raw), children, parent_id, message);
+            push_child(NodeKind::SeqExpr(raw), children, parent_id, bus);
         }
         Expr::Ident(raw) => {
-            push_child(NodeKind::Ident(raw), children, parent_id, message);
+            push_child(NodeKind::Ident(raw), children, parent_id, bus);
         }
         Expr::Lit(raw) => {
-            push_child(NodeKind::Lit(raw), children, parent_id, message);
+            push_child(NodeKind::Lit(raw), children, parent_id, bus);
         }
         Expr::Tpl(raw) => {
-            push_child(NodeKind::TemplateLiteral(raw), children, parent_id, message);
+            push_child(NodeKind::TemplateLiteral(raw), children, parent_id, bus);
         }
         Expr::TaggedTpl(raw) => {
-            push_child(NodeKind::TaggedTpl(raw), children, parent_id, message);
+            push_child(NodeKind::TaggedTpl(raw), children, parent_id, bus);
         }
         Expr::Arrow(raw) => {
-            push_child(NodeKind::ArrowExpr(raw), children, parent_id, message);
+            push_child(NodeKind::ArrowExpr(raw), children, parent_id, bus);
         }
         Expr::Class(raw) => {
-            push_child(NodeKind::ClassExpr(raw), children, parent_id, message);
+            push_child(NodeKind::ClassExpr(raw), children, parent_id, bus);
         }
         Expr::Yield(raw) => {
-            push_child(NodeKind::YieldExpr(raw), children, parent_id, message);
+            push_child(NodeKind::YieldExpr(raw), children, parent_id, bus);
         }
         Expr::MetaProp(raw) => {
-            push_child(NodeKind::MetaPropExpr(raw), children, parent_id, message);
+            push_child(NodeKind::MetaPropExpr(raw), children, parent_id, bus);
         }
         Expr::Await(raw) => {
-            push_child(NodeKind::AwaitExpr(raw), children, parent_id, message);
+            push_child(NodeKind::AwaitExpr(raw), children, parent_id, bus);
         }
         Expr::Paren(raw) => {
-            push_child(NodeKind::ParenExpr(raw), children, parent_id, message);
+            push_child(NodeKind::ParenExpr(raw), children, parent_id, bus);
         }
         Expr::TsTypeAssertion(raw) => {
-            push_child(NodeKind::TsTypeAssertionExpr(raw), children, parent_id, message);
+            push_child(NodeKind::TsTypeAssertionExpr(raw), children, parent_id, bus);
         }
         Expr::TsConstAssertion(raw) => {
-            push_child(NodeKind::TsConstAssertionExpr(raw), children, parent_id, message);
+            push_child(NodeKind::TsConstAssertionExpr(raw), children, parent_id, bus);
         }
         Expr::TsNonNull(raw) => {
-            push_child(NodeKind::TsNonNullExpr(raw), children, parent_id, message);
+            push_child(NodeKind::TsNonNullExpr(raw), children, parent_id, bus);
         }
         Expr::TsAs(raw) => {
-            push_child(NodeKind::TsAsExpr(raw), children, parent_id, message);
+            push_child(NodeKind::TsAsExpr(raw), children, parent_id, bus);
         }
         Expr::TsInstantiation(raw) => {
-            push_child(NodeKind::TsInstantiationExpr(raw), children, parent_id, message);
+            push_child(NodeKind::TsInstantiationExpr(raw), children, parent_id, bus);
         }
         Expr::TsSatisfies(raw) => {
-            push_child(NodeKind::TsSatisfiesExpr(raw), children, parent_id, message);
+            push_child(NodeKind::TsSatisfiesExpr(raw), children, parent_id, bus);
         }
         Expr::PrivateName(raw) => {
-            push_child(NodeKind::PrivateNameExpr(raw), children, parent_id, message);
+            push_child(NodeKind::PrivateNameExpr(raw), children, parent_id, bus);
         }
         Expr::OptChain(raw) => {
-            push_child(NodeKind::OptChainExpr(raw), children, parent_id, message);
+            push_child(NodeKind::OptChainExpr(raw), children, parent_id, bus);
         }
         Expr::Invalid(raw) => {
-            push_child(NodeKind::InvalidExpr(raw), children, parent_id, message);
+            push_child(NodeKind::InvalidExpr(raw), children, parent_id, bus);
         }
         _ => {}
     }
@@ -1004,17 +1003,17 @@ fn get_arrow_expr_children(
     expr: &'static ArrowExpr,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     push_child(
         NodeKind::BlockStmtOrExpr(&*expr.body),
         children,
         parent_id,
-        message.clone(),
+        bus.for_node(),
     );
 
     expr.params.iter().for_each(|param| {
-        push_child(NodeKind::Pat(param), children, parent_id, message.clone());
+        push_child(NodeKind::Pat(param), children, parent_id, bus.for_node());
     });
 }
 
@@ -1022,10 +1021,10 @@ fn get_module_children(
     module: &'static Module,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     for item in &module.body {
-        push_child(NodeKind::ModuleItem(item), children, parent_id, message.clone());
+        push_child(NodeKind::ModuleItem(item), children, parent_id, bus.for_node());
     }
 }
 
@@ -1033,29 +1032,29 @@ fn get_export_declartion_children(
     export_decl: &'static ExportDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match &export_decl.decl {
         Decl::Class(declaration) => {
-            push_child(NodeKind::ClassDecl(declaration), children, parent_id, message);
+            push_child(NodeKind::ClassDecl(declaration), children, parent_id, bus);
         }
         Decl::Fn(declaration) => {
-            push_child(NodeKind::FnDecl(declaration), children, parent_id, message);
+            push_child(NodeKind::FnDecl(declaration), children, parent_id, bus);
         }
         Decl::Var(declaration) => {
-            push_child(NodeKind::VarDecl(declaration), children, parent_id, message);
+            push_child(NodeKind::VarDecl(declaration), children, parent_id, bus);
         }
         Decl::TsInterface(declaration) => {
-            push_child(NodeKind::TsInterfaceDecl(declaration), children, parent_id, message);
+            push_child(NodeKind::TsInterfaceDecl(declaration), children, parent_id, bus);
         }
         Decl::TsTypeAlias(declaration) => {
-            push_child(NodeKind::TsTypeAliasDecl(declaration), children, parent_id, message);
+            push_child(NodeKind::TsTypeAliasDecl(declaration), children, parent_id, bus);
         }
         Decl::TsEnum(declaration) => {
-            push_child(NodeKind::TsEnumDecl(declaration), children, parent_id, message);
+            push_child(NodeKind::TsEnumDecl(declaration), children, parent_id, bus);
         }
         Decl::TsModule(declaration) => {
-            push_child(NodeKind::TsModuleDecl(declaration), children, parent_id, message);
+            push_child(NodeKind::TsModuleDecl(declaration), children, parent_id, bus);
         }
         _ => {}
     }
@@ -1065,23 +1064,23 @@ fn get_export_default_expr_children(
     expression: &'static ExportDefaultExpr,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
-    get_expr_children(&expression.expr, children, parent_id, message)
+    get_expr_children(&expression.expr, children, parent_id, bus)
 }
 
 fn get_export_default_decl_children(
     export_declaration: &'static ExportDefaultDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match &export_declaration.decl {
         DefaultDecl::Class(declaration) => {
-            push_child(NodeKind::ClassExpr(&declaration), children, parent_id, message);
+            push_child(NodeKind::ClassExpr(&declaration), children, parent_id, bus);
         }
         DefaultDecl::TsInterfaceDecl(declaration) => {
-            push_child(NodeKind::TsInterfaceDecl(&declaration), children, parent_id, message);
+            push_child(NodeKind::TsInterfaceDecl(&declaration), children, parent_id, bus);
         }
         _ => {}
     }
@@ -1091,14 +1090,14 @@ fn get_import_decl_children(
     import_declaration: &'static ImportDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     for specifier in &import_declaration.specifiers {
         push_child(
             NodeKind::ImportSpecifier(&specifier),
             children,
             parent_id,
-            message.clone(),
+            bus.for_node(),
         );
     }
 }
@@ -1107,39 +1106,39 @@ fn get_module_item_children(
     module_item: &'static ModuleItem,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match module_item {
         ModuleItem::ModuleDecl(declaration) => match declaration {
             ModuleDecl::Import(declaration) => {
-                push_child(NodeKind::ImportDecl(&declaration), children, parent_id, message);
+                push_child(NodeKind::ImportDecl(&declaration), children, parent_id, bus);
             }
             ModuleDecl::ExportDecl(declaration) => {
-                push_child(NodeKind::ExportDecl(&declaration), children, parent_id, message);
+                push_child(NodeKind::ExportDecl(&declaration), children, parent_id, bus);
             }
             ModuleDecl::ExportNamed(declaration) => {
-                push_child(NodeKind::NamedExport(&declaration), children, parent_id, message);
+                push_child(NodeKind::NamedExport(&declaration), children, parent_id, bus);
             }
             ModuleDecl::ExportDefaultDecl(declaration) => {
-                push_child(NodeKind::ExportDefaultDecl(&declaration), children, parent_id, message);
+                push_child(NodeKind::ExportDefaultDecl(&declaration), children, parent_id, bus);
             }
             ModuleDecl::ExportDefaultExpr(declaration) => {
-                push_child(NodeKind::ExportDefaultExpr(&declaration), children, parent_id, message);
+                push_child(NodeKind::ExportDefaultExpr(&declaration), children, parent_id, bus);
             }
             ModuleDecl::ExportAll(declaration) => {
-                push_child(NodeKind::ExportAll(&declaration), children, parent_id, message);
+                push_child(NodeKind::ExportAll(&declaration), children, parent_id, bus);
             }
             ModuleDecl::TsImportEquals(declaration) => {
-                push_child(NodeKind::TsImportEquals(&declaration), children, parent_id, message);
+                push_child(NodeKind::TsImportEquals(&declaration), children, parent_id, bus);
             }
             ModuleDecl::TsExportAssignment(declaration) => {
-                push_child(NodeKind::TsExportAssignment(&declaration), children, parent_id, message);
+                push_child(NodeKind::TsExportAssignment(&declaration), children, parent_id, bus);
             }
             ModuleDecl::TsNamespaceExport(declaration) => {
-                push_child(NodeKind::TsNamespaceExport(&declaration), children, parent_id, message);
+                push_child(NodeKind::TsNamespaceExport(&declaration), children, parent_id, bus);
             }
         },
-        ModuleItem::Stmt(statement) => get_statement_children(statement, children, parent_id, message),
+        ModuleItem::Stmt(statement) => get_statement_children(statement, children, parent_id, bus),
     }
 }
 
@@ -1147,26 +1146,26 @@ fn get_pat_children(
     pat: &'static Pat,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match pat {
         Pat::Ident(ident) => ident.type_ann.iter().for_each(|raw| {
-            push_child(NodeKind::TsTypeAnnotation(raw), children, parent_id, message.clone());
+            push_child(NodeKind::TsTypeAnnotation(raw), children, parent_id, bus.for_node());
         }),
         Pat::Array(raw) => {
-            push_child(NodeKind::ArrayPat(raw), children, parent_id, message);
+            push_child(NodeKind::ArrayPat(raw), children, parent_id, bus);
         }
         Pat::Rest(raw) => {
-            push_child(NodeKind::RestPat(raw), children, parent_id, message);
+            push_child(NodeKind::RestPat(raw), children, parent_id, bus);
         }
         Pat::Object(raw) => {
-            push_child(NodeKind::ObjectPat(raw), children, parent_id, message);
+            push_child(NodeKind::ObjectPat(raw), children, parent_id, bus);
         }
         Pat::Assign(raw) => {
-            push_child(NodeKind::AssignPat(raw), children, parent_id, message);
+            push_child(NodeKind::AssignPat(raw), children, parent_id, bus);
         }
         Pat::Expr(raw) => {
-            push_child(NodeKind::Expr(raw), children, parent_id, message);
+            push_child(NodeKind::Expr(raw), children, parent_id, bus);
         }
         _ => {}
     }
@@ -1176,65 +1175,65 @@ fn get_statement_children(
     statement: &'static Stmt,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match statement {
         Stmt::Block(block_stmt) => {
-            push_child(NodeKind::BlockStmt(block_stmt), children, parent_id, message);
+            push_child(NodeKind::BlockStmt(block_stmt), children, parent_id, bus);
         }
         Stmt::Empty(empty_stmt) => {
-            push_child(NodeKind::EmptyStmt(empty_stmt), children, parent_id, message);
+            push_child(NodeKind::EmptyStmt(empty_stmt), children, parent_id, bus);
         }
         Stmt::Debugger(debugger_stmt) => {
-            push_child(NodeKind::DebuggerStmt(debugger_stmt), children, parent_id, message);
+            push_child(NodeKind::DebuggerStmt(debugger_stmt), children, parent_id, bus);
         }
         Stmt::With(with_stmt) => {
-            push_child(NodeKind::WithStmt(with_stmt), children, parent_id, message);
+            push_child(NodeKind::WithStmt(with_stmt), children, parent_id, bus);
         }
         Stmt::Return(return_stmt) => {
-            push_child(NodeKind::ReturnStmt(return_stmt), children, parent_id, message);
+            push_child(NodeKind::ReturnStmt(return_stmt), children, parent_id, bus);
         }
         Stmt::Labeled(labeled_stmt) => {
-            push_child(NodeKind::LabeledStmt(labeled_stmt), children, parent_id, message);
+            push_child(NodeKind::LabeledStmt(labeled_stmt), children, parent_id, bus);
         }
         Stmt::Break(break_stmt) => {
-            push_child(NodeKind::BreakStmt(break_stmt), children, parent_id, message);
+            push_child(NodeKind::BreakStmt(break_stmt), children, parent_id, bus);
         }
         Stmt::Continue(continue_stmt) => {
-            push_child(NodeKind::ContinueStmt(continue_stmt), children, parent_id, message);
+            push_child(NodeKind::ContinueStmt(continue_stmt), children, parent_id, bus);
         }
         Stmt::If(if_stmt) => {
-            push_child(NodeKind::IfStmt(if_stmt), children, parent_id, message);
+            push_child(NodeKind::IfStmt(if_stmt), children, parent_id, bus);
         }
         Stmt::Switch(switch_stmt) => {
-            push_child(NodeKind::SwitchStmt(switch_stmt), children, parent_id, message);
+            push_child(NodeKind::SwitchStmt(switch_stmt), children, parent_id, bus);
         }
         Stmt::Throw(throw_stmt) => {
-            push_child(NodeKind::ThrowStmt(throw_stmt), children, parent_id, message);
+            push_child(NodeKind::ThrowStmt(throw_stmt), children, parent_id, bus);
         }
         Stmt::Try(try_stmt) => {
-            push_child(NodeKind::TryStmt(try_stmt), children, parent_id, message);
+            push_child(NodeKind::TryStmt(try_stmt), children, parent_id, bus);
         }
         Stmt::While(while_stmt) => {
-            push_child(NodeKind::WhileStmt(while_stmt), children, parent_id, message);
+            push_child(NodeKind::WhileStmt(while_stmt), children, parent_id, bus);
         }
         Stmt::DoWhile(do_while_stmt) => {
-            push_child(NodeKind::DoWhileStmt(do_while_stmt), children, parent_id, message);
+            push_child(NodeKind::DoWhileStmt(do_while_stmt), children, parent_id, bus);
         }
         Stmt::For(for_stmt) => {
-            push_child(NodeKind::ForStmt(for_stmt), children, parent_id, message);
+            push_child(NodeKind::ForStmt(for_stmt), children, parent_id, bus);
         }
         Stmt::ForIn(for_in_stmt) => {
-            push_child(NodeKind::ForInStmt(for_in_stmt), children, parent_id, message);
+            push_child(NodeKind::ForInStmt(for_in_stmt), children, parent_id, bus);
         }
         Stmt::ForOf(for_of_stmt) => {
-            push_child(NodeKind::ForOfStmt(for_of_stmt), children, parent_id, message);
+            push_child(NodeKind::ForOfStmt(for_of_stmt), children, parent_id, bus);
         }
         Stmt::Decl(decl_stmt) => {
-            push_child(NodeKind::Decl(decl_stmt), children, parent_id, message);
+            push_child(NodeKind::Decl(decl_stmt), children, parent_id, bus);
         }
         Stmt::Expr(expr_stmt) => {
-            push_child(NodeKind::ExprStmt(expr_stmt), children, parent_id, message);
+            push_child(NodeKind::ExprStmt(expr_stmt), children, parent_id, bus);
         }
     }
 }
@@ -1243,67 +1242,67 @@ fn get_block_statement_children(
     block_stmnt: &'static BlockStmt,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     block_stmnt
         .stmts
         .iter()
-        .for_each(|statement| get_statement_children(statement, children, parent_id, message.clone()))
+        .for_each(|statement| get_statement_children(statement, children, parent_id, bus.for_node()))
 }
 
 fn get_type_annotation_children(
     type_annotation: &'static TsTypeAnn,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     match &*type_annotation.type_ann {
         TsType::TsKeywordType(ts_keyword_type) => {
-            push_child(NodeKind::TsKeywordType(&ts_keyword_type), children, parent_id, message);
+            push_child(NodeKind::TsKeywordType(&ts_keyword_type), children, parent_id, bus);
         }
         TsType::TsThisType(ts_this_type) => {
-            push_child(NodeKind::TsThisType(&ts_this_type), children, parent_id, message);
+            push_child(NodeKind::TsThisType(&ts_this_type), children, parent_id, bus);
         }
         TsType::TsFnOrConstructorType(ts_fn_or_constructor_type) => {
             push_child(
                 NodeKind::TsFnOrConstructorType(&ts_fn_or_constructor_type),
                 children,
                 parent_id,
-                message,
+                bus,
             );
         }
         TsType::TsTypeRef(ts_type_ref) => {
-            push_child(NodeKind::TsTypeRef(&ts_type_ref), children, parent_id, message);
+            push_child(NodeKind::TsTypeRef(&ts_type_ref), children, parent_id, bus);
         }
         TsType::TsTypeQuery(ts_type_query) => {
-            push_child(NodeKind::TsTypeQuery(&ts_type_query), children, parent_id, message);
+            push_child(NodeKind::TsTypeQuery(&ts_type_query), children, parent_id, bus);
         }
         TsType::TsTypeLit(ts_type_lit) => {
-            push_child(NodeKind::TsTypeLit(&ts_type_lit), children, parent_id, message);
+            push_child(NodeKind::TsTypeLit(&ts_type_lit), children, parent_id, bus);
         }
         TsType::TsArrayType(ts_array_type) => {
-            push_child(NodeKind::TsArrayType(&ts_array_type), children, parent_id, message);
+            push_child(NodeKind::TsArrayType(&ts_array_type), children, parent_id, bus);
         }
         TsType::TsTupleType(ts_tuple_type) => {
-            push_child(NodeKind::TsTupleType(&ts_tuple_type), children, parent_id, message);
+            push_child(NodeKind::TsTupleType(&ts_tuple_type), children, parent_id, bus);
         }
         TsType::TsOptionalType(ts_optional_type) => {
             push_child(
                 NodeKind::TsOptionalType(&ts_optional_type),
                 children,
                 parent_id,
-                message,
+                bus,
             );
         }
         TsType::TsRestType(ts_rest_type) => {
-            push_child(NodeKind::TsRestType(&ts_rest_type), children, parent_id, message);
+            push_child(NodeKind::TsRestType(&ts_rest_type), children, parent_id, bus);
         }
         TsType::TsUnionOrIntersectionType(ts_union_or_intersection_type) => {
             push_child(
                 NodeKind::TsUnionOrIntersectionType(&ts_union_or_intersection_type),
                 children,
                 parent_id,
-                message,
+                bus,
             );
         }
         TsType::TsConditionalType(ts_conditional_type) => {
@@ -1311,18 +1310,18 @@ fn get_type_annotation_children(
                 NodeKind::TsConditionalType(&ts_conditional_type),
                 children,
                 parent_id,
-                message,
+                bus,
             );
         }
         TsType::TsInferType(ts_infer_type) => {
-            push_child(NodeKind::TsInferType(&ts_infer_type), children, parent_id, message);
+            push_child(NodeKind::TsInferType(&ts_infer_type), children, parent_id, bus);
         }
         TsType::TsParenthesizedType(ts_parenthesized_type) => {
             push_child(
                 NodeKind::TsParenthesizedType(&ts_parenthesized_type),
                 children,
                 parent_id,
-                message,
+                bus,
             );
         }
         TsType::TsTypeOperator(ts_type_operator) => {
@@ -1330,7 +1329,7 @@ fn get_type_annotation_children(
                 NodeKind::TsTypeOperator(&ts_type_operator),
                 children,
                 parent_id,
-                message,
+                bus,
             );
         }
         TsType::TsIndexedAccessType(ts_indexed_access_type) => {
@@ -1338,25 +1337,25 @@ fn get_type_annotation_children(
                 NodeKind::TsIndexedAccessType(&ts_indexed_access_type),
                 children,
                 parent_id,
-                message,
+                bus,
             );
         }
         TsType::TsMappedType(ts_mapped_type) => {
-            push_child(NodeKind::TsMappedType(&ts_mapped_type), children, parent_id, message);
+            push_child(NodeKind::TsMappedType(&ts_mapped_type), children, parent_id, bus);
         }
         TsType::TsLitType(ts_lit_type) => {
-            push_child(NodeKind::TsLitType(&ts_lit_type), children, parent_id, message);
+            push_child(NodeKind::TsLitType(&ts_lit_type), children, parent_id, bus);
         }
         TsType::TsTypePredicate(ts_type_predicate) => {
             push_child(
                 NodeKind::TsTypePredicate(&ts_type_predicate),
                 children,
                 parent_id,
-                message,
+                bus,
             );
         }
         TsType::TsImportType(ts_import_type) => {
-            push_child(NodeKind::TsImportType(&ts_import_type), children, parent_id, message);
+            push_child(NodeKind::TsImportType(&ts_import_type), children, parent_id, bus);
         }
     }
 }
@@ -1365,9 +1364,9 @@ fn get_var_decl_children(
     variable_declaration: &'static VarDecl,
     children: &mut Vec<Arc<Node<'static>>>,
     parent_id: u8,
-    message: Sender<Message>,
+    bus: MessageBus,
 ) {
     variable_declaration.decls.iter().for_each(|decl| {
-        push_child(NodeKind::VarDeclarator(decl), children, parent_id, message.clone());
+        push_child(NodeKind::VarDeclarator(decl), children, parent_id, bus.for_node());
     })
 }

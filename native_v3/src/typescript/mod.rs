@@ -4,3 +4,4 @@ mod node_kind;
 
 pub use application::Application;
 pub use node::Node;
+pub use node_kind::NodeKind;

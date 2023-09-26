@@ -20,6 +20,37 @@
             ]
         },
         {
+            "name": "Debug Native v3 Tests",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--manifest-path",
+                    "${workspaceFolder}/native_v3/Cargo.toml",
+                    "--lib",
+                    "--",
+                    "--nocapture",
+                ],
+                "env": {
+                    "RUST_BACKTRACE": "1",
+                    "RUST_LOG": "debug",
+                    "RUST_DEBUG": "true",
+                },
+                "filter": {
+                    "name": "lil_schemy",
+                    "kind": "lib"
+                },
+            },
+            "args": [],
+            "terminal": "integrated",
+            "stopOnEntry": false,
+            "envFile": "${workspaceFolder}/native_v3/.envrc",
+            "sourceLanguages": [
+                "rust"
+            ]
+        },
+        {
             "name": "Debug Node",
             "type": "node",
             "request": "launch",
