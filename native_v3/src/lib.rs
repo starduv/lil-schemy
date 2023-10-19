@@ -6,6 +6,9 @@ mod mappers;
 mod messaging;
 mod typescript;
 mod writer;
+mod schemy;
+
+use std::collections::{HashMap, BTreeMap};
 
 use mappers::{
     open_api::{OpenApiMapper, OpenApiResult},
@@ -29,7 +32,9 @@ pub fn generate_schemas_debug(open_api_options: mappers::open_api::OpenApiOption
     let mut result = GenerateSchemaResult::default();
     let bus = MessageBus::new();
     let mut application = Application::new();
-    let handle = OpenApiMapper::run(Some(open_api_options), bus.for_mapper());
+    let mut modules = BTreeMap::<String, usize>::new();
+
+    let handle = OpenApiMapper::run(Some(open_api_options), bus.clone());
 
     application.run(bus);
 

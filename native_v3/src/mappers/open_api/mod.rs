@@ -1,32 +1,43 @@
 mod options;
+mod path_options;
 
 use std::{
+    collections::HashSet,
+    ops::Deref,
     sync::Arc,
     thread::{self, JoinHandle},
 };
 
 pub use options::OpenApiOptions;
 use serde::Serialize;
+use swc_ecma_ast::{Expr, Lit, Prop, PropName};
 
-use crate::typescript::Node;
+use crate::{typescript::{Node, NodeKind}, schemy::{SchemyPath, self}};
+
+use self::path_options::PathOptions;
 
 use super::{Mapper, MessageBus};
 
 pub struct OpenApiMapper {}
 
 impl Mapper<OpenApiOptions, OpenApiResult> for OpenApiMapper {
-    fn run(options: Option<OpenApiOptions>, mapper_bus: MessageBus) -> Option<JoinHandle<OpenApiResult>> {
+    fn run(options: Option<OpenApiOptions>, bus: MessageBus) -> Option<JoinHandle<OpenApiResult>> {
+        let mut module_ids = HashSet::<usize>::new();
+
         match options {
             Some(options) => Some(thread::spawn(move || {
                 let mut open_api = OpenApi::default();
                 for ref filepath in options.filepaths {
-                    add_paths(
-                        &mut open_api,
-                        mapper_bus.request_module(filepath.clone()),
-                        &filepath,
-                        &mapper_bus,
-                    );
+                    module_ids.insert(bus.request_module(filepath.clone()));
                 }
+
+                bus.wait_serialize();
+
+                bus.on_schemy_created(|schemy| {
+                    if module_ids.contains(&schemy.module_id) {
+                        add_path(&mut open_api, schemy, &bus);
+                    }
+                });
 
                 OpenApiResult {
                     schema: open_api,
@@ -38,23 +49,8 @@ impl Mapper<OpenApiOptions, OpenApiResult> for OpenApiMapper {
     }
 }
 
-fn add_paths(open_api: &mut OpenApi, node: Arc<Node<'static>>, filepath: &str, bus: &MessageBus) -> () {
-    match node.is_path() {
-        true => {
-            add_path(open_api, node, filepath, bus);
-        }
-        false => {
-            for child in node.children() {
-                add_paths(open_api, child, filepath, bus);
-            }
-        }
-    }
-}
-
-fn add_path(open_api: &mut OpenApi, node: Arc<Node>, filepath: &str, bus: &MessageBus) -> () {
-    node.with_parent(|callee| callee.with_parent(|call_exp| {
-        
-    }))
+fn add_path(open_api: &mut OpenApi, node: Arc<SchemyPath>, bus: &MessageBus) -> () {
+    println!("add_path: {:?}", node);
 }
 
 #[derive(Serialize, Debug, Default)]
