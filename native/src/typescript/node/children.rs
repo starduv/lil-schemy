@@ -6,7 +6,7 @@ use super::{NodeKind, SchemyNode};
 
 impl<'n> SchemyNode<'n> {
     pub fn children(&self) -> Vec<usize> {
-        let mut children = vec![];
+        let mut children = Vec::new();
         match self.kind {
             NodeKind::AwaitExpr(raw_await) => self.get_await_expr_children(raw_await, &mut children),
             NodeKind::ArrowExpr(arrow) => self.get_arrow_expr_children(arrow, &mut children),
@@ -859,23 +859,24 @@ impl<'n> SchemyNode<'n> {
         self.get_expr_children(&*expr.expr, children);
     }
 
-    // fn get_var_declarator_children(&self, var_declarator: &'n VarDeclarator, children: &mut Vec<usize>) {
-    //     let mut borrow = self.context.borrow_mut();
-    //     if let Some(init) = &var_declarator.init {
-    //         let child_index = borrow.nodes.len();
-    //         let child_node = SchemyNode {
-    //             index: child_index,
-    //             parent_index: Some(self.index.clone()),
-    //             kind: NodeKind::Expr(init),
-    //             context: self.context.clone(),
-    //         };
-    //         borrow.nodes.push(Rc::new(child_node));
-    //         children.push(child_index);
-    //     }
-    // }
-
     fn get_var_declarator_children(&self, var_declarator: &'n VarDeclarator, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
+        match &var_declarator.name {
+            Pat::Ident(raw_ident) => {
+                if let Some(ref raw_ann) = raw_ident.type_ann {
+                    let child_index = borrow.nodes.len();
+                    let child_node = SchemyNode {
+                        index: child_index,
+                        parent_index: Some(self.index.clone()),
+                        kind: NodeKind::TsTypeAnnotation(raw_ann),
+                        context: self.context.clone(),
+                    };
+                    borrow.nodes.push(Rc::new(child_node));
+                    children.push(child_index);
+                }
+            }
+            _ => {}
+        }
         if let Some(init) = &var_declarator.init {
             let child_index = borrow.nodes.len();
             let child_node = SchemyNode {
@@ -2019,7 +2020,7 @@ impl<'n> SchemyNode<'n> {
                     };
                     borrow.nodes.push(Rc::new(child_node));
                     children.push(child_index);
-                },
+                }
             },
             ModuleItem::Stmt(statement) => self.get_statement_children(statement, children),
         }

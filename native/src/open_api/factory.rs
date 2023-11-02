@@ -317,16 +317,14 @@ impl OpenApiFactory {
             Some(param) => match &param.kind {
                 NodeKind::TsType(media_type) => match media_type {
                     TsType::TsLitType(raw) => match &raw.lit {
-                        TsLit::Str(raw_str) => {
-                            Some(&raw_str.value)
-                        }
-                        _ => None
+                        TsLit::Str(raw_str) => Some(&raw_str.value),
+                        _ => None,
                     },
-                    _ => None
+                    _ => None,
                 },
-                _ => None
+                _ => None,
             },
-            None => None
+            None => None,
         };
 
         match type_params.get(0) {

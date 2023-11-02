@@ -11,6 +11,21 @@ pub(in crate::open_api) fn store_declaration_maybe(
     symbol_tables: &mut DeclarationTables,
 ) -> () {
     match root.kind {
+        NodeKind::TsTypeRef(raw_ref) => {
+            match &raw_ref.type_name {
+                TsEntityName::Ident(identifier) => {
+                    let type_name = identifier.sym.to_string();
+                    symbol_tables.insert(
+                        file_path,
+                        type_name.to_string(),
+                        Declaration::Type {
+                            node: root.index.clone(),
+                        },
+                    );
+                }
+                _ => {}
+            }
+        }
         NodeKind::ModuleItem(_) => {
             for child_item in root.children() {
                 store_declaration_maybe(root.get(child_item).unwrap(), file_path, symbol_tables)

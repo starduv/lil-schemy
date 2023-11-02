@@ -1,4 +1,4 @@
-import { LilBodyParam, LilPath, LilRequiredProp, LilResponse, LilRouteParam } from '../../../src';
+import { LilBodyParam, LilPath, LilRequiredProp, LilResponse, LilRouteParam, LilSub } from '../../../src';
 import { AnimalsRequest, Request, AnimalUpdate, AnimalLicense } from '../dtos/requests';
 import { Router } from './router';
 
@@ -31,7 +31,12 @@ Router.get("", {}, LilPath(async (request: Request<{ Querystring: { id: LilRoute
 }));
 
 Router.put("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUpdate> }>, reply: any): Promise<void> => {
-    await reply.send(LilResponse(new Animal("Billy", ["tetnis", "rabies"]), {
+    const lilTike: LilSub<unknown, Animal> = {
+        name: "Billy",
+        shots: ["tetnis", "rabies"]
+    };
+
+    await reply.send(LilResponse(lilTike, {
         statusCode: 200,
         description: "A specific animal",
     }));

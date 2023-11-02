@@ -26,6 +26,21 @@ describe('open api generator', () => {
 
     it('generates schemas', () => {
         expect(schema.components?.schemas).to.deep.equalInAnyOrder({
+            Animal: {
+                $id: "#/components/schemas/Animal",
+                properties: {
+                    shots: {
+                        items: {
+                            type: "string"
+                        },
+                        type: "array"
+                    },
+                    name: {
+                        type: "string"
+                    }
+                },
+                type: "object"
+            },
             Account: {
                 $id: "#/components/schemas/Account",
                 properties: {
@@ -459,18 +474,7 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        properties: {
-                                            shots: {
-                                                items: {
-                                                    type: "string"
-                                                },
-                                                type: "array"
-                                            },
-                                            name: {
-                                                type: "string"
-                                            }
-                                        },
-                                        type: "object"
+                                        $ref: "#/components/schemas/Animal"
                                     }
                                 }
                             }
