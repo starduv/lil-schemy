@@ -1,55 +1,63 @@
-use std::{cell::RefCell, rc::Rc};
-
-use lazy_static::__Deref;
+use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use swc_ecma_ast::*;
 
-use crate::typescript::{Declaration, DeclarationTables, ModuleCache, NodeKind, SchemyNode};
+use crate::typescript::{ModuleCache, NodeKind, SchemyNode};
 
 use super::{
-    caching::store_declaration_maybe,
-    deferred::DeferredSchemas,
     schema::{ApiPathOperation, ApiSchema, OpenApi, PathOptions, ResponseOptions},
+    state::{Declaration, Store},
 };
 
-pub struct OpenApiFactory {
-    deferred_schemas: DeferredSchemas,
-    symbol_tables: DeclarationTables,
-}
+pub struct OpenApiFactory {}
 
 impl OpenApiFactory {
     pub fn new() -> Self {
-        OpenApiFactory {
-            deferred_schemas: DeferredSchemas::default(),
-            symbol_tables: DeclarationTables::default(),
-        }
+        OpenApiFactory {}
     }
 
-    pub fn append_schema(&mut self, open_api: &mut OpenApi, file_path: &str, module_cache: &mut ModuleCache) -> () {
+    pub fn append_schema(
+        &mut self,
+        open_api: &mut OpenApi,
+        file_path: &str,
+        module_cache: &mut ModuleCache,
+        store: &mut Store,
+    ) -> () {
         let root = module_cache.parse(&file_path);
-        self.find_paths(open_api, root.clone(), file_path);
+        self.find_paths(open_api, root.clone(), file_path, store);
 
-        while self.deferred_schemas.has_unrecognized_local_types(file_path) {
-            self.define_local_schemas(file_path, &root, open_api);
+        while store.has_unrecognized_local_types(file_path) {
+            self.define_local_schemas(file_path, &root, open_api, store);
         }
     }
 
-    pub fn append_deferred_schemas(&mut self, open_api: &mut OpenApi, module_cache: &mut ModuleCache) {
-        while let Some(file_path) = self.deferred_schemas.next_module() {
+    pub fn append_deferred_schemas(
+        &mut self,
+        open_api: &mut OpenApi,
+        module_cache: &mut ModuleCache,
+        store: &mut Store,
+    ) -> () {
+        while let Some(file_path) = store.next_module() {
             let deferred_root = module_cache.parse(&file_path);
             for item_index in deferred_root.children() {
                 let item = deferred_root.get(item_index).unwrap();
-                self.define_external_schema(open_api, item, &file_path);
+                self.define_external_schema(open_api, item, &file_path, store);
             }
 
-            while self.deferred_schemas.has_unrecognized_local_types(&file_path) {
-                self.define_local_schemas(&file_path, &deferred_root, open_api);
+            while store.has_unrecognized_local_types(&file_path) {
+                self.define_local_schemas(&file_path, &deferred_root, open_api, store);
             }
         }
     }
 
-    fn define_local_schemas(&mut self, file_path: &str, root: &Rc<SchemyNode>, open_api: &mut OpenApi) {
-        for local_type in self.deferred_schemas.recognize_local_types(file_path) {
+    fn define_local_schemas(
+        &mut self,
+        file_path: &str,
+        root: &Rc<SchemyNode>,
+        open_api: &mut OpenApi,
+        store: &mut Store,
+    ) {
+        for local_type in store.recognize_local_types(file_path) {
             let root = root.get(local_type.index).unwrap();
             self.define_local_schema(
                 root,
@@ -57,28 +65,29 @@ impl OpenApiFactory {
                 &local_type.schema_name,
                 open_api,
                 file_path,
+                store,
             )
         }
     }
 
-    fn find_paths<'m>(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode<'m>>, file_path: &str) {
-        store_declaration_maybe(root.clone(), file_path, &mut self.symbol_tables);
+    fn find_paths<'m>(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode<'m>>, file_path: &str, store: &mut Store) {
+        store.store_declaration_maybe(root.clone(), file_path);
 
         for child_index in root.children() {
             let child = root.get(child_index).unwrap();
             match &child.kind {
                 NodeKind::Ident(raw_ident) if raw_ident.sym.eq("LilPath") => {
                     let parent = child.parent().unwrap().parent().unwrap();
-                    self.symbol_tables.add_child_scope(file_path);
-                    self.add_path(open_api, parent, file_path);
-                    self.symbol_tables.parent_scope(file_path);
+                    store.add_child_scope(file_path);
+                    self.add_path(open_api, parent, file_path, store);
+                    store.parent_scope(file_path);
                 }
-                _ => self.find_paths(open_api, child, file_path),
+                _ => self.find_paths(open_api, child, file_path, store),
             }
         }
     }
 
-    fn add_path(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode>, file_path: &str) -> () {
+    fn add_path(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode>, file_path: &str, store: &mut Store) -> () {
         let args = root.args();
         let route_handler = args.first().unwrap().as_arrow_expr().unwrap();
         let route_options = args.last().unwrap();
@@ -93,7 +102,7 @@ impl OpenApiFactory {
                     borrow.tags(options.tags.clone());
                 }
 
-                self.add_request_details(&operation, route_handler.clone(), file_path, &options);
+                self.add_request_details(&operation, route_handler.clone(), file_path, &options, store);
             }
         }
     }
@@ -104,16 +113,17 @@ impl OpenApiFactory {
         route_handler: Rc<SchemyNode>,
         file_path: &str,
         path_options: &PathOptions,
+        store: &mut Store,
     ) -> () {
         for param in route_handler.params() {
-            self.add_request_params(operation, param, file_path, path_options);
+            self.add_request_params(operation, param, file_path, path_options, store);
         }
 
-        self.symbol_tables.add_child_scope(file_path);
+        store.add_child_scope(file_path);
 
-        self.find_response(operation, route_handler, file_path, path_options, &mut "".into());
+        self.find_response(operation, route_handler, file_path, path_options, &mut "".into(), store);
 
-        self.symbol_tables.parent_scope(file_path);
+        store.parent_scope(file_path);
     }
 
     fn add_request_params(
@@ -122,10 +132,11 @@ impl OpenApiFactory {
         root: Rc<SchemyNode>,
         file_path: &str,
         path_options: &PathOptions,
+        store: &mut Store,
     ) {
         match root.kind {
             NodeKind::Ident(identifier) if identifier.sym.eq("LilBodyParam") => {
-                self.add_body_param_details(operation, find_parent_type_ref(root), file_path, path_options);
+                self.add_body_param_details(operation, find_parent_type_ref(root), file_path, path_options, store);
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("LilHeader") => {
                 self.add_param_details(
@@ -135,6 +146,7 @@ impl OpenApiFactory {
                     file_path,
                     true,
                     path_options,
+                    store,
                 );
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("LilQueryParam") => {
@@ -145,6 +157,7 @@ impl OpenApiFactory {
                     file_path,
                     false,
                     path_options,
+                    store,
                 );
             }
             NodeKind::Ident(identifier) if identifier.sym.eq("LilRouteParam") => {
@@ -155,23 +168,29 @@ impl OpenApiFactory {
                     file_path,
                     true,
                     path_options,
+                    store,
                 );
             }
-            NodeKind::Ident(identifier) => match self.symbol_tables.get_root_declaration(file_path, &identifier.sym) {
+            NodeKind::Ident(identifier) => match store.get_root_declaration(file_path, &identifier.sym) {
                 Some(Declaration::Import { name, source_file_name }) => {
-                    self.deferred_schemas
-                        .defer_operation_type(&source_file_name, operation, &name);
+                    store.defer_operation_type(&source_file_name, operation, &name);
                 }
                 Some(Declaration::Type { node }) => {
                     if let Some(root) = root.get(node) {
-                        self.add_request_params(operation, root, file_path, path_options);
+                        self.add_request_params(operation, root, file_path, path_options, store);
                     }
                 }
                 _ => {}
             },
             _ => {
                 for child_index in root.children() {
-                    self.add_request_params(operation, root.get(child_index).unwrap(), file_path, path_options);
+                    self.add_request_params(
+                        operation,
+                        root.get(child_index).unwrap(),
+                        file_path,
+                        path_options,
+                        store,
+                    );
                 }
             }
         }
@@ -185,6 +204,7 @@ impl OpenApiFactory {
         file_path: &str,
         required_default: bool,
         path_options: &PathOptions,
+        store: &mut Store,
     ) {
         let mut operation = (**operation).borrow_mut();
         let parameter_name = get_parameter_name(root.clone());
@@ -193,7 +213,7 @@ impl OpenApiFactory {
         let type_params = root.params();
         if let Some(type_param) = type_params.get(0) {
             let param_schema = operation_param.content(None).schema();
-            self.define_schema_details(param_schema, &type_param, file_path, false, path_options);
+            self.define_schema_details(param_schema, &type_param, file_path, false, path_options, store);
         }
 
         match type_params.get(1) {
@@ -241,15 +261,16 @@ impl OpenApiFactory {
         file_path: &str,
         path_options: &PathOptions,
         depth: &mut String,
+        store: &mut Store,
     ) -> () {
         for child_index in root.children() {
             let child = root.get(child_index.clone()).unwrap();
-            store_declaration_maybe(child.clone(), file_path, &mut self.symbol_tables);
+            store.store_declaration_maybe(child.clone(), file_path);
             match child.kind {
                 NodeKind::Ident(raw) if raw.sym.eq("LilResponse") => {
-                    self.add_response(operation, root.parent().unwrap(), file_path, path_options)
+                    self.add_response(operation, root.parent().unwrap(), file_path, path_options, store)
                 }
-                _ => self.find_response(operation, child, file_path, path_options, &mut depth.clone()),
+                _ => self.find_response(operation, child, file_path, path_options, &mut depth.clone(), store),
             }
         }
     }
@@ -260,6 +281,7 @@ impl OpenApiFactory {
         root: Rc<SchemyNode>,
         file_path: &str,
         path_options: &PathOptions,
+        store: &mut Store,
     ) -> () {
         let args = root.args();
         let options = match args.get(1) {
@@ -275,7 +297,14 @@ impl OpenApiFactory {
 
         match args.get(0) {
             Some(response_type) if options.is_some() => {
-                self.add_response_details(&response_type, &options.unwrap(), file_path, operation, path_options);
+                self.add_response_details(
+                    &response_type,
+                    &options.unwrap(),
+                    file_path,
+                    operation,
+                    path_options,
+                    store,
+                );
             }
             _ => {}
         };
@@ -288,6 +317,7 @@ impl OpenApiFactory {
         file_path: &str,
         operation: &Rc<RefCell<ApiPathOperation>>,
         path_options: &PathOptions,
+        store: &mut Store,
     ) {
         let status_code = options.status_code.as_ref().unwrap();
         let description = options.description.as_ref().unwrap();
@@ -297,7 +327,7 @@ impl OpenApiFactory {
         let response = operation.response(&status_code, &description);
         let content = response.content(media_type);
 
-        self.define_schema_details(content.schema(), root, file_path, true, path_options);
+        self.define_schema_details(content.schema(), root, file_path, true, path_options, store);
 
         content.example(options.example.clone());
     }
@@ -308,6 +338,7 @@ impl OpenApiFactory {
         root: Rc<SchemyNode>,
         file_path: &str,
         path_options: &PathOptions,
+        store: &mut Store,
     ) -> () {
         let mut operation = (**operation).borrow_mut();
         let operation_param = operation.body();
@@ -338,6 +369,7 @@ impl OpenApiFactory {
                             file_path,
                             false,
                             &PathOptions::default(),
+                            store,
                         );
                     }
                     TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
@@ -363,6 +395,7 @@ impl OpenApiFactory {
                                 path_options,
                                 &root,
                                 true,
+                                store,
                             );
                         }
                         _ => {}
@@ -398,63 +431,68 @@ impl OpenApiFactory {
         schema_name: &str,
         open_api: &mut OpenApi,
         file_path: &str,
+        store: &mut Store,
     ) -> () {
         if open_api.components.contains_schema(schema_name) {
             return;
         }
 
-        match self.symbol_tables.get_root_declaration(file_path, type_name) {
+        match store.get_root_declaration(file_path, type_name) {
             Some(Declaration::Export {
                 name: type_name,
                 source_file_name,
             }) => {
-                self.deferred_schemas
-                    .defer_external_type(&source_file_name, schema_name.into(), &type_name);
+                store.defer_external_type(&source_file_name, schema_name.into(), &type_name);
             }
             Some(Declaration::Import {
                 name: type_name,
                 source_file_name,
             }) => {
-                self.deferred_schemas
-                    .defer_external_type(&source_file_name, schema_name.into(), &type_name);
+                store.defer_external_type(&source_file_name, schema_name.into(), &type_name);
             }
             Some(Declaration::Type { node: node_index }) => {
                 let schema = open_api.components.schema_with_id(schema_name);
 
                 if let Some(node) = type_node.get(node_index) {
-                    self.define_schema_details(schema, &node, file_path, false, &PathOptions::default());
+                    self.define_schema_details(schema, &node, file_path, false, &PathOptions::default(), store);
                 }
             }
             _ => {}
         };
     }
 
-    fn define_external_schema(&mut self, open_api: &mut OpenApi, root: Rc<SchemyNode>, file_path: &str) -> () {
-        store_declaration_maybe(root.clone(), file_path, &mut self.symbol_tables);
+    fn define_external_schema(
+        &mut self,
+        open_api: &mut OpenApi,
+        root: Rc<SchemyNode>,
+        file_path: &str,
+        store: &mut Store,
+    ) -> () {
+        store.store_declaration_maybe(root.clone(), file_path);
         match &root.kind {
             NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(_))) => {
-                self.define_external_schema_maybe(&root, open_api, "default", file_path)
+                self.define_external_schema_maybe(&root, open_api, "default", file_path, store)
             }
             NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(raw_decl))) => {
                 let root = root.to_child(NodeKind::DefaultDecl(&raw_decl.decl));
-                self.define_external_schema_maybe(&root, open_api, "default", file_path)
+                self.define_external_schema_maybe(&root, open_api, "default", file_path, store)
             }
             NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(raw_decl))) => match &raw_decl.decl {
                 Decl::Class(ref raw_class) => {
                     let root = root.to_child(NodeKind::ClassDecl(raw_class));
-                    self.define_external_schema_maybe(&root, open_api, &raw_class.ident.sym, file_path)
+                    self.define_external_schema_maybe(&root, open_api, &raw_class.ident.sym, file_path, store)
                 }
                 Decl::TsInterface(ref raw_interface) => {
                     let root = root.to_child(NodeKind::TsInterfaceDecl(raw_interface));
-                    self.define_external_schema_maybe(&root, open_api, &raw_interface.id.sym, file_path)
+                    self.define_external_schema_maybe(&root, open_api, &raw_interface.id.sym, file_path, store)
                 }
                 Decl::TsTypeAlias(ref raw_alias) => {
                     let root = root.to_child(NodeKind::TsTypeAliasDecl(raw_alias));
-                    self.define_external_schema_maybe(&root, open_api, &raw_alias.id.sym, file_path)
+                    self.define_external_schema_maybe(&root, open_api, &raw_alias.id.sym, file_path, store)
                 }
                 Decl::TsEnum(ref raw_alias) => {
                     let root = root.to_child(NodeKind::TsEnumDecl(raw_alias));
-                    self.define_external_schema_maybe(&root, open_api, &raw_alias.id.sym, file_path)
+                    self.define_external_schema_maybe(&root, open_api, &raw_alias.id.sym, file_path, store)
                 }
                 _ => {}
             },
@@ -474,7 +512,7 @@ impl OpenApiFactory {
                                 },
                             };
 
-                            self.define_external_schema_maybe(&specifier, open_api, &name, file_path);
+                            self.define_external_schema_maybe(&specifier, open_api, &name, file_path, store);
                         }
                         _ => {}
                     }
@@ -482,25 +520,25 @@ impl OpenApiFactory {
             }
             NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::TsEnum(raw_enum)))) => {
                 let root = root.to_child(NodeKind::TsEnumDecl(raw_enum));
-                self.define_external_schema_maybe(&root, open_api, &raw_enum.id.sym, file_path)
+                self.define_external_schema_maybe(&root, open_api, &raw_enum.id.sym, file_path, store)
             }
             NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::Class(raw_class)))) => {
                 let root = root.to_child(NodeKind::ClassDecl(raw_class));
-                self.define_external_schema_maybe(&root, open_api, &raw_class.ident.sym, file_path)
+                self.define_external_schema_maybe(&root, open_api, &raw_class.ident.sym, file_path, store)
             }
             NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(raw_interface)))) => {
                 let root = root.to_child(NodeKind::TsInterfaceDecl(raw_interface));
-                self.define_external_schema_maybe(&root, open_api, &raw_interface.id.sym, file_path)
+                self.define_external_schema_maybe(&root, open_api, &raw_interface.id.sym, file_path, store)
             }
             NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(raw_alias)))) => {
                 let root = root.to_child(NodeKind::TsTypeAliasDecl(raw_alias));
-                self.define_external_schema_maybe(&root, open_api, &raw_alias.id.sym, file_path)
+                self.define_external_schema_maybe(&root, open_api, &raw_alias.id.sym, file_path, store)
             }
             NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::TsModule(raw_module)))) => {
                 let root = root.to_child(NodeKind::TsModuleDecl(raw_module));
                 for child in root.children() {
                     let child = root.get(child).unwrap();
-                    self.define_external_schema(open_api, child, file_path);
+                    self.define_external_schema(open_api, child, file_path, store);
                 }
             }
             _ => {}
@@ -513,13 +551,14 @@ impl OpenApiFactory {
         open_api: &mut OpenApi,
         type_name: &str,
         file_path: &str,
+        store: &mut Store,
     ) -> () {
         if open_api.components.contains_schema(type_name) {
             return;
         }
 
-        if let Some(deferred_operation_type) = self.deferred_schemas.recognize_operation_type(type_name, file_path) {
-            match self.symbol_tables.get_root_declaration(file_path, type_name) {
+        if let Some(deferred_operation_type) = store.recognize_operation_type(type_name, file_path) {
+            match store.get_root_declaration(file_path, type_name) {
                 Some(Declaration::Type { node }) => {
                     let root = root.get(node).unwrap();
                     self.add_request_params(
@@ -527,37 +566,33 @@ impl OpenApiFactory {
                         root,
                         file_path,
                         &PathOptions::default(),
+                        store,
                     );
                 }
                 Some(Declaration::Import {
                     name: imported_name,
                     source_file_name: module_file_name,
                 }) => {
-                    self.deferred_schemas.defer_operation_type(
-                        &module_file_name,
-                        &deferred_operation_type.operation,
-                        &imported_name,
-                    );
+                    store.defer_operation_type(&module_file_name, &deferred_operation_type.operation, &imported_name);
                 }
                 _ => {}
             }
         }
 
-        if let Some(deferred_type) = self.deferred_schemas.recognize_external_type(type_name, file_path) {
-            match self.symbol_tables.get_root_declaration(file_path, &type_name) {
+        if let Some(deferred_type) = store.recognize_external_type(type_name, file_path) {
+            match store.get_root_declaration(file_path, &type_name) {
                 Some(Declaration::Type { node }) => {
                     let schema = open_api.components.schema_with_id(&deferred_type.schema_name);
 
                     let node = root.get(node).unwrap();
 
-                    self.define_schema_details(schema, &node, file_path, false, &PathOptions::default());
+                    self.define_schema_details(schema, &node, file_path, false, &PathOptions::default(), store);
                 }
                 Some(Declaration::Import {
                     name: imported_name,
                     source_file_name: module_file_name,
                 }) => {
-                    self.deferred_schemas
-                        .defer_external_type(&module_file_name, type_name, &imported_name);
+                    store.defer_external_type(&module_file_name, type_name, &imported_name);
                 }
                 _ => {}
             }
@@ -571,15 +606,16 @@ impl OpenApiFactory {
         file_path: &str,
         is_required: bool,
         path_options: &PathOptions,
+        store: &mut Store,
     ) -> () {
         match root.kind {
-            NodeKind::Ident(raw_ident) => match self.symbol_tables.get_root_declaration(file_path, &raw_ident.sym) {
+            NodeKind::Ident(raw_ident) => match store.get_root_declaration(file_path, &raw_ident.sym) {
                 Some(Declaration::Type { node: index }) => {
                     let node = root.get(index).unwrap();
-                    self.define_schema_details(root_schema, &node, file_path, false, path_options);
+                    self.define_schema_details(root_schema, &node, file_path, false, path_options, store);
                 }
                 _ => {
-                    let schema_name = self.symbol_tables.get_root_declaration_name(file_path, &raw_ident.sym);
+                    let schema_name = store.get_root_declaration_name(file_path, &raw_ident.sym);
 
                     self.define_schema_from_identifier(
                         &schema_name,
@@ -588,13 +624,14 @@ impl OpenApiFactory {
                         path_options,
                         root,
                         is_required,
+                        store,
                     );
                 }
             },
             NodeKind::TsUnionOrIntersectionType(_) => {
                 for child in root.children() {
                     let child = root.get(child).unwrap();
-                    self.define_schema_details(root_schema, &child, file_path, is_required, path_options);
+                    self.define_schema_details(root_schema, &child, file_path, is_required, path_options, store);
                 }
             }
             NodeKind::TsUnionType(_) => {
@@ -612,12 +649,26 @@ impl OpenApiFactory {
                         },
                         NodeKind::TsTypeLit(_) => {
                             let mut schema = ApiSchema::new();
-                            self.define_schema_details(&mut schema, &child, file_path, is_required, path_options);
+                            self.define_schema_details(
+                                &mut schema,
+                                &child,
+                                file_path,
+                                is_required,
+                                path_options,
+                                store,
+                            );
                             any_of.push(schema);
                         }
                         NodeKind::Ident(_) => {
                             let mut schema = ApiSchema::new();
-                            self.define_schema_details(&mut schema, &child, file_path, is_required, path_options);
+                            self.define_schema_details(
+                                &mut schema,
+                                &child,
+                                file_path,
+                                is_required,
+                                path_options,
+                                store,
+                            );
                             any_of.push(schema);
                         }
                         _ => {}
@@ -643,12 +694,26 @@ impl OpenApiFactory {
                         },
                         NodeKind::TsTypeLit(_) => {
                             let mut schema = ApiSchema::new();
-                            self.define_schema_details(&mut schema, &child, file_path, is_required, path_options);
+                            self.define_schema_details(
+                                &mut schema,
+                                &child,
+                                file_path,
+                                is_required,
+                                path_options,
+                                store,
+                            );
                             all_of.push(schema);
                         }
                         NodeKind::Ident(_) => {
                             let mut schema = ApiSchema::new();
-                            self.define_schema_details(&mut schema, &child, file_path, is_required, path_options);
+                            self.define_schema_details(
+                                &mut schema,
+                                &child,
+                                file_path,
+                                is_required,
+                                path_options,
+                                store,
+                            );
                             all_of.push(schema);
                         }
                         _ => {}
@@ -664,22 +729,16 @@ impl OpenApiFactory {
                     if raw_ident.sym.eq("Omit") || raw_ident.sym.eq("Pick") {
                         let params = root.params();
                         let param = params.first().unwrap();
-                        self.define_schema_details(root_schema, &param, file_path, is_required, path_options);
+                        self.define_schema_details(root_schema, &param, file_path, is_required, path_options, store);
                     } else {
-                        match self.symbol_tables.get_root_declaration(file_path, &raw_ident.sym) {
+                        match store.get_root_declaration(file_path, &raw_ident.sym) {
                             Some(Declaration::Import { name, source_file_name }) => {
-                                self.deferred_schemas
-                                    .defer_external_type(&source_file_name, &name, &name);
+                                store.defer_external_type(&source_file_name, &name, &name);
 
                                 root_schema.reference(Some(name), false);
                             }
                             _ => {
-                                self.deferred_schemas.defer_local_type(
-                                    file_path,
-                                    &raw_ident.sym,
-                                    &raw_ident.sym,
-                                    root.index,
-                                );
+                                store.defer_local_type(file_path, &raw_ident.sym, &raw_ident.sym, root.index);
 
                                 root_schema.reference(Some(raw_ident.sym.to_string()), false);
                             }
@@ -697,6 +756,7 @@ impl OpenApiFactory {
                         path_options,
                         root,
                         is_required,
+                        store,
                     );
                 }
                 _ => {}
@@ -704,7 +764,7 @@ impl OpenApiFactory {
             NodeKind::TsTypeAnnotation(_) => {
                 for child_index in root.children() {
                     let child = root.get(child_index).unwrap();
-                    self.define_schema_details(root_schema, &child, file_path, is_required, path_options);
+                    self.define_schema_details(root_schema, &child, file_path, is_required, path_options, store);
                 }
             }
             NodeKind::TsKeywordType(raw) => match raw.kind {
@@ -750,6 +810,7 @@ impl OpenApiFactory {
                                             file_path,
                                             is_required,
                                             path_options,
+                                            store,
                                         );
                                     }
                                 }
@@ -768,6 +829,7 @@ impl OpenApiFactory {
                                         file_path,
                                         is_required,
                                         path_options,
+                                        store,
                                     );
                                 }
                             }
@@ -801,6 +863,7 @@ impl OpenApiFactory {
                                             file_path,
                                             is_required,
                                             path_options,
+                                            store,
                                         );
                                     }
                                 }
@@ -813,7 +876,14 @@ impl OpenApiFactory {
             NodeKind::TsArrayType(_) => {
                 root_schema.data_type("array");
                 let elem_type = root.elem_type().unwrap();
-                self.define_schema_details(root_schema.items(), &elem_type, file_path, is_required, path_options);
+                self.define_schema_details(
+                    root_schema.items(),
+                    &elem_type,
+                    file_path,
+                    is_required,
+                    path_options,
+                    store,
+                );
             }
             NodeKind::TsInterfaceDecl(_) => {
                 let extends = root.extends();
@@ -821,7 +891,7 @@ impl OpenApiFactory {
                     let all_of = root_schema.all_of();
                     for extend in &extends {
                         let mut schema = ApiSchema::new();
-                        self.define_schema_details(&mut schema, &extend, file_path, is_required, path_options);
+                        self.define_schema_details(&mut schema, &extend, file_path, is_required, path_options, store);
                         all_of.push(schema);
                     }
                 }
@@ -863,6 +933,7 @@ impl OpenApiFactory {
                                             file_path,
                                             is_required,
                                             path_options,
+                                            store,
                                         );
                                     }
                                 }
@@ -900,6 +971,7 @@ impl OpenApiFactory {
                                             file_path,
                                             is_required,
                                             path_options,
+                                            store,
                                         );
                                     }
                                 }
@@ -912,19 +984,19 @@ impl OpenApiFactory {
             }
             NodeKind::TsTypeAliasDecl(_) => {
                 if let Some(annotation) = root.type_ann() {
-                    self.define_schema_details(root_schema, &annotation, file_path, is_required, path_options);
+                    self.define_schema_details(root_schema, &annotation, file_path, is_required, path_options, store);
                 }
             }
             NodeKind::TsType(_) => {
                 for child_index in root.children() {
                     let child = root.get(child_index).unwrap();
-                    self.define_schema_details(root_schema, &child, file_path, is_required, path_options);
+                    self.define_schema_details(root_schema, &child, file_path, is_required, path_options, store);
                 }
             }
             NodeKind::TsEnumDecl(_) => {
                 for member in root.members() {
                     root_schema.data_type("string");
-                    self.define_schema_details(root_schema, &member, file_path, is_required, path_options);
+                    self.define_schema_details(root_schema, &member, file_path, is_required, path_options, store);
                 }
             }
             NodeKind::TsEnumMember(raw_member) => match &raw_member.init {
@@ -965,7 +1037,7 @@ impl OpenApiFactory {
             _ => {
                 for child in root.children() {
                     let child = root.get(child).unwrap();
-                    self.define_schema_details(root_schema, &child, file_path, is_required, path_options);
+                    self.define_schema_details(root_schema, &child, file_path, is_required, path_options, store);
                 }
             }
         }
@@ -979,15 +1051,16 @@ impl OpenApiFactory {
         path_options: &PathOptions,
         root: &Rc<SchemyNode>,
         is_required: bool,
+        store: &mut Store,
     ) -> () {
         if identifier.eq("LilSub") {
             let params = root.params();
             let param = params.last().unwrap();
-            self.define_schema_details(root_schema, &param.clone(), file_path, true, path_options);
+            self.define_schema_details(root_schema, &param.clone(), file_path, true, path_options, store);
         } else if identifier.eq("LilRequiredProp") {
             let params = root.params();
             let param = params.first().unwrap();
-            self.define_schema_details(root_schema, &param.clone(), file_path, true, path_options);
+            self.define_schema_details(root_schema, &param.clone(), file_path, true, path_options, store);
         } else if identifier.eq("Array") {
             let items_schema = root_schema.data_type("array").items();
             if let Some(type_params) = root.type_params() {
@@ -995,7 +1068,14 @@ impl OpenApiFactory {
                     NodeKind::TsTypeParamInstantiation(raw) => {
                         if let Some(type_param) = raw.params.get(0) {
                             let type_param = type_params.to_child(NodeKind::TsType(type_param));
-                            self.define_schema_details(items_schema, &type_param, file_path, is_required, path_options);
+                            self.define_schema_details(
+                                items_schema,
+                                &type_param,
+                                file_path,
+                                is_required,
+                                path_options,
+                                store,
+                            );
                         }
                     }
                     _ => {}
@@ -1006,16 +1086,14 @@ impl OpenApiFactory {
         } else if identifier.eq("URL") {
             root_schema.data_type("string").format(Some("uri".into()));
         } else {
-            match self.symbol_tables.get_root_declaration(file_path, identifier) {
+            match store.get_root_declaration(file_path, identifier) {
                 Some(Declaration::Import { name, source_file_name }) => {
                     root_schema.reference(Some(identifier.to_string()), false);
-                    self.deferred_schemas
-                        .defer_external_type(&source_file_name, identifier, &name);
+                    store.defer_external_type(&source_file_name, identifier, &name);
                 }
                 _ => {
                     root_schema.reference(Some(identifier.to_string()), false);
-                    self.deferred_schemas
-                        .defer_local_type(file_path, identifier, identifier, root.index);
+                    store.defer_local_type(file_path, identifier, identifier, root.index);
                 }
             }
         }
