@@ -4,7 +4,7 @@ use swc_ecma_ast::*;
 
 use super::{NodeKind, SchemyNode};
 
-impl<'n> SchemyNode<'n> {
+impl<'m> SchemyNode<'m> {
     pub fn children(&self) -> Vec<usize> {
         let mut children = Vec::new();
         match self.kind {
@@ -29,7 +29,10 @@ impl<'n> SchemyNode<'n> {
             NodeKind::Lit(raw) => self.get_lit_children(raw, &mut children),
             NodeKind::MemberExpr(raw) => self.get_member_expr_children(raw, &mut children),
             NodeKind::MemberProp(raw) => self.get_member_prop_children(raw, &mut children),
-            NodeKind::Module(module) => self.get_module_children(module, &mut children),
+            NodeKind::Module(ref module) => self.get_module_children(
+                unsafe { std::mem::transmute::<&'_ Module, &'m Module>(module) },
+                &mut children,
+            ),
             NodeKind::ModuleItem(raw) => self.get_module_item_children(raw, &mut children),
             NodeKind::NewExpr(raw) => self.get_new_expr_children(raw, &mut children),
             NodeKind::Pat(raw) => self.get_pat_children(raw, &mut children),
@@ -62,13 +65,13 @@ impl<'n> SchemyNode<'n> {
         children
     }
 
-    fn get_return_statement_children(&self, raw: &'n ReturnStmt, children: &mut Vec<usize>) {
+    fn get_return_statement_children(&self, raw: &'m ReturnStmt, children: &mut Vec<usize>) {
         if let Some(arg) = &raw.arg {
             self.get_expr_children(arg, children);
         }
     }
 
-    fn get_if_statement_children(&self, raw: &'n IfStmt, children: &mut Vec<usize>) {
+    fn get_if_statement_children(&self, raw: &'m IfStmt, children: &mut Vec<usize>) {
         self.get_expr_children(&*raw.test, children);
         self.get_statement_children(&*raw.cons, children);
         if let Some(alt) = &raw.alt {
@@ -76,7 +79,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_try_statement_children(&self, raw: &'n TryStmt, children: &mut Vec<usize>) {
+    fn get_try_statement_children(&self, raw: &'m TryStmt, children: &mut Vec<usize>) {
         self.get_block_statement_children(&raw.block, children);
 
         if let Some(catch) = &raw.handler {
@@ -88,15 +91,15 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_catch_clause_children(&self, raw: &'n CatchClause, children: &mut Vec<usize>) {
+    fn get_catch_clause_children(&self, raw: &'m CatchClause, children: &mut Vec<usize>) {
         self.get_block_statement_children(&raw.body, children);
     }
 
-    fn get_ts_lit_type_chilren(&self, raw: &'n TsLitType, children: &mut Vec<usize>) {
+    fn get_ts_lit_type_chilren(&self, raw: &'m TsLitType, children: &mut Vec<usize>) {
         self.get_ts_lit_children(&raw.lit, children);
     }
 
-    fn get_ts_lit_children(&self, raw: &'n TsLit, children: &mut Vec<usize>) {
+    fn get_ts_lit_children(&self, raw: &'m TsLit, children: &mut Vec<usize>) {
         match raw {
             TsLit::Number(raw) => {
                 let mut borrow = self.context.borrow_mut();
@@ -161,19 +164,19 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_ts_union_type_children(&self, raw: &'n TsUnionType, children: &mut Vec<usize>) {
+    fn get_ts_union_type_children(&self, raw: &'m TsUnionType, children: &mut Vec<usize>) {
         for type_ann in &raw.types {
             self.get_ts_type_children(type_ann, children);
         }
     }
 
-    fn get_ts_intersection_type_children(&self, raw: &'n TsIntersectionType, children: &mut Vec<usize>) {
+    fn get_ts_intersection_type_children(&self, raw: &'m TsIntersectionType, children: &mut Vec<usize>) {
         for type_ann in &raw.types {
             self.get_ts_type_children(type_ann, children);
         }
     }
 
-    fn get_ts_union_or_intersection_children(&self, raw: &'n TsUnionOrIntersectionType, children: &mut Vec<usize>) {
+    fn get_ts_union_or_intersection_children(&self, raw: &'m TsUnionOrIntersectionType, children: &mut Vec<usize>) {
         match raw {
             TsUnionOrIntersectionType::TsUnionType(raw_union) => {
                 let mut borrow = self.context.borrow_mut();
@@ -202,13 +205,13 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_await_expr_children(&self, raw_await: &'n AwaitExpr, children: &mut Vec<usize>) {
+    fn get_await_expr_children(&self, raw_await: &'m AwaitExpr, children: &mut Vec<usize>) {
         self.get_expr_children(&*raw_await.arg, children);
     }
 
     fn get_ts_type_param_instantiation_children(
         &self,
-        type_params: &'n TsTypeParamInstantiation,
+        type_params: &'m TsTypeParamInstantiation,
         children: &mut Vec<usize>,
     ) {
         for param in &type_params.params {
@@ -216,7 +219,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_ts_type_param(&self, type_param: &'n TsTypeParam, children: &mut Vec<usize>) {
+    fn get_ts_type_param(&self, type_param: &'m TsTypeParam, children: &mut Vec<usize>) {
         if let Some(constraint) = &type_param.constraint {
             self.get_ts_type_children(constraint, children);
         }
@@ -226,7 +229,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_lit_children(&self, lit: &'n Lit, children: &mut Vec<usize>) {
+    fn get_lit_children(&self, lit: &'m Lit, children: &mut Vec<usize>) {
         match lit {
             Lit::Str(raw) => {
                 let mut borrow = self.context.borrow_mut();
@@ -304,12 +307,12 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_ts_type_assertion_expr_children(&self, expr: &'n TsTypeAssertion, children: &mut Vec<usize>) {
+    fn get_ts_type_assertion_expr_children(&self, expr: &'m TsTypeAssertion, children: &mut Vec<usize>) {
         self.get_expr_children(&*expr.expr, children);
         self.get_ts_type_children(&*expr.type_ann, children);
     }
 
-    fn get_ts_entity_name_children(&self, entity_name: &'n TsEntityName, children: &mut Vec<usize>) {
+    fn get_ts_entity_name_children(&self, entity_name: &'m TsEntityName, children: &mut Vec<usize>) {
         match entity_name {
             TsEntityName::Ident(raw) => {
                 let mut borrow = self.context.borrow_mut();
@@ -338,7 +341,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_ts_type_ref_children(&self, type_ref: &'n TsTypeRef, children: &mut Vec<usize>) {
+    fn get_ts_type_ref_children(&self, type_ref: &'m TsTypeRef, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         let child_index = borrow.nodes.len();
 
@@ -364,7 +367,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_ts_type_children(&self, ts_type: &'n TsType, children: &mut Vec<usize>) {
+    fn get_ts_type_children(&self, ts_type: &'m TsType, children: &mut Vec<usize>) {
         match ts_type {
             TsType::TsKeywordType(raw) => {
                 let mut borrow = self.context.borrow_mut();
@@ -609,11 +612,11 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_new_expr_children(&self, expr: &'n NewExpr, children: &mut Vec<usize>) {
+    fn get_new_expr_children(&self, expr: &'m NewExpr, children: &mut Vec<usize>) {
         self.get_expr_children(&expr.callee, children);
     }
 
-    fn get_ts_as_expr_children(&self, expr: &'n TsAsExpr, children: &mut Vec<usize>) {
+    fn get_ts_as_expr_children(&self, expr: &'m TsAsExpr, children: &mut Vec<usize>) {
         match &*expr.type_ann {
             TsType::TsKeywordType(raw) => {
                 let mut borrow = self.context.borrow_mut();
@@ -859,7 +862,7 @@ impl<'n> SchemyNode<'n> {
         self.get_expr_children(&*expr.expr, children);
     }
 
-    fn get_var_declarator_children(&self, var_declarator: &'n VarDeclarator, children: &mut Vec<usize>) {
+    fn get_var_declarator_children(&self, var_declarator: &'m VarDeclarator, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         match &var_declarator.name {
             Pat::Ident(raw_ident) => {
@@ -890,7 +893,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_member_prop_children(&self, prop: &'n MemberProp, children: &mut Vec<usize>) {
+    fn get_member_prop_children(&self, prop: &'m MemberProp, children: &mut Vec<usize>) {
         match prop {
             MemberProp::Ident(raw) => {
                 let mut borrow = self.context.borrow_mut();
@@ -908,7 +911,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_member_expr_children(&self, expr: &'n MemberExpr, children: &mut Vec<usize>) {
+    fn get_member_expr_children(&self, expr: &'m MemberExpr, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         let child_index = borrow.nodes.len();
         let child_node = SchemyNode {
@@ -931,14 +934,14 @@ impl<'n> SchemyNode<'n> {
         children.push(child_index);
     }
 
-    fn get_callee_children(&self, callee: &'n Callee, children: &mut Vec<usize>) {
+    fn get_callee_children(&self, callee: &'m Callee, children: &mut Vec<usize>) {
         match callee {
             Callee::Expr(expr) => self.get_expr_children(expr, children),
             _ => {}
         }
     }
 
-    fn get_decl_children(&self, decl: &'n Decl, children: &mut Vec<usize>) {
+    fn get_decl_children(&self, decl: &'m Decl, children: &mut Vec<usize>) {
         match decl {
             Decl::Class(raw) => {
                 let mut borrow = self.context.borrow_mut();
@@ -1028,7 +1031,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_ts_module_decl_children(&self, decl: &'n TsModuleDecl, children: &mut Vec<usize>) {
+    fn get_ts_module_decl_children(&self, decl: &'m TsModuleDecl, children: &mut Vec<usize>) {
         match &decl.body {
             Some(TsNamespaceBody::TsModuleBlock(raw)) => self.get_ts_module_block_children(raw, children),
             Some(TsNamespaceBody::TsNamespaceDecl(raw)) => self.get_ts_namespace_decl_children(raw, children),
@@ -1036,14 +1039,14 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_ts_namespace_decl_children(&self, decl: &'n TsNamespaceDecl, children: &mut Vec<usize>) {
+    fn get_ts_namespace_decl_children(&self, decl: &'m TsNamespaceDecl, children: &mut Vec<usize>) {
         match &*decl.body {
             TsNamespaceBody::TsModuleBlock(raw) => self.get_ts_module_block_children(raw, children),
             TsNamespaceBody::TsNamespaceDecl(raw) => self.get_ts_namespace_decl_children(raw, children),
         }
     }
 
-    fn get_ts_module_block_children(&self, block: &'n TsModuleBlock, children: &mut Vec<usize>) {
+    fn get_ts_module_block_children(&self, block: &'m TsModuleBlock, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         block.body.iter().for_each(|item| {
             let child_index = borrow.nodes.len();
@@ -1058,7 +1061,7 @@ impl<'n> SchemyNode<'n> {
         });
     }
 
-    fn get_class_decl_children(&self, decl: &'n ClassDecl, children: &mut Vec<usize>) {
+    fn get_class_decl_children(&self, decl: &'m ClassDecl, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         decl.class.body.iter().for_each(|member| {
             let child_index = borrow.nodes.len();
@@ -1072,7 +1075,7 @@ impl<'n> SchemyNode<'n> {
             children.push(child_index);
         });
     }
-    fn get_fn_decl_children(&self, decl: &'n FnDecl, children: &mut Vec<usize>) {
+    fn get_fn_decl_children(&self, decl: &'m FnDecl, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         decl.function.body.iter().for_each(|member| {
             let child_index = borrow.nodes.len();
@@ -1086,7 +1089,7 @@ impl<'n> SchemyNode<'n> {
             children.push(child_index);
         });
     }
-    fn get_ts_enum_decl_children(&self, decl: &'n TsEnumDecl, children: &mut Vec<usize>) {
+    fn get_ts_enum_decl_children(&self, decl: &'m TsEnumDecl, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         decl.members.iter().for_each(|member| {
             let child_index = borrow.nodes.len();
@@ -1100,7 +1103,7 @@ impl<'n> SchemyNode<'n> {
             children.push(child_index);
         });
     }
-    fn get_ts_interface_decl_children(&self, decl: &'n TsInterfaceDecl, children: &mut Vec<usize>) {
+    fn get_ts_interface_decl_children(&self, decl: &'m TsInterfaceDecl, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         if let Some(type_params) = &decl.type_params {
             for param in &type_params.params {
@@ -1129,7 +1132,7 @@ impl<'n> SchemyNode<'n> {
         });
     }
 
-    fn get_ts_type_alias_declaration(&self, decl: &'n TsTypeAliasDecl, children: &mut Vec<usize>) {
+    fn get_ts_type_alias_declaration(&self, decl: &'m TsTypeAliasDecl, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         let child_index = borrow.nodes.len();
         let child_node = SchemyNode {
@@ -1142,7 +1145,7 @@ impl<'n> SchemyNode<'n> {
         children.push(child_index);
     }
 
-    fn get_module_decl_children(&self, decl: &'n ModuleDecl, children: &mut Vec<usize>) {
+    fn get_module_decl_children(&self, decl: &'m ModuleDecl, children: &mut Vec<usize>) {
         match decl {
             ModuleDecl::Import(raw) => self.get_import_decl_children(raw, children),
             ModuleDecl::ExportDecl(raw) => self.get_export_declartion_children(raw, children),
@@ -1153,7 +1156,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_named_export_children(&self, named_export: &'n NamedExport, children: &mut Vec<usize>) {
+    fn get_named_export_children(&self, named_export: &'m NamedExport, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         for specifier in &named_export.specifiers {
             let child_index = borrow.nodes.len();
@@ -1168,7 +1171,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_ts_type_element_children(&self, type_element: &'n TsTypeElement, children: &mut Vec<usize>) {
+    fn get_ts_type_element_children(&self, type_element: &'m TsTypeElement, children: &mut Vec<usize>) {
         match type_element {
             TsTypeElement::TsCallSignatureDecl(raw) => self.get_ts_call_signature_decl_children(raw, children),
             TsTypeElement::TsConstructSignatureDecl(raw) => {
@@ -1182,7 +1185,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_ts_call_signature_decl_children(&self, thing: &'n TsCallSignatureDecl, children: &mut Vec<usize>) {
+    fn get_ts_call_signature_decl_children(&self, thing: &'m TsCallSignatureDecl, children: &mut Vec<usize>) {
         {
             let mut borrow = self.context.borrow_mut();
             let child_index = borrow.nodes.len();
@@ -1202,7 +1205,7 @@ impl<'n> SchemyNode<'n> {
             self.get_type_annotation_children(type_ann, children);
         }
     }
-    fn get_ts_construct_signature_decl_children(&self, thing: &'n TsConstructSignatureDecl, children: &mut Vec<usize>) {
+    fn get_ts_construct_signature_decl_children(&self, thing: &'m TsConstructSignatureDecl, children: &mut Vec<usize>) {
         {
             let mut borrow = self.context.borrow_mut();
             let child_index = borrow.nodes.len();
@@ -1222,7 +1225,7 @@ impl<'n> SchemyNode<'n> {
             self.get_type_annotation_children(type_ann, children);
         }
     }
-    fn get_ts_index_signature_children(&self, thing: &'n TsIndexSignature, children: &mut Vec<usize>) {
+    fn get_ts_index_signature_children(&self, thing: &'m TsIndexSignature, children: &mut Vec<usize>) {
         {
             let mut borrow = self.context.borrow_mut();
             let child_index = borrow.nodes.len();
@@ -1242,7 +1245,7 @@ impl<'n> SchemyNode<'n> {
             self.get_type_annotation_children(type_ann, children);
         }
     }
-    fn get_ts_method_signature_children(&self, thing: &'n TsMethodSignature, children: &mut Vec<usize>) {
+    fn get_ts_method_signature_children(&self, thing: &'m TsMethodSignature, children: &mut Vec<usize>) {
         {
             let mut borrow = self.context.borrow_mut();
             let child_index = borrow.nodes.len();
@@ -1262,7 +1265,7 @@ impl<'n> SchemyNode<'n> {
             self.get_type_annotation_children(type_ann, children);
         }
     }
-    fn get_ts_property_signature_children(&self, signature: &'n TsPropertySignature, children: &mut Vec<usize>) {
+    fn get_ts_property_signature_children(&self, signature: &'m TsPropertySignature, children: &mut Vec<usize>) {
         {
             let mut borrow = self.context.borrow_mut();
             let child_index = borrow.nodes.len();
@@ -1283,13 +1286,13 @@ impl<'n> SchemyNode<'n> {
             self.get_type_annotation_children(type_ann, children);
         }
     }
-    fn get_ts_getter_signature_children(&self, thing: &'n TsGetterSignature, children: &mut Vec<usize>) {
+    fn get_ts_getter_signature_children(&self, thing: &'m TsGetterSignature, children: &mut Vec<usize>) {
         if let Some(type_ann) = &thing.type_ann {
             self.get_type_annotation_children(type_ann, children);
         }
     }
 
-    fn get_type_lit_children(&self, type_lit: &'n TsTypeLit, children: &mut Vec<usize>) {
+    fn get_type_lit_children(&self, type_lit: &'m TsTypeLit, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         for member in &type_lit.members {
             let child_index = borrow.nodes.len();
@@ -1304,7 +1307,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_call_expr_children(&self, expr: &'n CallExpr, children: &mut Vec<usize>) {
+    fn get_call_expr_children(&self, expr: &'m CallExpr, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         let child_index = borrow.nodes.len();
         let child_node = SchemyNode {
@@ -1329,7 +1332,7 @@ impl<'n> SchemyNode<'n> {
         });
     }
 
-    fn get_expr_children(&self, expr: &'n Expr, children: &mut Vec<usize>) {
+    fn get_expr_children(&self, expr: &'m Expr, children: &mut Vec<usize>) {
         match expr {
             Expr::This(raw) => {
                 let mut borrow = self.context.borrow_mut();
@@ -1731,7 +1734,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_arrow_expr_children(&self, expr: &'n ArrowExpr, children: &mut Vec<usize>) {
+    fn get_arrow_expr_children(&self, expr: &'m ArrowExpr, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         let child_index = borrow.nodes.len();
         let child_node = SchemyNode {
@@ -1756,7 +1759,7 @@ impl<'n> SchemyNode<'n> {
         });
     }
 
-    fn get_module_children(&self, module: &'n Module, children: &mut Vec<usize>) {
+    fn get_module_children(&self, module: &'m Module, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         for item in &module.body {
             let child_index = borrow.nodes.len();
@@ -1771,7 +1774,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_export_declartion_children(&self, export_decl: &'n ExportDecl, children: &mut Vec<usize>) {
+    fn get_export_declartion_children(&self, export_decl: &'m ExportDecl, children: &mut Vec<usize>) {
         match &export_decl.decl {
             Decl::Class(declaration) => {
                 let mut borrow = self.context.borrow_mut();
@@ -1861,11 +1864,11 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_export_default_expr_children(&self, expression: &'n ExportDefaultExpr, children: &mut Vec<usize>) {
+    fn get_export_default_expr_children(&self, expression: &'m ExportDefaultExpr, children: &mut Vec<usize>) {
         self.get_expr_children(&expression.expr, children)
     }
 
-    fn get_export_default_decl_children(&self, export_declaration: &'n ExportDefaultDecl, children: &mut Vec<usize>) {
+    fn get_export_default_decl_children(&self, export_declaration: &'m ExportDefaultDecl, children: &mut Vec<usize>) {
         match &export_declaration.decl {
             DefaultDecl::Class(declaration) => {
                 let mut borrow = self.context.borrow_mut();
@@ -1895,7 +1898,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_import_decl_children(&self, import_declaration: &'n ImportDecl, children: &mut Vec<usize>) {
+    fn get_import_decl_children(&self, import_declaration: &'m ImportDecl, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         for specifier in &import_declaration.specifiers {
             let child_index = borrow.nodes.len();
@@ -1910,7 +1913,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_module_item_children(&self, module_item: &'n ModuleItem, children: &mut Vec<usize>) {
+    fn get_module_item_children(&self, module_item: &'m ModuleItem, children: &mut Vec<usize>) {
         match module_item {
             ModuleItem::ModuleDecl(declaration) => match declaration {
                 ModuleDecl::Import(declaration) => {
@@ -2026,7 +2029,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_pat_children(&self, pat: &'n Pat, children: &mut Vec<usize>) {
+    fn get_pat_children(&self, pat: &'m Pat, children: &mut Vec<usize>) {
         match pat {
             Pat::Ident(ident) => {
                 let mut borrow = self.context.borrow_mut();
@@ -2104,7 +2107,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_statement_children(&self, statement: &'n Stmt, children: &mut Vec<usize>) {
+    fn get_statement_children(&self, statement: &'m Stmt, children: &mut Vec<usize>) {
         match statement {
             Stmt::Block(block_stmt) => {
                 let mut borrow = self.context.borrow_mut();
@@ -2337,14 +2340,14 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_block_statement_children(&self, block_stmnt: &'n BlockStmt, children: &mut Vec<usize>) {
+    fn get_block_statement_children(&self, block_stmnt: &'m BlockStmt, children: &mut Vec<usize>) {
         block_stmnt
             .stmts
             .iter()
             .for_each(|statement| self.get_statement_children(statement, children))
     }
 
-    fn get_type_annotation_children(&self, type_annotation: &'n TsTypeAnn, children: &mut Vec<usize>) {
+    fn get_type_annotation_children(&self, type_annotation: &'m TsTypeAnn, children: &mut Vec<usize>) {
         match &*type_annotation.type_ann {
             TsType::TsKeywordType(ts_keyword_type) => {
                 let mut borrow = self.context.borrow_mut();
@@ -2589,7 +2592,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_var_decl_children(&self, variable_declaration: &'n VarDecl, children: &mut Vec<usize>) {
+    fn get_var_decl_children(&self, variable_declaration: &'m VarDecl, children: &mut Vec<usize>) {
         let mut borrow = self.context.borrow_mut();
         variable_declaration.decls.iter().for_each(|decl| {
             let child_index = borrow.nodes.len();

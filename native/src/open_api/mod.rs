@@ -12,7 +12,11 @@ use serde_json::json;
 
 use crate::typescript::ModuleCache;
 
-use self::{factory::OpenApiFactory, schema::OpenApi, state::Store};
+use self::{
+    factory::{append_deferred_schemas, append_schema},
+    schema::OpenApi,
+    state::Store,
+};
 
 fn merge_schemas(open_api: &OpenApi, base_schema: serde_json::Value) -> Result<String, Throw> {
     let mut generated = json!(open_api);
@@ -39,17 +43,16 @@ fn merge(target: &mut serde_json::Value, overlay: &serde_json::Value) {
 
 fn generate_schema(open_api_handle: Handle<JsObject>, cx: &mut FunctionContext) -> Result<String, Throw> {
     let mut store = Store::new();
-    let mut factory = OpenApiFactory::new();
     let mut module_cache = ModuleCache::new();
     let paths = open_api_handle.get::<JsArray, FunctionContext, &str>(cx, "entry")?;
 
     let mut open_api = OpenApi::new();
     for path in paths.to_vec(cx)? {
         let path = path.downcast_or_throw::<JsString, _>(cx)?.value(cx);
-        factory.append_schema(&mut open_api, &path, &mut module_cache, &mut store);
+        append_schema(&mut open_api, &path, &mut module_cache, &mut store);
     }
 
-    factory.append_deferred_schemas(&mut open_api, &mut module_cache, &mut store);
+    append_deferred_schemas(&mut open_api, &mut module_cache, &mut store);
 
     let base_handle: Handle<JsString> = open_api_handle.get(cx, "base")?;
     let base = serde_json::from_str(&base_handle.value(cx)).expect("Could not deserialize base schema");
@@ -59,15 +62,14 @@ fn generate_schema(open_api_handle: Handle<JsObject>, cx: &mut FunctionContext) 
 
 pub fn generate_openapi_debug(paths: Vec<String>) -> Result<String, Throw> {
     let mut store = Store::new();
-    let mut factory = OpenApiFactory::new();
     let mut module_cache = ModuleCache::new();
 
     let mut open_api = OpenApi::new();
     for path in paths {
-        factory.append_schema(&mut open_api, &path, &mut module_cache, &mut store);
+        append_schema(&mut open_api, &path, &mut module_cache, &mut store);
     }
 
-    factory.append_deferred_schemas(&mut open_api, &mut module_cache, &mut store);
+    append_deferred_schemas(&mut open_api, &mut module_cache, &mut store);
 
     merge_schemas(&mut open_api, json!({}))
 }

@@ -19,7 +19,7 @@ pub struct SchemyNode<'m> {
 }
 
 impl<'m, 'c> SchemyNode<'m> {
-    pub fn from_module(module: &'m Module) -> Rc<SchemyNode<'m>> {
+    pub fn from_module(module: Module) -> Rc<SchemyNode<'m>> {
         let context = Rc::new(RefCell::new(Context::new()));
         let mut borrow = context.borrow_mut();
         let index = borrow.nodes.len();
