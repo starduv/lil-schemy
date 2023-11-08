@@ -146,6 +146,7 @@ fn add_request_params(
                 store.defer_operation_type(&source_file_name, operation, &name);
             }
             Some(Declaration::Type { node }) => {
+                println!("we're hitting this point");
                 add_request_params(operation, node, file_path, path_options, store);
             }
             _ => {}

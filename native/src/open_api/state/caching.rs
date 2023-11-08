@@ -19,7 +19,7 @@ impl Store {
     pub fn store_declaration_maybe(&mut self, root: Rc<SchemyNode<'static>>, file_path: &str) -> () {
         match root.kind {
             NodeKind::TsTypeRef(raw_ref) => match &raw_ref.type_name {
-                TsEntityName::Ident(identifier) => {
+                TsEntityName::Ident(identifier) if identifier.sym.eq("LilSub") => {
                     let type_name = identifier.sym.to_string();
                     self.symbol_tables.insert(
                         file_path,

@@ -124,7 +124,7 @@ impl<'m> SchemyNode<'m> {
                 NodeKind::TsTypeParamInstantiation(_) => {
                     for child in child.children() {
                         match child.kind {
-                            NodeKind::TsType(_) => params.push(child.clone()),
+                            NodeKind::TsTypeRef(_) => params.push(child.clone()),
                             _ => {}
                         }
                     }
