@@ -14,29 +14,26 @@ pub fn append_schema(open_api: &mut OpenApi, file_path: &str, module_cache: &mut
     find_paths(open_api, root.clone(), file_path, store);
 
     while store.has_unrecognized_local_types(file_path) {
-        define_local_schemas(file_path, &root, open_api, store);
+        define_local_schemas(file_path, open_api, store);
     }
 }
 
 pub fn append_deferred_schemas(open_api: &mut OpenApi, module_cache: &mut ModuleCache, store: &mut Store) -> () {
     while let Some(file_path) = store.next_module() {
         let deferred_root = module_cache.parse(&file_path);
-        for item_index in deferred_root.children() {
-            let item = deferred_root.get(item_index).unwrap();
+        for item in deferred_root.children() {
             define_external_schema(open_api, item, &file_path, store);
         }
 
         while store.has_unrecognized_local_types(&file_path) {
-            define_local_schemas(&file_path, &deferred_root, open_api, store);
+            define_local_schemas(&file_path, open_api, store);
         }
     }
 }
 
-fn define_local_schemas(file_path: &str, root: &Rc<SchemyNode>, open_api: &mut OpenApi, store: &mut Store) {
+fn define_local_schemas(file_path: &str, open_api: &mut OpenApi, store: &mut Store) {
     for local_type in store.recognize_local_types(file_path) {
-        let root = root.get(local_type.index).unwrap();
         define_local_schema(
-            root,
             &local_type.type_name,
             &local_type.schema_name,
             open_api,
@@ -46,11 +43,10 @@ fn define_local_schemas(file_path: &str, root: &Rc<SchemyNode>, open_api: &mut O
     }
 }
 
-fn find_paths<'m>(open_api: &mut OpenApi, root: Rc<SchemyNode<'m>>, file_path: &str, store: &mut Store) {
+fn find_paths(open_api: &mut OpenApi, root: Rc<SchemyNode<'static>>, file_path: &str, store: &mut Store) {
     store.store_declaration_maybe(root.clone(), file_path);
 
-    for child_index in root.children() {
-        let child = root.get(child_index).unwrap();
+    for child in root.children() {
         match &child.kind {
             NodeKind::Ident(raw_ident) if raw_ident.sym.eq("LilPath") => {
                 let parent = child.parent().unwrap().parent().unwrap();
@@ -63,7 +59,7 @@ fn find_paths<'m>(open_api: &mut OpenApi, root: Rc<SchemyNode<'m>>, file_path: &
     }
 }
 
-fn add_path(open_api: &mut OpenApi, root: Rc<SchemyNode>, file_path: &str, store: &mut Store) -> () {
+fn add_path(open_api: &mut OpenApi, root: Rc<SchemyNode<'static>>, file_path: &str, store: &mut Store) -> () {
     let args = root.args();
     let route_handler = args.first().unwrap().as_arrow_expr().unwrap();
     let route_options = args.last().unwrap();
@@ -85,7 +81,7 @@ fn add_path(open_api: &mut OpenApi, root: Rc<SchemyNode>, file_path: &str, store
 
 fn add_request_details(
     operation: &Rc<RefCell<ApiPathOperation>>,
-    route_handler: Rc<SchemyNode>,
+    route_handler: Rc<SchemyNode<'static>>,
     file_path: &str,
     path_options: &PathOptions,
     store: &mut Store,
@@ -103,7 +99,7 @@ fn add_request_details(
 
 fn add_request_params(
     operation: &Rc<RefCell<ApiPathOperation>>,
-    root: Rc<SchemyNode>,
+    root: Rc<SchemyNode<'static>>,
     file_path: &str,
     path_options: &PathOptions,
     store: &mut Store,
@@ -150,21 +146,13 @@ fn add_request_params(
                 store.defer_operation_type(&source_file_name, operation, &name);
             }
             Some(Declaration::Type { node }) => {
-                if let Some(root) = root.get(node) {
-                    add_request_params(operation, root, file_path, path_options, store);
-                }
+                add_request_params(operation, node, file_path, path_options, store);
             }
             _ => {}
         },
         _ => {
-            for child_index in root.children() {
-                add_request_params(
-                    operation,
-                    root.get(child_index).unwrap(),
-                    file_path,
-                    path_options,
-                    store,
-                );
+            for child in root.children() {
+                add_request_params(operation, child, file_path, path_options, store);
             }
         }
     }
@@ -173,7 +161,7 @@ fn add_request_params(
 fn add_param_details(
     operation: &Rc<RefCell<ApiPathOperation>>,
     location: &str,
-    root: Rc<SchemyNode>,
+    root: Rc<SchemyNode<'static>>,
     file_path: &str,
     required_default: bool,
     path_options: &PathOptions,
@@ -229,14 +217,13 @@ fn add_param_details(
 
 fn find_response(
     operation: &Rc<RefCell<ApiPathOperation>>,
-    root: Rc<SchemyNode>,
+    root: Rc<SchemyNode<'static>>,
     file_path: &str,
     path_options: &PathOptions,
     depth: &mut String,
     store: &mut Store,
 ) -> () {
-    for child_index in root.children() {
-        let child = root.get(child_index.clone()).unwrap();
+    for child in root.children() {
         store.store_declaration_maybe(child.clone(), file_path);
         match child.kind {
             NodeKind::Ident(raw) if raw.sym.eq("LilResponse") => {
@@ -249,7 +236,7 @@ fn find_response(
 
 fn add_response(
     operation: &Rc<RefCell<ApiPathOperation>>,
-    root: Rc<SchemyNode>,
+    root: Rc<SchemyNode<'static>>,
     file_path: &str,
     path_options: &PathOptions,
     store: &mut Store,
@@ -282,7 +269,7 @@ fn add_response(
 }
 
 fn add_response_details(
-    root: &Rc<SchemyNode>,
+    root: &Rc<SchemyNode<'static>>,
     options: &ResponseOptions,
     file_path: &str,
     operation: &Rc<RefCell<ApiPathOperation>>,
@@ -304,7 +291,7 @@ fn add_response_details(
 
 fn add_body_param_details(
     operation: &Rc<RefCell<ApiPathOperation>>,
-    root: Rc<SchemyNode>,
+    root: Rc<SchemyNode<'static>>,
     file_path: &str,
     path_options: &PathOptions,
     store: &mut Store,
@@ -394,7 +381,6 @@ fn add_body_param_details(
 }
 
 fn define_local_schema(
-    type_node: Rc<SchemyNode>,
     type_name: &str,
     schema_name: &str,
     open_api: &mut OpenApi,
@@ -418,44 +404,39 @@ fn define_local_schema(
         }) => {
             store.defer_external_type(&source_file_name, schema_name.into(), &type_name);
         }
-        Some(Declaration::Type { node: node_index }) => {
+        Some(Declaration::Type { node }) => {
             let schema = open_api.components.schema_with_id(schema_name);
-
-            if let Some(node) = type_node.get(node_index) {
-                define_schema_details(schema, &node, file_path, false, &PathOptions::default(), store);
-            }
+            define_schema_details(schema, &node, file_path, false, &PathOptions::default(), store);
         }
         _ => {}
     };
 }
 
-fn define_external_schema(open_api: &mut OpenApi, root: Rc<SchemyNode>, file_path: &str, store: &mut Store) -> () {
+fn define_external_schema(
+    open_api: &mut OpenApi,
+    root: Rc<SchemyNode<'static>>,
+    file_path: &str,
+    store: &mut Store,
+) -> () {
     store.store_declaration_maybe(root.clone(), file_path);
     match &root.kind {
         NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultExpr(_))) => {
-            define_external_schema_maybe(&root, open_api, "default", file_path, store)
+            define_external_schema_maybe(open_api, "default", file_path, store)
         }
-        NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(raw_decl))) => {
-            let root = root.to_child(NodeKind::DefaultDecl(&raw_decl.decl));
-            define_external_schema_maybe(&root, open_api, "default", file_path, store)
+        NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDefaultDecl(_))) => {
+            define_external_schema_maybe(open_api, "default", file_path, store)
         }
         NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportDecl(raw_decl))) => match &raw_decl.decl {
             Decl::Class(ref raw_class) => {
-                let root = root.to_child(NodeKind::ClassDecl(raw_class));
-                define_external_schema_maybe(&root, open_api, &raw_class.ident.sym, file_path, store)
+                define_external_schema_maybe(open_api, &raw_class.ident.sym, file_path, store)
             }
             Decl::TsInterface(ref raw_interface) => {
-                let root = root.to_child(NodeKind::TsInterfaceDecl(raw_interface));
-                define_external_schema_maybe(&root, open_api, &raw_interface.id.sym, file_path, store)
+                define_external_schema_maybe(open_api, &raw_interface.id.sym, file_path, store)
             }
             Decl::TsTypeAlias(ref raw_alias) => {
-                let root = root.to_child(NodeKind::TsTypeAliasDecl(raw_alias));
-                define_external_schema_maybe(&root, open_api, &raw_alias.id.sym, file_path, store)
+                define_external_schema_maybe(open_api, &raw_alias.id.sym, file_path, store)
             }
-            Decl::TsEnum(ref raw_alias) => {
-                let root = root.to_child(NodeKind::TsEnumDecl(raw_alias));
-                define_external_schema_maybe(&root, open_api, &raw_alias.id.sym, file_path, store)
-            }
+            Decl::TsEnum(ref raw_alias) => define_external_schema_maybe(open_api, &raw_alias.id.sym, file_path, store),
             _ => {}
         },
         NodeKind::ModuleItem(ModuleItem::ModuleDecl(ModuleDecl::ExportNamed(raw_export))) => {
@@ -474,32 +455,27 @@ fn define_external_schema(open_api: &mut OpenApi, root: Rc<SchemyNode>, file_pat
                             },
                         };
 
-                        define_external_schema_maybe(&specifier, open_api, &name, file_path, store);
+                        define_external_schema_maybe(open_api, &name, file_path, store);
                     }
                     _ => {}
                 }
             }
         }
         NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::TsEnum(raw_enum)))) => {
-            let root = root.to_child(NodeKind::TsEnumDecl(raw_enum));
-            define_external_schema_maybe(&root, open_api, &raw_enum.id.sym, file_path, store)
+            define_external_schema_maybe(open_api, &raw_enum.id.sym, file_path, store)
         }
         NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::Class(raw_class)))) => {
-            let root = root.to_child(NodeKind::ClassDecl(raw_class));
-            define_external_schema_maybe(&root, open_api, &raw_class.ident.sym, file_path, store)
+            define_external_schema_maybe(open_api, &raw_class.ident.sym, file_path, store)
         }
         NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::TsInterface(raw_interface)))) => {
-            let root = root.to_child(NodeKind::TsInterfaceDecl(raw_interface));
-            define_external_schema_maybe(&root, open_api, &raw_interface.id.sym, file_path, store)
+            define_external_schema_maybe(open_api, &raw_interface.id.sym, file_path, store)
         }
         NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::TsTypeAlias(raw_alias)))) => {
-            let root = root.to_child(NodeKind::TsTypeAliasDecl(raw_alias));
-            define_external_schema_maybe(&root, open_api, &raw_alias.id.sym, file_path, store)
+            define_external_schema_maybe(open_api, &raw_alias.id.sym, file_path, store)
         }
         NodeKind::ModuleItem(ModuleItem::Stmt(Stmt::Decl(Decl::TsModule(raw_module)))) => {
             let root = root.to_child(NodeKind::TsModuleDecl(raw_module));
             for child in root.children() {
-                let child = root.get(child).unwrap();
                 define_external_schema(open_api, child, file_path, store);
             }
         }
@@ -507,13 +483,7 @@ fn define_external_schema(open_api: &mut OpenApi, root: Rc<SchemyNode>, file_pat
     }
 }
 
-fn define_external_schema_maybe(
-    root: &Rc<SchemyNode>,
-    open_api: &mut OpenApi,
-    type_name: &str,
-    file_path: &str,
-    store: &mut Store,
-) -> () {
+fn define_external_schema_maybe(open_api: &mut OpenApi, type_name: &str, file_path: &str, store: &mut Store) -> () {
     if open_api.components.contains_schema(type_name) {
         return;
     }
@@ -521,10 +491,9 @@ fn define_external_schema_maybe(
     if let Some(deferred_operation_type) = store.recognize_operation_type(type_name, file_path) {
         match store.get_root_declaration(file_path, type_name) {
             Some(Declaration::Type { node }) => {
-                let root = root.get(node).unwrap();
                 add_request_params(
                     &deferred_operation_type.operation,
-                    root,
+                    node,
                     file_path,
                     &PathOptions::default(),
                     store,
@@ -544,9 +513,6 @@ fn define_external_schema_maybe(
         match store.get_root_declaration(file_path, &type_name) {
             Some(Declaration::Type { node }) => {
                 let schema = open_api.components.schema_with_id(&deferred_type.schema_name);
-
-                let node = root.get(node).unwrap();
-
                 define_schema_details(schema, &node, file_path, false, &PathOptions::default(), store);
             }
             Some(Declaration::Import {
@@ -562,7 +528,7 @@ fn define_external_schema_maybe(
 
 fn define_schema_details(
     root_schema: &mut ApiSchema,
-    root: &Rc<SchemyNode>,
+    root: &Rc<SchemyNode<'static>>,
     file_path: &str,
     is_required: bool,
     path_options: &PathOptions,
@@ -570,8 +536,7 @@ fn define_schema_details(
 ) -> () {
     match root.kind {
         NodeKind::Ident(raw_ident) => match store.get_root_declaration(file_path, &raw_ident.sym) {
-            Some(Declaration::Type { node: index }) => {
-                let node = root.get(index).unwrap();
+            Some(Declaration::Type { node }) => {
                 define_schema_details(root_schema, &node, file_path, false, path_options, store);
             }
             _ => {
@@ -590,7 +555,6 @@ fn define_schema_details(
         },
         NodeKind::TsUnionOrIntersectionType(_) => {
             for child in root.children() {
-                let child = root.get(child).unwrap();
                 define_schema_details(root_schema, &child, file_path, is_required, path_options, store);
             }
         }
@@ -598,7 +562,6 @@ fn define_schema_details(
             let any_of = root_schema.any_of();
             let mut enum_schema = ApiSchema::new();
             for child in root.children() {
-                let child = root.get(child).unwrap();
                 match child.kind {
                     NodeKind::TsLitType(raw) => match &raw.lit {
                         TsLit::Number(raw_num) => enum_schema.enum_value(&format!("{}", &raw_num.value)),
@@ -629,7 +592,6 @@ fn define_schema_details(
             let all_of = root_schema.all_of();
             let mut enum_schema = ApiSchema::new();
             for child in root.children() {
-                let child = root.get(child).unwrap();
                 match child.kind {
                     NodeKind::TsLitType(raw) => match &raw.lit {
                         TsLit::Number(raw_num) => enum_schema.enum_value(&format!("{}", &raw_num.value)),
@@ -670,7 +632,7 @@ fn define_schema_details(
                             root_schema.reference(Some(name), false);
                         }
                         _ => {
-                            store.defer_local_type(file_path, &raw_ident.sym, &raw_ident.sym, root.index);
+                            store.defer_local_type(file_path, &raw_ident.sym, &raw_ident.sym, root.clone());
 
                             root_schema.reference(Some(raw_ident.sym.to_string()), false);
                         }
@@ -694,8 +656,7 @@ fn define_schema_details(
             _ => {}
         },
         NodeKind::TsTypeAnnotation(_) => {
-            for child_index in root.children() {
-                let child = root.get(child_index).unwrap();
+            for child in root.children() {
                 define_schema_details(root_schema, &child, file_path, is_required, path_options, store);
             }
         }
@@ -920,8 +881,7 @@ fn define_schema_details(
             }
         }
         NodeKind::TsType(_) => {
-            for child_index in root.children() {
-                let child = root.get(child_index).unwrap();
+            for child in root.children() {
                 define_schema_details(root_schema, &child, file_path, is_required, path_options, store);
             }
         }
@@ -968,7 +928,6 @@ fn define_schema_details(
         }
         _ => {
             for child in root.children() {
-                let child = root.get(child).unwrap();
                 define_schema_details(root_schema, &child, file_path, is_required, path_options, store);
             }
         }
@@ -980,7 +939,7 @@ fn define_schema_from_identifier(
     root_schema: &mut ApiSchema,
     file_path: &str,
     path_options: &PathOptions,
-    root: &Rc<SchemyNode>,
+    root: &Rc<SchemyNode<'static>>,
     is_required: bool,
     store: &mut Store,
 ) -> () {
@@ -1017,7 +976,7 @@ fn define_schema_from_identifier(
             }
             _ => {
                 root_schema.reference(Some(identifier.to_string()), false);
-                store.defer_local_type(file_path, identifier, identifier, root.index);
+                store.defer_local_type(file_path, identifier, identifier, root.clone());
             }
         }
     }

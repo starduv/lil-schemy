@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
-use crate::open_api::schema::ApiPathOperation;
+use crate::{open_api::schema::ApiPathOperation, typescript::SchemyNode};
 
 use super::Store;
 
@@ -22,7 +22,7 @@ impl Store {
         file_path: &str,
         schema_name: &str,
         type_name: &str,
-        node_index: usize,
+        node: Rc<SchemyNode<'static>>,
     ) -> () {
         self.deferred_schemas
             .local_types
@@ -31,7 +31,7 @@ impl Store {
             .push(LocalType {
                 schema_name: schema_name.into(),
                 type_name: type_name.into(),
-                index: node_index,
+                node,
             });
     }
 
@@ -133,5 +133,5 @@ pub struct OperationType {
 pub struct LocalType {
     pub schema_name: String,
     pub type_name: String,
-    pub index: usize,
+    pub node: Rc<SchemyNode<'static>>,
 }

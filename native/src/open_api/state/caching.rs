@@ -5,7 +5,7 @@ use swc_ecma_ast::{Callee, ExportSpecifier, Expr, ImportSpecifier, ModuleExportN
 
 use crate::typescript::{NodeKind, SchemyNode};
 
-use super::{Store, declaration_table::Declaration};
+use super::{declaration_table::Declaration, Store};
 
 impl Store {
     pub fn add_child_scope(&mut self, file_path: &str) -> () {
@@ -16,7 +16,7 @@ impl Store {
         self.symbol_tables.parent_scope(file_path)
     }
 
-    pub fn store_declaration_maybe(&mut self, root: Rc<SchemyNode>, file_path: &str) -> () {
+    pub fn store_declaration_maybe(&mut self, root: Rc<SchemyNode<'static>>, file_path: &str) -> () {
         match root.kind {
             NodeKind::TsTypeRef(raw_ref) => match &raw_ref.type_name {
                 TsEntityName::Ident(identifier) => {
@@ -24,75 +24,50 @@ impl Store {
                     self.symbol_tables.insert(
                         file_path,
                         type_name.to_string(),
-                        Declaration::Type {
-                            node: root.index.clone(),
-                        },
+                        Declaration::Type { node: root.clone() },
                     );
                 }
                 _ => {}
             },
             NodeKind::ModuleItem(_) => {
-                for child_item in root.children() {
-                    self.store_declaration_maybe(root.get(child_item).unwrap(), file_path)
+                for child in root.children() {
+                    self.store_declaration_maybe(child, file_path)
                 }
             }
             NodeKind::ExportDecl(_) => {
-                for child_index in root.children() {
-                    let child = root.get(child_index).unwrap();
+                for child in root.children() {
                     self.store_declaration_maybe(child, file_path)
                 }
             }
             NodeKind::ExportDefaultExpr(_) => {
-                for child_index in root.children() {
-                    let child = root.get(child_index).unwrap();
+                for child in root.children() {
                     self.store_default_declaration(child, file_path)
                 }
             }
             NodeKind::Decl(_) => {
-                for child_index in root.children() {
-                    let child = root.get(child_index).unwrap();
+                for child in root.children() {
                     self.store_declaration_maybe(child, file_path)
                 }
             }
             NodeKind::ClassDecl(raw) => {
                 let name = raw.ident.sym.to_string();
-                self.symbol_tables.insert(
-                    file_path,
-                    name.to_string(),
-                    Declaration::Type {
-                        node: root.index.clone(),
-                    },
-                )
+                self.symbol_tables
+                    .insert(file_path, name.to_string(), Declaration::Type { node: root.clone() })
             }
             NodeKind::TsInterfaceDecl(raw) => {
                 let name = raw.id.sym.to_string();
-                self.symbol_tables.insert(
-                    file_path,
-                    name,
-                    Declaration::Type {
-                        node: root.index.clone(),
-                    },
-                )
+                self.symbol_tables
+                    .insert(file_path, name, Declaration::Type { node: root.clone() })
             }
             NodeKind::TsTypeAliasDecl(raw) => {
                 let name = raw.id.sym.to_string();
-                self.symbol_tables.insert(
-                    file_path,
-                    name,
-                    Declaration::Type {
-                        node: root.index.clone(),
-                    },
-                )
+                self.symbol_tables
+                    .insert(file_path, name, Declaration::Type { node: root.clone() })
             }
             NodeKind::TsEnumDecl(raw) => {
                 let name = raw.id.sym.to_string();
-                self.symbol_tables.insert(
-                    file_path,
-                    name,
-                    Declaration::Type {
-                        node: root.index.clone(),
-                    },
-                )
+                self.symbol_tables
+                    .insert(file_path, name, Declaration::Type { node: root.clone() })
             }
             NodeKind::ExportDefaultDecl(raw_decl) => {
                 match &raw_decl.decl {
@@ -102,9 +77,7 @@ impl Store {
                         self.symbol_tables.insert(
                             file_path,
                             "default".into(),
-                            Declaration::Type {
-                                node: class.index.clone(),
-                            },
+                            Declaration::Type { node: class.clone() },
                         )
                     }
                     swc_ecma_ast::DefaultDecl::TsInterfaceDecl(raw_int) => {
@@ -113,7 +86,7 @@ impl Store {
                             file_path,
                             "default".into(),
                             Declaration::Type {
-                                node: interface.index.clone(),
+                                node: interface.clone(),
                             },
                         )
                     }
@@ -121,8 +94,7 @@ impl Store {
                 };
             }
             NodeKind::ImportDecl(raw) => {
-                for child_index in root.children() {
-                    let child = root.get(child_index).unwrap();
+                for child in root.children() {
                     match child.kind {
                         NodeKind::ImportSpecifier(ImportSpecifier::Default(raw_specifier)) => {
                             let src = raw.src.value.to_string();
@@ -231,7 +203,7 @@ impl Store {
                                     file_path,
                                     name.to_string(),
                                     Declaration::Type {
-                                        node: root.to_child(NodeKind::TsTypeLit(raw_type)).index.clone(),
+                                        node: root.to_child(NodeKind::TsTypeLit(raw_type)).clone(),
                                     },
                                 ),
                                 _ => {}
@@ -252,7 +224,7 @@ impl Store {
         }
     }
 
-    fn store_default_declaration(&mut self, root: Rc<SchemyNode>, file_path: &str) -> () {
+    fn store_default_declaration(&mut self, root: Rc<SchemyNode<'static>>, file_path: &str) -> () {
         match root.kind {
             NodeKind::CallExpr(raw_call) => match &raw_call.callee {
                 Callee::Expr(raw_callee) => match &**raw_callee {
@@ -267,20 +239,14 @@ impl Store {
                 },
                 _ => {}
             },
-            NodeKind::ArrayLit(_) => self.symbol_tables.insert(
-                file_path,
-                "default".into(),
-                Declaration::Type {
-                    node: root.index.clone(),
-                },
-            ),
-            NodeKind::ObjectLit(_) => self.symbol_tables.insert(
-                file_path,
-                "default".into(),
-                Declaration::Type {
-                    node: root.index.clone(),
-                },
-            ),
+            NodeKind::ArrayLit(_) => {
+                self.symbol_tables
+                    .insert(file_path, "default".into(), Declaration::Type { node: root.clone() })
+            }
+            NodeKind::ObjectLit(_) => {
+                self.symbol_tables
+                    .insert(file_path, "default".into(), Declaration::Type { node: root.clone() })
+            }
             NodeKind::NewExpr(expr) => match &*expr.callee {
                 Expr::Ident(raw_ident) => self.symbol_tables.insert(
                     file_path,
@@ -300,7 +266,7 @@ impl Store {
             ),
             NodeKind::ArrowExpr(_) => {
                 self.symbol_tables
-                    .insert(file_path, "default".into(), Declaration::Type { node: root.index })
+                    .insert(file_path, "default".into(), Declaration::Type { node: root })
             }
             NodeKind::ClassExpr(expr) => match &expr.ident {
                 Some(raw_ident) => self.symbol_tables.insert(
@@ -340,8 +306,7 @@ impl Store {
     }
 
     fn store_variable(&mut self, name: &str, root: Rc<SchemyNode>, file_path: &str) -> () {
-        for child_index in root.children() {
-            let child = root.get(child_index).unwrap();
+        for child in root.children() {
             match child.kind {
                 NodeKind::Ident(raw) => {
                     let type_name = raw.sym.to_string();

@@ -139,6 +139,15 @@ pub enum NodeKind<'m> {
     TsUnionType(&'m TsUnionType),
     TsIntersectionType(&'m TsIntersectionType),
     TsTplLit(&'m TsTplLitType),
+    Method(&'m ClassMethod),
+    PrivateMethod(&'m PrivateMethod),
+    PrivateProp(&'m PrivateProp),
+    TsIndexSignature(&'m TsIndexSignature),
+    StaticBlock(&'m StaticBlock),
+    TsAutoAccessor(&'m AutoAccessor),
+    ParamOrTsParamProp(&'m ParamOrTsParamProp),
+    TsParamProp(&'m TsParamProp),
+    Param(&'m Param),
 }
 
 impl<'n> Clone for NodeKind<'n> {
@@ -197,7 +206,7 @@ impl<'n> Clone for NodeKind<'n> {
             NodeKind::MemberExpr(raw) => NodeKind::MemberExpr(raw),
             NodeKind::MemberProp(raw) => NodeKind::MemberProp(raw),
             NodeKind::MetaPropExpr(raw) => NodeKind::MetaPropExpr(raw),
-            NodeKind::Module(raw) => panic!("Module cannot be cloned"),
+            NodeKind::Module(_) => panic!("Module cannot be cloned"),
             NodeKind::ModuleItem(raw) => NodeKind::ModuleItem(*raw),
             NodeKind::NamedExport(raw) => NodeKind::NamedExport(*raw),
             NodeKind::NewExpr(raw) => NodeKind::NewExpr(raw),
@@ -280,6 +289,15 @@ impl<'n> Clone for NodeKind<'n> {
             NodeKind::WhileStmt(raw) => NodeKind::WhileStmt(*raw),
             NodeKind::WithStmt(raw) => NodeKind::WithStmt(*raw),
             NodeKind::YieldExpr(raw) => NodeKind::YieldExpr(raw),
+            NodeKind::PrivateMethod(raw) => NodeKind::PrivateMethod(raw),
+            NodeKind::PrivateProp(raw) => NodeKind::PrivateProp(raw),
+            NodeKind::TsIndexSignature(raw) => NodeKind::TsIndexSignature(raw),
+            NodeKind::Method(raw) => NodeKind::Method(raw),
+            NodeKind::StaticBlock(raw) => NodeKind::StaticBlock(raw),
+            NodeKind::TsAutoAccessor(raw) => NodeKind::TsAutoAccessor(raw),
+            NodeKind::ParamOrTsParamProp(raw) => NodeKind::ParamOrTsParamProp(raw),
+            NodeKind::TsParamProp(raw) => NodeKind::TsParamProp(raw),
+            NodeKind::Param(raw) => NodeKind::Param(raw),
         }
     }
 }
@@ -423,6 +441,15 @@ impl<'m> Debug for NodeKind<'m> {
             NodeKind::TsUnionType(_) => f.debug_tuple("TsUnionType").finish(),
             NodeKind::TsIntersectionType(_) => f.debug_tuple("TsIntersectionType").finish(),
             NodeKind::TsTplLit(_) => f.debug_tuple("TsTplLit").finish(),
+            NodeKind::PrivateMethod(_) => f.debug_tuple("PrivateMethod").finish(),
+            NodeKind::PrivateProp(_) => f.debug_tuple("PrivateProp").finish(),
+            NodeKind::TsIndexSignature(_) => f.debug_tuple("TsIndexSignature").finish(),
+            NodeKind::Method(_) => f.debug_tuple("Method").finish(),
+            NodeKind::StaticBlock(_) => f.debug_tuple("StaticBlock").finish(),
+            NodeKind::TsAutoAccessor(_) => f.debug_tuple("TsAutoAccessor").finish(),
+            NodeKind::ParamOrTsParamProp(_) => f.debug_tuple("ParamOrTsParamProp").finish(),
+            NodeKind::TsParamProp(_) => f.debug_tuple("TsParamProp").finish(),
+            NodeKind::Param(_) => f.debug_tuple("Param").finish(),
         }
     }
 }

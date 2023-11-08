@@ -1,5 +1,7 @@
 use std::{cell::RefCell, collections::{VecDeque, BTreeMap}, fmt, rc::Rc};
 
+use crate::typescript::SchemyNode;
+
 #[derive(Debug, Default)]
 struct Scope {
     symbols: BTreeMap<String, Declaration>,
@@ -252,7 +254,7 @@ impl DeclarationTable {
 
 pub enum Declaration {
     Alias { to: String },
-    Type { node: usize },
+    Type { node: Rc<SchemyNode<'static>> },
     Export { name: String, source_file_name: String },
     Import { name: String, source_file_name: String },
 }
