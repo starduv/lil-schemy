@@ -3,7 +3,6 @@ import deepEqual from 'deep-equal-in-any-order';
 import { OpenAPIV3 } from 'openapi-types';
 import { generateSchemas } from '../src/generator';
 import { getRootFiles } from '../src/utils';
-import { writeFileSync } from 'fs';
 
 use(deepEqual);
 
@@ -19,8 +18,6 @@ describe('open api generator', () => {
         });
 
         schema = JSON.parse(result.openApi.schema || "");
-
-        writeFileSync("/Users/joelrainear-wills/Desktop/b.json", result.openApi.schema || "")
     });
 
     it('sets OpenApi version', () => {
