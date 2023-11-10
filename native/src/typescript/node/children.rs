@@ -4,12 +4,13 @@ use swc_ecma_ast::*;
 
 use super::{NodeKind, SchemyNode};
 
-impl<'n> SchemyNode<'n> {
-    pub fn children(&self) -> Vec<usize> {
-        let mut children = vec![];
+impl<'m> SchemyNode<'m> {
+    pub fn children(self: &Rc<Self>) -> Vec<Rc<SchemyNode<'m>>> {
+        let mut children = Vec::new();
         match self.kind {
-            NodeKind::AwaitExpr(raw_await) => self.get_await_expr_children(raw_await, &mut children),
-            NodeKind::ArrowExpr(arrow) => self.get_arrow_expr_children(arrow, &mut children),
+            NodeKind::AwaitExpr(raw) => self.get_await_expr_children(raw, &mut children),
+            NodeKind::ArrowExpr(raw) => self.get_arrow_expr_children(raw, &mut children),
+            NodeKind::BindingIdent(raw) => self.get_binding_ident_children(raw, &mut children),
             NodeKind::BlockStmt(raw) => self.get_block_statement_children(raw, &mut children),
             NodeKind::BlockStmtOrExpr(temp) => match temp {
                 BlockStmtOrExpr::BlockStmt(raw) => self.get_block_statement_children(raw, &mut children),
@@ -17,6 +18,12 @@ impl<'n> SchemyNode<'n> {
             },
             NodeKind::Callee(raw) => self.get_callee_children(raw, &mut children),
             NodeKind::CallExpr(raw) => self.get_call_expr_children(raw, &mut children),
+            NodeKind::Class(raw) => self.get_class_children(raw, &mut children),
+            NodeKind::ClassDecl(raw) => self.get_class_decl_children(raw, &mut children),
+            NodeKind::ClassExpr(raw) => self.get_class_expr_children(raw, &mut children),
+            NodeKind::ClassMember(raw) => self.get_class_member_children(raw, &mut children),
+            NodeKind::ClassProp(raw) => self.get_class_prop_children(raw, &mut children),
+            NodeKind::Constructor(raw) => self.get_constructor_children(raw, &mut children),
             NodeKind::Decl(raw) => self.get_decl_children(raw, &mut children),
             NodeKind::ExportDecl(raw) => self.get_export_declartion_children(raw, &mut children),
             NodeKind::ExportDefaultDecl(raw) => self.get_export_default_decl_children(raw, &mut children),
@@ -29,18 +36,27 @@ impl<'n> SchemyNode<'n> {
             NodeKind::Lit(raw) => self.get_lit_children(raw, &mut children),
             NodeKind::MemberExpr(raw) => self.get_member_expr_children(raw, &mut children),
             NodeKind::MemberProp(raw) => self.get_member_prop_children(raw, &mut children),
-            NodeKind::Module(module) => self.get_module_children(module, &mut children),
+            NodeKind::Module(ref module) => self.get_module_children(
+                unsafe { std::mem::transmute::<&'_ Module, &'m Module>(module) },
+                &mut children,
+            ),
             NodeKind::ModuleItem(raw) => self.get_module_item_children(raw, &mut children),
+            NodeKind::NamedExport(raw) => self.get_named_export_children(raw, &mut children),
             NodeKind::NewExpr(raw) => self.get_new_expr_children(raw, &mut children),
             NodeKind::Pat(raw) => self.get_pat_children(raw, &mut children),
             NodeKind::ReturnStmt(raw) => self.get_return_statement_children(raw, &mut children),
             NodeKind::TryStmt(raw) => self.get_try_statement_children(raw, &mut children),
+            NodeKind::TsArrayType(raw) => self.get_ts_array_type_children(raw, &mut children),
             NodeKind::TsAsExpr(raw) => self.get_ts_as_expr_children(raw, &mut children),
             NodeKind::TsEntityName(raw) => self.get_ts_entity_name_children(raw, &mut children),
+            NodeKind::TsEnumDecl(raw) => self.get_ts_enum_decl_children(raw, &mut children),
+            NodeKind::TsExprWithTypeArgs(raw) => self.get_ts_expr_with_type_args_children(raw, &mut children),
+            NodeKind::TsInterfaceBody(raw) => self.get_ts_interface_body_children(raw, &mut children),
             NodeKind::TsInterfaceDecl(raw) => self.get_ts_interface_decl_children(raw, &mut children),
             NodeKind::TsIntersectionType(raw) => self.get_ts_intersection_type_children(raw, &mut children),
             NodeKind::TsLitType(raw) => self.get_ts_lit_type_chilren(raw, &mut children),
             NodeKind::TsModuleDecl(raw) => self.get_ts_module_decl_children(raw, &mut children),
+            NodeKind::TsParamProp(raw) => self.get_ts_param_prop_children(raw, &mut children),
             NodeKind::TsPropertySignature(raw) => self.get_ts_property_signature_children(raw, &mut children),
             NodeKind::TsType(raw) => self.get_ts_type_children(raw, &mut children),
             NodeKind::TsTypeAliasDecl(raw) => self.get_ts_type_alias_declaration(raw, &mut children),
@@ -52,9 +68,9 @@ impl<'n> SchemyNode<'n> {
             NodeKind::TsTypeParamInstantiation(raw) => {
                 self.get_ts_type_param_instantiation_children(raw, &mut children)
             }
+            NodeKind::TsTypeRef(raw) => self.get_ts_type_ref_children(raw, &mut children),
             NodeKind::TsUnionType(raw) => self.get_ts_union_type_children(raw, &mut children),
             NodeKind::TsUnionOrIntersectionType(raw) => self.get_ts_union_or_intersection_children(raw, &mut children),
-            NodeKind::TsTypeRef(raw) => self.get_ts_type_ref_children(raw, &mut children),
             NodeKind::VarDecl(raw) => self.get_var_decl_children(raw, &mut children),
             NodeKind::VarDeclarator(raw) => self.get_var_declarator_children(raw, &mut children),
             _ => {}
@@ -62,13 +78,153 @@ impl<'n> SchemyNode<'n> {
         children
     }
 
-    fn get_return_statement_children(&self, raw: &'n ReturnStmt, children: &mut Vec<usize>) {
+    fn push_children(self: &Rc<Self>, kind: NodeKind<'m>, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        let node = Rc::new(SchemyNode {
+            kind,
+            parent: Some(Rc::downgrade(self)),
+            this: None,
+        });
+
+        children.push(node);
+    }
+
+    fn get_ts_expr_with_type_args_children(
+        self: &Rc<Self>,
+        raw: &'m TsExprWithTypeArgs,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
+        let kind = NodeKind::Expr(&raw.expr);
+        self.push_children(kind, children);
+
+        if let Some(type_args) = &raw.type_args {
+            let kind = NodeKind::TsTypeParamInstantiation(type_args);
+            self.push_children(kind, children);
+        }
+    }
+
+    fn get_binding_ident_children(self: &Rc<Self>, raw: &'m BindingIdent, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        if let Some(ref raw_ann) = raw.type_ann {
+            let kind = NodeKind::TsTypeAnnotation(raw_ann);
+            self.push_children(kind, children);
+        }
+    }
+
+    fn get_class_prop_children(self: &Rc<Self>, raw: &'m ClassProp, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        if let Some(ref raw_ann) = raw.type_ann {
+            let kind = NodeKind::TsTypeAnnotation(raw_ann);
+            self.push_children(kind, children);
+        }
+    }
+
+    fn get_ts_param_prop_children(self: &Rc<Self>, raw: &'m TsParamProp, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        match &raw.param {
+            TsParamPropParam::Ident(raw) => {
+                let kind = NodeKind::BindingIdent(&raw);
+                self.push_children(kind, children);
+            }
+            TsParamPropParam::Assign(raw) => {
+                let kind = NodeKind::AssignPat(&raw);
+                self.push_children(kind, children);
+            }
+        }
+    }
+
+    fn get_constructor_children(self: &Rc<Self>, raw: &'m Constructor, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        for param in &raw.params {
+            match param {
+                ParamOrTsParamProp::TsParamProp(param) => {
+                    let kind = NodeKind::TsParamProp(param);
+                    self.push_children(kind, children);
+                }
+                ParamOrTsParamProp::Param(param) => {
+                    let kind = NodeKind::Param(param);
+                    self.push_children(kind, children);
+                }
+            }
+        }
+    }
+
+    fn get_class_member_children(self: &Rc<Self>, raw: &'m ClassMember, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        match raw {
+            ClassMember::Constructor(raw) => {
+                let kind = NodeKind::Constructor(raw);
+                self.push_children(kind, children);
+            }
+            ClassMember::ClassProp(raw) => {
+                let kind = NodeKind::ClassProp(raw);
+                self.push_children(kind, children);
+            }
+            ClassMember::Method(raw) => {
+                let kind = NodeKind::Method(raw);
+                self.push_children(kind, children);
+            }
+            ClassMember::PrivateMethod(raw) => {
+                let kind = NodeKind::PrivateMethod(raw);
+                self.push_children(kind, children);
+            }
+            ClassMember::PrivateProp(raw) => {
+                let kind = NodeKind::PrivateProp(raw);
+                self.push_children(kind, children);
+            }
+            ClassMember::TsIndexSignature(raw) => {
+                let kind = NodeKind::TsIndexSignature(raw);
+                self.push_children(kind, children);
+            }
+            ClassMember::Empty(raw) => {
+                let kind = NodeKind::EmptyStmt(raw);
+                self.push_children(kind, children);
+            }
+            ClassMember::StaticBlock(raw) => {
+                let kind = NodeKind::StaticBlock(raw);
+                self.push_children(kind, children);
+            }
+            ClassMember::AutoAccessor(raw) => {
+                let kind = NodeKind::TsAutoAccessor(raw);
+                self.push_children(kind, children);
+            }
+        }
+    }
+
+    fn get_ts_array_type_children(self: &Rc<Self>, raw: &'m TsArrayType, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        let kind = NodeKind::TsType(&raw.elem_type);
+        self.push_children(kind, children);
+    }
+
+    fn get_class_expr_children(self: &Rc<Self>, raw: &'m ClassExpr, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        let kind = NodeKind::Class(&raw.class);
+        self.push_children(kind, children);
+    }
+
+    fn get_ts_interface_body_children(
+        self: &Rc<Self>,
+        raw: &'m TsInterfaceBody,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
+        for member in &raw.body {
+            let kind = NodeKind::TsTypeElement(member);
+            self.push_children(kind, children);
+        }
+    }
+
+    fn get_class_children(self: &Rc<Self>, raw: &'m Class, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        if let Some(ref raw_super_class) = raw.super_class {
+            let kind = NodeKind::Expr(raw_super_class);
+            self.push_children(kind, children);
+        }
+
+        for member in &raw.body {
+            let kind = NodeKind::ClassMember(member);
+            self.push_children(kind, children);
+        }
+    }
+
+    fn get_return_statement_children(self: &Rc<Self>, raw: &'m ReturnStmt, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         if let Some(arg) = &raw.arg {
             self.get_expr_children(arg, children);
         }
     }
 
-    fn get_if_statement_children(&self, raw: &'n IfStmt, children: &mut Vec<usize>) {
+    fn get_if_statement_children(self: &Rc<Self>, raw: &'m IfStmt, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         self.get_expr_children(&*raw.test, children);
         self.get_statement_children(&*raw.cons, children);
         if let Some(alt) = &raw.alt {
@@ -76,7 +232,7 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_try_statement_children(&self, raw: &'n TryStmt, children: &mut Vec<usize>) {
+    fn get_try_statement_children(self: &Rc<Self>, raw: &'m TryStmt, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         self.get_block_statement_children(&raw.block, children);
 
         if let Some(catch) = &raw.handler {
@@ -88,135 +244,87 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_catch_clause_children(&self, raw: &'n CatchClause, children: &mut Vec<usize>) {
+    fn get_catch_clause_children(self: &Rc<Self>, raw: &'m CatchClause, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         self.get_block_statement_children(&raw.body, children);
     }
 
-    fn get_ts_lit_type_chilren(&self, raw: &'n TsLitType, children: &mut Vec<usize>) {
+    fn get_ts_lit_type_chilren(self: &Rc<Self>, raw: &'m TsLitType, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         self.get_ts_lit_children(&raw.lit, children);
     }
 
-    fn get_ts_lit_children(&self, raw: &'n TsLit, children: &mut Vec<usize>) {
+    fn get_ts_lit_children(self: &Rc<Self>, raw: &'m TsLit, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match raw {
             TsLit::Number(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::Num(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Num(raw);
+                self.push_children(kind, children);
             }
             TsLit::Str(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::Str(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Str(raw);
+                self.push_children(kind, children);
             }
             TsLit::Tpl(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsTplLit(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTplLit(raw);
+                self.push_children(kind, children);
             }
             TsLit::Bool(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::Bool(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Bool(raw);
+                self.push_children(kind, children);
             }
             TsLit::BigInt(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::BigInt(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::BigInt(raw);
+                self.push_children(kind, children);
             }
         }
     }
 
-    fn get_ts_union_type_children(&self, raw: &'n TsUnionType, children: &mut Vec<usize>) {
+    fn get_ts_union_type_children(self: &Rc<Self>, raw: &'m TsUnionType, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         for type_ann in &raw.types {
             self.get_ts_type_children(type_ann, children);
         }
     }
 
-    fn get_ts_intersection_type_children(&self, raw: &'n TsIntersectionType, children: &mut Vec<usize>) {
+    fn get_ts_intersection_type_children(
+        self: &Rc<Self>,
+        raw: &'m TsIntersectionType,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         for type_ann in &raw.types {
             self.get_ts_type_children(type_ann, children);
         }
     }
 
-    fn get_ts_union_or_intersection_children(&self, raw: &'n TsUnionOrIntersectionType, children: &mut Vec<usize>) {
+    fn get_ts_union_or_intersection_children(
+        self: &Rc<Self>,
+        raw: &'m TsUnionOrIntersectionType,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         match raw {
             TsUnionOrIntersectionType::TsUnionType(raw_union) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsUnionType(raw_union),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsUnionType(raw_union);
+                self.push_children(kind, children);
             }
             TsUnionOrIntersectionType::TsIntersectionType(raw_intersection) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsIntersectionType(raw_intersection),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsIntersectionType(raw_intersection);
+                self.push_children(kind, children);
             }
         }
     }
 
-    fn get_await_expr_children(&self, raw_await: &'n AwaitExpr, children: &mut Vec<usize>) {
+    fn get_await_expr_children(self: &Rc<Self>, raw_await: &'m AwaitExpr, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         self.get_expr_children(&*raw_await.arg, children);
     }
 
     fn get_ts_type_param_instantiation_children(
-        &self,
-        type_params: &'n TsTypeParamInstantiation,
-        children: &mut Vec<usize>,
+        self: &Rc<Self>,
+        type_params: &'m TsTypeParamInstantiation,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
     ) {
         for param in &type_params.params {
             self.get_ts_type_children(param, children);
         }
     }
 
-    fn get_ts_type_param(&self, type_param: &'n TsTypeParam, children: &mut Vec<usize>) {
+    fn get_ts_type_param(self: &Rc<Self>, type_param: &'m TsTypeParam, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         if let Some(constraint) = &type_param.constraint {
             self.get_ts_type_children(constraint, children);
         }
@@ -226,808 +334,335 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_lit_children(&self, lit: &'n Lit, children: &mut Vec<usize>) {
+    fn get_lit_children(self: &Rc<Self>, lit: &'m Lit, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match lit {
             Lit::Str(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::Str(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Str(raw);
+                self.push_children(kind, children);
             }
             Lit::Bool(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::Bool(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Bool(raw);
+                self.push_children(kind, children);
             }
             Lit::Null(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::Null(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Null(raw);
+                self.push_children(kind, children);
             }
             Lit::Num(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::Num(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Num(raw);
+                self.push_children(kind, children);
             }
             Lit::BigInt(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::BigInt(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::BigInt(raw);
+                self.push_children(kind, children);
             }
             Lit::Regex(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::Regex(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Regex(raw);
+                self.push_children(kind, children);
             }
             _ => {}
         }
     }
 
-    fn get_ts_type_assertion_expr_children(&self, expr: &'n TsTypeAssertion, children: &mut Vec<usize>) {
+    fn get_ts_type_assertion_expr_children(
+        self: &Rc<Self>,
+        expr: &'m TsTypeAssertion,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         self.get_expr_children(&*expr.expr, children);
         self.get_ts_type_children(&*expr.type_ann, children);
     }
 
-    fn get_ts_entity_name_children(&self, entity_name: &'n TsEntityName, children: &mut Vec<usize>) {
+    fn get_ts_entity_name_children(
+        self: &Rc<Self>,
+        entity_name: &'m TsEntityName,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         match entity_name {
             TsEntityName::Ident(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::Ident(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Ident(raw);
+                self.push_children(kind, children);
             }
             TsEntityName::TsQualifiedName(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsQualifiedName(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsQualifiedName(raw);
+                self.push_children(kind, children);
             }
         }
     }
 
-    fn get_ts_type_ref_children(&self, type_ref: &'n TsTypeRef, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
-        let child_index = borrow.nodes.len();
-
-        let child_node = SchemyNode {
-            index: child_index,
-            parent_index: Some(self.index.clone()),
-            kind: NodeKind::TsEntityName(&type_ref.type_name),
-            context: self.context.clone(),
-        };
-        borrow.nodes.push(Rc::new(child_node));
-        children.push(child_index);
+    fn get_ts_type_ref_children(self: &Rc<Self>, type_ref: &'m TsTypeRef, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        let kind = NodeKind::TsEntityName(&type_ref.type_name);
+        self.push_children(kind, children);
 
         if let Some(type_params) = &type_ref.type_params {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::TsTypeParamInstantiation(type_params),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::TsTypeParamInstantiation(type_params);
+            self.push_children(kind, children);
         }
     }
 
-    fn get_ts_type_children(&self, ts_type: &'n TsType, children: &mut Vec<usize>) {
+    fn get_ts_type_children(self: &Rc<Self>, ts_type: &'m TsType, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match ts_type {
             TsType::TsKeywordType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsKeywordType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsKeywordType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsThisType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsThisType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsThisType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsFnOrConstructorType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsFnOrConstructorType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsFnOrConstructorType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTypeRef(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTypeRef(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeRef(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTypeQuery(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTypeQuery(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeQuery(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTypeLit(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTypeLit(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeLit(raw);
+                self.push_children(kind, children);
             }
             TsType::TsArrayType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsArrayType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsArrayType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTupleType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTupleType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTupleType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsOptionalType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsOptionalType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsOptionalType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsRestType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsRestType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsRestType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsUnionOrIntersectionType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsUnionOrIntersectionType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsUnionOrIntersectionType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsConditionalType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsConditionalType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsConditionalType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsInferType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsInferType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsInferType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsParenthesizedType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsParenthesizedType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsParenthesizedType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTypeOperator(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTypeOperator(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeOperator(raw);
+                self.push_children(kind, children);
             }
             TsType::TsIndexedAccessType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsIndexedAccessType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsIndexedAccessType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsMappedType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsMappedType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsMappedType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsLitType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsLitType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsLitType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTypePredicate(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTypePredicate(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypePredicate(raw);
+                self.push_children(kind, children);
             }
             TsType::TsImportType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsImportType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsImportType(raw);
+                self.push_children(kind, children);
             }
         }
     }
 
-    fn get_new_expr_children(&self, expr: &'n NewExpr, children: &mut Vec<usize>) {
-        self.get_expr_children(&expr.callee, children);
+    fn get_new_expr_children(self: &Rc<Self>, expr: &'m NewExpr, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        let kind = NodeKind::Expr(&expr.callee);
+        self.push_children(kind, children);
+
+        if let Some(args) = &expr.args {
+            for arg in args {
+                let kind = NodeKind::ExprOrSpread(arg);
+                self.push_children(kind, children);
+            }
+        }
     }
 
-    fn get_ts_as_expr_children(&self, expr: &'n TsAsExpr, children: &mut Vec<usize>) {
+    fn get_ts_as_expr_children(self: &Rc<Self>, expr: &'m TsAsExpr, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match &*expr.type_ann {
             TsType::TsKeywordType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsKeywordType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsKeywordType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsThisType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsThisType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsThisType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsFnOrConstructorType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsFnOrConstructorType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsFnOrConstructorType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTypeRef(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTypeRef(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeRef(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTypeQuery(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTypeQuery(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeQuery(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTypeLit(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTypeLit(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeLit(raw);
+                self.push_children(kind, children);
             }
             TsType::TsArrayType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsArrayType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsArrayType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTupleType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTupleType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTupleType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsOptionalType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsOptionalType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsOptionalType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsRestType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsRestType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsRestType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsUnionOrIntersectionType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsUnionOrIntersectionType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsUnionOrIntersectionType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsConditionalType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsConditionalType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsConditionalType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsInferType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsInferType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsInferType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsParenthesizedType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsParenthesizedType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsParenthesizedType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTypeOperator(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTypeOperator(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeOperator(raw);
+                self.push_children(kind, children);
             }
             TsType::TsIndexedAccessType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsIndexedAccessType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsIndexedAccessType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsMappedType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsMappedType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsMappedType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsLitType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsLitType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsLitType(raw);
+                self.push_children(kind, children);
             }
             TsType::TsTypePredicate(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsTypePredicate(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypePredicate(raw);
+                self.push_children(kind, children);
             }
             TsType::TsImportType(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                    kind: NodeKind::TsImportType(raw),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsImportType(raw);
+                self.push_children(kind, children);
             }
         }
         self.get_expr_children(&*expr.expr, children);
     }
 
-    // fn get_var_declarator_children(&self, var_declarator: &'n VarDeclarator, children: &mut Vec<usize>) {
-    //     let mut borrow = self.context.borrow_mut();
-    //     if let Some(init) = &var_declarator.init {
-    //         let child_index = borrow.nodes.len();
-    //         let child_node = SchemyNode {
-    //             index: child_index,
-    //             parent_index: Some(self.index.clone()),
-    //             kind: NodeKind::Expr(init),
-    //             context: self.context.clone(),
-    //         };
-    //         borrow.nodes.push(Rc::new(child_node));
-    //         children.push(child_index);
-    //     }
-    // }
-
-    fn get_var_declarator_children(&self, var_declarator: &'n VarDeclarator, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
+    fn get_var_declarator_children(
+        self: &Rc<Self>,
+        var_declarator: &'m VarDeclarator,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
+        match &var_declarator.name {
+            Pat::Ident(raw_ident) => {
+                if let Some(ref raw_ann) = raw_ident.type_ann {
+                    let kind = NodeKind::TsTypeAnnotation(raw_ann);
+                    self.push_children(kind, children);
+                }
+            }
+            _ => {}
+        }
         if let Some(init) = &var_declarator.init {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::Expr(init),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::Expr(init);
+            self.push_children(kind, children);
         }
     }
 
-    fn get_member_prop_children(&self, prop: &'n MemberProp, children: &mut Vec<usize>) {
+    fn get_member_prop_children(self: &Rc<Self>, prop: &'m MemberProp, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match prop {
             MemberProp::Ident(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::Ident(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Ident(raw);
+                self.push_children(kind, children);
             }
             _ => {}
         }
     }
 
-    fn get_member_expr_children(&self, expr: &'n MemberExpr, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
-        let child_index = borrow.nodes.len();
-        let child_node = SchemyNode {
-            index: child_index,
-            parent_index: Some(self.index.clone()),
-            kind: NodeKind::Expr(&expr.obj),
-            context: self.context.clone(),
-        };
-        borrow.nodes.push(Rc::new(child_node));
-        children.push(child_index);
+    fn get_member_expr_children(self: &Rc<Self>, expr: &'m MemberExpr, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        let kind = NodeKind::Expr(&expr.obj);
+        self.push_children(kind, children);
 
-        let child_index = borrow.nodes.len();
-        let child_node = SchemyNode {
-            index: child_index,
-            parent_index: Some(self.index.clone()),
-            kind: NodeKind::MemberProp(&expr.prop),
-            context: self.context.clone(),
-        };
-        borrow.nodes.push(Rc::new(child_node));
-        children.push(child_index);
+        let kind = NodeKind::MemberProp(&expr.prop);
+        self.push_children(kind, children);
     }
 
-    fn get_callee_children(&self, callee: &'n Callee, children: &mut Vec<usize>) {
+    fn get_callee_children(self: &Rc<Self>, callee: &'m Callee, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match callee {
             Callee::Expr(expr) => self.get_expr_children(expr, children),
             _ => {}
         }
     }
 
-    fn get_decl_children(&self, decl: &'n Decl, children: &mut Vec<usize>) {
+    fn get_decl_children(self: &Rc<Self>, decl: &'m Decl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match decl {
             Decl::Class(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::ClassDecl(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ClassDecl(raw);
+                self.push_children(kind, children);
             }
             Decl::Fn(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::FnDecl(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::FnDecl(raw);
+                self.push_children(kind, children);
             }
             Decl::TsEnum(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsEnumDecl(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsEnumDecl(raw);
+                self.push_children(kind, children);
             }
             Decl::TsInterface(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsInterfaceDecl(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsInterfaceDecl(raw);
+                self.push_children(kind, children);
             }
             Decl::TsModule(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsModuleDecl(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsModuleDecl(raw);
+                self.push_children(kind, children);
             }
             Decl::Var(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::VarDecl(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::VarDecl(raw);
+                self.push_children(kind, children);
             }
             Decl::TsTypeAlias(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    kind: NodeKind::TsTypeAliasDecl(raw),
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeAliasDecl(raw);
+                self.push_children(kind, children);
             }
             _ => {}
         }
     }
 
-    fn get_ts_module_decl_children(&self, decl: &'n TsModuleDecl, children: &mut Vec<usize>) {
+    fn get_ts_module_decl_children(self: &Rc<Self>, decl: &'m TsModuleDecl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match &decl.body {
             Some(TsNamespaceBody::TsModuleBlock(raw)) => self.get_ts_module_block_children(raw, children),
             Some(TsNamespaceBody::TsNamespaceDecl(raw)) => self.get_ts_namespace_decl_children(raw, children),
@@ -1035,113 +670,75 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_ts_namespace_decl_children(&self, decl: &'n TsNamespaceDecl, children: &mut Vec<usize>) {
+    fn get_ts_namespace_decl_children(
+        self: &Rc<Self>,
+        decl: &'m TsNamespaceDecl,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         match &*decl.body {
             TsNamespaceBody::TsModuleBlock(raw) => self.get_ts_module_block_children(raw, children),
             TsNamespaceBody::TsNamespaceDecl(raw) => self.get_ts_namespace_decl_children(raw, children),
         }
     }
 
-    fn get_ts_module_block_children(&self, block: &'n TsModuleBlock, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
+    fn get_ts_module_block_children(self: &Rc<Self>, block: &'m TsModuleBlock, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         block.body.iter().for_each(|item| {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::ModuleItem(item),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::ModuleItem(item);
+            self.push_children(kind, children);
         });
     }
 
-    fn get_class_decl_children(&self, decl: &'n ClassDecl, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
-        decl.class.body.iter().for_each(|member| {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::ClassMember(member),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
-        });
+    fn get_class_decl_children(self: &Rc<Self>, decl: &'m ClassDecl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        let kind = NodeKind::Class(&decl.class);
+        self.push_children(kind, children);
+        // decl.class.body.iter().for_each(|member| {
+        //     let kind = NodeKind::ClassMember(member);
+        //     self.push_children(kind, children);
+        // });
     }
-    fn get_fn_decl_children(&self, decl: &'n FnDecl, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
+    fn get_fn_decl_children(self: &Rc<Self>, decl: &'m FnDecl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         decl.function.body.iter().for_each(|member| {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::BlockStmt(member),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::BlockStmt(member);
+            self.push_children(kind, children);
         });
     }
-    fn get_ts_enum_decl_children(&self, decl: &'n TsEnumDecl, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
+    fn get_ts_enum_decl_children(self: &Rc<Self>, decl: &'m TsEnumDecl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         decl.members.iter().for_each(|member| {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::TsEnumMember(member),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::TsEnumMember(member);
+            self.push_children(kind, children);
         });
     }
-    fn get_ts_interface_decl_children(&self, decl: &'n TsInterfaceDecl, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
+    fn get_ts_interface_decl_children(
+        self: &Rc<Self>,
+        decl: &'m TsInterfaceDecl,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
+        for extend in &decl.extends {
+            let kind = NodeKind::TsExprWithTypeArgs(&extend);
+            self.push_children(kind, children);
+        }
+
         if let Some(type_params) = &decl.type_params {
             for param in &type_params.params {
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsTypeParam(&param),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeParam(&param);
+                self.push_children(kind, children);
             }
         }
 
-        decl.body.body.iter().for_each(|member| {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::TsTypeElement(member),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
-        });
+        let kind = NodeKind::TsInterfaceBody(&decl.body);
+        self.push_children(kind, children);
     }
 
-    fn get_ts_type_alias_declaration(&self, decl: &'n TsTypeAliasDecl, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
-        let child_index = borrow.nodes.len();
-        let child_node = SchemyNode {
-            index: child_index,
-            parent_index: Some(self.index.clone()),
-            kind: NodeKind::TsType(&decl.type_ann),
-            context: self.context.clone(),
-        };
-        borrow.nodes.push(Rc::new(child_node));
-        children.push(child_index);
+    fn get_ts_type_alias_declaration(
+        self: &Rc<Self>,
+        decl: &'m TsTypeAliasDecl,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
+        let kind = NodeKind::TsType(&decl.type_ann);
+        self.push_children(kind, children);
     }
 
-    fn get_module_decl_children(&self, decl: &'n ModuleDecl, children: &mut Vec<usize>) {
+    fn get_module_decl_children(self: &Rc<Self>, decl: &'m ModuleDecl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match decl {
             ModuleDecl::Import(raw) => self.get_import_decl_children(raw, children),
             ModuleDecl::ExportDecl(raw) => self.get_export_declartion_children(raw, children),
@@ -1152,22 +749,22 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_named_export_children(&self, named_export: &'n NamedExport, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
+    fn get_named_export_children(
+        self: &Rc<Self>,
+        named_export: &'m NamedExport,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         for specifier in &named_export.specifiers {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::ExportSpecifier(specifier),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::ExportSpecifier(specifier);
+            self.push_children(kind, children);
         }
     }
 
-    fn get_ts_type_element_children(&self, type_element: &'n TsTypeElement, children: &mut Vec<usize>) {
+    fn get_ts_type_element_children(
+        self: &Rc<Self>,
+        type_element: &'m TsTypeElement,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         match type_element {
             TsTypeElement::TsCallSignatureDecl(raw) => self.get_ts_call_signature_decl_children(raw, children),
             TsTypeElement::TsConstructSignatureDecl(raw) => {
@@ -1181,19 +778,15 @@ impl<'n> SchemyNode<'n> {
         }
     }
 
-    fn get_ts_call_signature_decl_children(&self, thing: &'n TsCallSignatureDecl, children: &mut Vec<usize>) {
+    fn get_ts_call_signature_decl_children(
+        self: &Rc<Self>,
+        thing: &'m TsCallSignatureDecl,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         {
-            let mut borrow = self.context.borrow_mut();
-            let child_index = borrow.nodes.len();
             for param in &thing.params {
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsFnParam(param),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsFnParam(param);
+                self.push_children(kind, children);
             }
         }
 
@@ -1201,19 +794,15 @@ impl<'n> SchemyNode<'n> {
             self.get_type_annotation_children(type_ann, children);
         }
     }
-    fn get_ts_construct_signature_decl_children(&self, thing: &'n TsConstructSignatureDecl, children: &mut Vec<usize>) {
+    fn get_ts_construct_signature_decl_children(
+        self: &Rc<Self>,
+        thing: &'m TsConstructSignatureDecl,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         {
-            let mut borrow = self.context.borrow_mut();
-            let child_index = borrow.nodes.len();
             for param in &thing.params {
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsFnParam(param),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsFnParam(param);
+                self.push_children(kind, children);
             }
         }
 
@@ -1221,19 +810,15 @@ impl<'n> SchemyNode<'n> {
             self.get_type_annotation_children(type_ann, children);
         }
     }
-    fn get_ts_index_signature_children(&self, thing: &'n TsIndexSignature, children: &mut Vec<usize>) {
+    fn get_ts_index_signature_children(
+        self: &Rc<Self>,
+        thing: &'m TsIndexSignature,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         {
-            let mut borrow = self.context.borrow_mut();
-            let child_index = borrow.nodes.len();
             for param in &thing.params {
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsFnParam(param),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsFnParam(param);
+                self.push_children(kind, children);
             }
         }
 
@@ -1241,19 +826,15 @@ impl<'n> SchemyNode<'n> {
             self.get_type_annotation_children(type_ann, children);
         }
     }
-    fn get_ts_method_signature_children(&self, thing: &'n TsMethodSignature, children: &mut Vec<usize>) {
+    fn get_ts_method_signature_children(
+        self: &Rc<Self>,
+        thing: &'m TsMethodSignature,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         {
-            let mut borrow = self.context.borrow_mut();
-            let child_index = borrow.nodes.len();
             for param in &thing.params {
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsFnParam(param),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsFnParam(param);
+                self.push_children(kind, children);
             }
         }
 
@@ -1261,1345 +842,515 @@ impl<'n> SchemyNode<'n> {
             self.get_type_annotation_children(type_ann, children);
         }
     }
-    fn get_ts_property_signature_children(&self, signature: &'n TsPropertySignature, children: &mut Vec<usize>) {
+    fn get_ts_property_signature_children(
+        self: &Rc<Self>,
+        signature: &'m TsPropertySignature,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         {
-            let mut borrow = self.context.borrow_mut();
-            let child_index = borrow.nodes.len();
-
             for param in &signature.params {
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsFnParam(param),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsFnParam(param);
+                self.push_children(kind, children);
             }
         }
 
         if let Some(type_ann) = &signature.type_ann {
-            self.get_type_annotation_children(type_ann, children);
+            let kind = NodeKind::TsTypeAnnotation(type_ann);
+            self.push_children(kind, children);
         }
     }
-    fn get_ts_getter_signature_children(&self, thing: &'n TsGetterSignature, children: &mut Vec<usize>) {
+    fn get_ts_getter_signature_children(
+        self: &Rc<Self>,
+        thing: &'m TsGetterSignature,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         if let Some(type_ann) = &thing.type_ann {
             self.get_type_annotation_children(type_ann, children);
         }
     }
 
-    fn get_type_lit_children(&self, type_lit: &'n TsTypeLit, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
+    fn get_type_lit_children(self: &Rc<Self>, type_lit: &'m TsTypeLit, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         for member in &type_lit.members {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::TsTypeElement(member),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::TsTypeElement(member);
+            self.push_children(kind, children);
         }
     }
 
-    fn get_call_expr_children(&self, expr: &'n CallExpr, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
-        let child_index = borrow.nodes.len();
-        let child_node = SchemyNode {
-            index: child_index,
-            parent_index: Some(self.index.clone()),
-            kind: NodeKind::Callee(&expr.callee),
-            context: self.context.clone(),
-        };
-        borrow.nodes.push(Rc::new(child_node));
-        children.push(child_index);
+    fn get_call_expr_children(self: &Rc<Self>, expr: &'m CallExpr, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        let kind = NodeKind::Callee(&expr.callee);
+        self.push_children(kind, children);
 
         expr.args.iter().for_each(|arg| {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::ExprOrSpread(arg),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::ExprOrSpread(arg);
+            self.push_children(kind, children);
         });
     }
 
-    fn get_expr_children(&self, expr: &'n Expr, children: &mut Vec<usize>) {
+    fn get_expr_children(self: &Rc<Self>, expr: &'m Expr, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match expr {
             Expr::This(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::ThisExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ThisExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Array(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::ArrayLit(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ArrayLit(raw);
+                self.push_children(kind, children);
             }
             Expr::Object(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::ObjectLit(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ObjectLit(raw);
+                self.push_children(kind, children);
             }
             Expr::Fn(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::FnExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::FnExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Unary(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::UnaryExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::UnaryExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Update(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::UpdateExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::UpdateExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Bin(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::BinExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::BinExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Assign(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::AssignExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::AssignExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Member(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::MemberExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::MemberExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::SuperProp(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::SuperPropExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::SuperPropExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Cond(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::CondExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::CondExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Call(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::CallExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::CallExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::New(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::NewExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::NewExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Seq(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::SeqExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::SeqExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Ident(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::Ident(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Ident(raw);
+                self.push_children(kind, children);
             }
             Expr::Lit(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::Lit(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Lit(raw);
+                self.push_children(kind, children);
             }
             Expr::Tpl(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::TemplateLiteral(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TemplateLiteral(raw);
+                self.push_children(kind, children);
             }
             Expr::TaggedTpl(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::TaggedTpl(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TaggedTpl(raw);
+                self.push_children(kind, children);
             }
             Expr::Arrow(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::ArrowExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ArrowExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Class(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::ClassExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ClassExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Yield(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::YieldExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::YieldExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::MetaProp(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::MetaPropExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::MetaPropExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Await(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::AwaitExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::AwaitExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Paren(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::ParenExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ParenExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::TsTypeAssertion(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::TsTypeAssertionExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeAssertionExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::TsConstAssertion(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::TsConstAssertionExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsConstAssertionExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::TsNonNull(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::TsNonNullExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsNonNullExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::TsAs(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::TsAsExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsAsExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::TsInstantiation(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::TsInstantiationExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsInstantiationExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::TsSatisfies(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::TsSatisfiesExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsSatisfiesExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::PrivateName(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::PrivateNameExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::PrivateNameExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::OptChain(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::OptChainExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::OptChainExpr(raw);
+                self.push_children(kind, children);
             }
             Expr::Invalid(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: (Some(self.index.clone())),
-                    kind: NodeKind::InvalidExpr(raw),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::InvalidExpr(raw);
+                self.push_children(kind, children);
             }
             _ => {}
         }
     }
 
-    fn get_arrow_expr_children(&self, expr: &'n ArrowExpr, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
-        let child_index = borrow.nodes.len();
-        let child_node = SchemyNode {
-            index: child_index,
-            parent_index: Some(self.index.clone()),
-            kind: NodeKind::BlockStmtOrExpr(&*expr.body),
-            context: self.context.clone(),
-        };
-        borrow.nodes.push(Rc::new(child_node));
-        children.push(child_index);
+    fn get_arrow_expr_children(self: &Rc<Self>, expr: &'m ArrowExpr, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        let kind = NodeKind::BlockStmtOrExpr(&*expr.body);
+        self.push_children(kind, children);
 
         expr.params.iter().for_each(|param| {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::Pat(param),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::Pat(param);
+            self.push_children(kind, children);
         });
     }
 
-    fn get_module_children(&self, module: &'n Module, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
+    fn get_module_children(self: &Rc<Self>, module: &'m Module, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         for item in &module.body {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                kind: NodeKind::ModuleItem(item),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::ModuleItem(item);
+            self.push_children(kind, children);
         }
     }
 
-    fn get_export_declartion_children(&self, export_decl: &'n ExportDecl, children: &mut Vec<usize>) {
-        match &export_decl.decl {
-            Decl::Class(declaration) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::ClassDecl(declaration),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
-            }
-            Decl::Fn(declaration) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::FnDecl(declaration),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
-            }
-            Decl::Var(declaration) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::VarDecl(declaration),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
-            }
-            Decl::TsInterface(declaration) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsInterfaceDecl(declaration),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
-            }
-            Decl::TsTypeAlias(declaration) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsTypeAliasDecl(declaration),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
-            }
-            Decl::TsEnum(declaration) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsEnumDecl(declaration),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
-            }
-            Decl::TsModule(declaration) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    kind: NodeKind::TsModuleDecl(declaration),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
-            }
-            _ => {}
-        }
+    fn get_export_declartion_children(
+        self: &Rc<Self>,
+        export_decl: &'m ExportDecl,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
+        let kind = NodeKind::Decl(&export_decl.decl);
+        self.push_children(kind, children);
     }
 
-    fn get_export_default_expr_children(&self, expression: &'n ExportDefaultExpr, children: &mut Vec<usize>) {
+    fn get_export_default_expr_children(
+        self: &Rc<Self>,
+        expression: &'m ExportDefaultExpr,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         self.get_expr_children(&expression.expr, children)
     }
 
-    fn get_export_default_decl_children(&self, export_declaration: &'n ExportDefaultDecl, children: &mut Vec<usize>) {
+    fn get_export_default_decl_children(
+        self: &Rc<Self>,
+        export_declaration: &'m ExportDefaultDecl,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         match &export_declaration.decl {
             DefaultDecl::Class(declaration) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::ClassExpr(&declaration),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ClassExpr(&declaration);
+
+                self.push_children(kind, children);
             }
             DefaultDecl::TsInterfaceDecl(declaration) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsInterfaceDecl(&declaration),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsInterfaceDecl(&declaration);
+                self.push_children(kind, children);
             }
             _ => {}
         }
     }
 
-    fn get_import_decl_children(&self, import_declaration: &'n ImportDecl, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
+    fn get_import_decl_children(
+        self: &Rc<Self>,
+        import_declaration: &'m ImportDecl,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         for specifier in &import_declaration.specifiers {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                kind: NodeKind::ImportSpecifier(&specifier),
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::ImportSpecifier(&specifier);
+            self.push_children(kind, children);
         }
     }
 
-    fn get_module_item_children(&self, module_item: &'n ModuleItem, children: &mut Vec<usize>) {
+    fn get_module_item_children(self: &Rc<Self>, module_item: &'m ModuleItem, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match module_item {
             ModuleItem::ModuleDecl(declaration) => match declaration {
                 ModuleDecl::Import(declaration) => {
-                    let mut borrow = self.context.borrow_mut();
-                    let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
-                        kind: NodeKind::ImportDecl(&declaration),
-                        index: child_index,
-                        parent_index: Some(self.index.clone()),
-                        context: self.context.clone(),
-                    };
-                    borrow.nodes.push(Rc::new(child_node));
-                    children.push(child_index);
+                    let kind = NodeKind::ImportDecl(&declaration);
+                    self.push_children(kind, children);
                 }
                 ModuleDecl::ExportDecl(declaration) => {
-                    let mut borrow = self.context.borrow_mut();
-                    let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
-                        kind: NodeKind::ExportDecl(&declaration),
-                        index: child_index,
-                        parent_index: Some(self.index.clone()),
-                        context: self.context.clone(),
-                    };
-                    borrow.nodes.push(Rc::new(child_node));
-                    children.push(child_index);
+                    let kind = NodeKind::ExportDecl(&declaration);
+                    self.push_children(kind, children);
                 }
                 ModuleDecl::ExportNamed(declaration) => {
-                    let mut borrow = self.context.borrow_mut();
-                    let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
-                        kind: NodeKind::NamedExport(&declaration),
-                        index: child_index,
-                        parent_index: Some(self.index.clone()),
-                        context: self.context.clone(),
-                    };
-                    borrow.nodes.push(Rc::new(child_node));
-                    children.push(child_index);
+                    let kind = NodeKind::NamedExport(&declaration);
+                    self.push_children(kind, children);
                 }
                 ModuleDecl::ExportDefaultDecl(declaration) => {
-                    let mut borrow = self.context.borrow_mut();
-                    let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
-                        kind: NodeKind::ExportDefaultDecl(&declaration),
-                        index: child_index,
-                        parent_index: Some(self.index.clone()),
-                        context: self.context.clone(),
-                    };
-                    borrow.nodes.push(Rc::new(child_node));
-                    children.push(child_index);
+                    let kind = NodeKind::ExportDefaultDecl(&declaration);
+                    self.push_children(kind, children);
                 }
                 ModuleDecl::ExportDefaultExpr(declaration) => {
-                    let mut borrow = self.context.borrow_mut();
-                    let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
-                        kind: NodeKind::ExportDefaultExpr(&declaration),
-                        index: child_index,
-                        parent_index: Some(self.index.clone()),
-                        context: self.context.clone(),
-                    };
-                    borrow.nodes.push(Rc::new(child_node));
-                    children.push(child_index);
+                    let kind = NodeKind::ExportDefaultExpr(&declaration);
+                    self.push_children(kind, children);
                 }
                 ModuleDecl::ExportAll(declaration) => {
-                    let mut borrow = self.context.borrow_mut();
-                    let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
-                        kind: NodeKind::ExportAll(&declaration),
-                        index: child_index,
-                        parent_index: Some(self.index.clone()),
-                        context: self.context.clone(),
-                    };
-                    borrow.nodes.push(Rc::new(child_node));
-                    children.push(child_index);
+                    let kind = NodeKind::ExportAll(&declaration);
+                    self.push_children(kind, children);
                 }
                 ModuleDecl::TsImportEquals(declaration) => {
-                    let mut borrow = self.context.borrow_mut();
-                    let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
-                        kind: NodeKind::TsImportEquals(&declaration),
-                        index: child_index,
-                        parent_index: Some(self.index.clone()),
-                        context: self.context.clone(),
-                    };
-                    borrow.nodes.push(Rc::new(child_node));
-                    children.push(child_index);
+                    let kind = NodeKind::TsImportEquals(&declaration);
+                    self.push_children(kind, children);
                 }
                 ModuleDecl::TsExportAssignment(declaration) => {
-                    let mut borrow = self.context.borrow_mut();
-                    let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
-                        kind: NodeKind::TsExportAssignment(&declaration),
-                        index: child_index,
-                        parent_index: Some(self.index.clone()),
-                        context: self.context.clone(),
-                    };
-                    borrow.nodes.push(Rc::new(child_node));
-                    children.push(child_index);
+                    let kind = NodeKind::TsExportAssignment(&declaration);
+                    self.push_children(kind, children);
                 }
                 ModuleDecl::TsNamespaceExport(declaration) => {
-                    let mut borrow = self.context.borrow_mut();
-                    let child_index = borrow.nodes.len();
-                    let child_node = SchemyNode {
-                        kind: NodeKind::TsNamespaceExport(&declaration),
-                        index: child_index,
-                        parent_index: Some(self.index.clone()),
-                        context: self.context.clone(),
-                    };
-                    borrow.nodes.push(Rc::new(child_node));
-                    children.push(child_index);
-                },
+                    let kind = NodeKind::TsNamespaceExport(&declaration);
+                    self.push_children(kind, children);
+                }
             },
             ModuleItem::Stmt(statement) => self.get_statement_children(statement, children),
         }
     }
 
-    fn get_pat_children(&self, pat: &'n Pat, children: &mut Vec<usize>) {
+    fn get_pat_children(self: &Rc<Self>, pat: &'m Pat, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match pat {
             Pat::Ident(ident) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsTypeAnnotation(ident.type_ann.as_ref().unwrap()),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeAnnotation(ident.type_ann.as_ref().unwrap());
+                self.push_children(kind, children);
             }
             Pat::Array(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::ArrayPat(raw),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ArrayPat(raw);
+                self.push_children(kind, children);
             }
             Pat::Rest(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::RestPat(raw),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::RestPat(raw);
+                self.push_children(kind, children);
             }
             Pat::Object(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::ObjectPat(raw),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ObjectPat(raw);
+                self.push_children(kind, children);
             }
             Pat::Assign(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::AssignPat(raw),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::AssignPat(raw);
+                self.push_children(kind, children);
             }
             Pat::Expr(raw) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::Expr(raw),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Expr(raw);
+                self.push_children(kind, children);
             }
             _ => {}
         }
     }
 
-    fn get_statement_children(&self, statement: &'n Stmt, children: &mut Vec<usize>) {
+    fn get_statement_children(self: &Rc<Self>, statement: &'m Stmt, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         match statement {
             Stmt::Block(block_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::BlockStmt(block_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::BlockStmt(block_stmt);
+                self.push_children(kind, children);
             }
             Stmt::Empty(empty_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::EmptyStmt(empty_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::EmptyStmt(empty_stmt);
+                self.push_children(kind, children);
             }
             Stmt::Debugger(debugger_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::DebuggerStmt(debugger_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::DebuggerStmt(debugger_stmt);
+                self.push_children(kind, children);
             }
             Stmt::With(with_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::WithStmt(with_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::WithStmt(with_stmt);
+                self.push_children(kind, children);
             }
             Stmt::Return(return_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::ReturnStmt(return_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ReturnStmt(return_stmt);
+                self.push_children(kind, children);
             }
             Stmt::Labeled(labeled_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::LabeledStmt(labeled_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::LabeledStmt(labeled_stmt);
+                self.push_children(kind, children);
             }
             Stmt::Break(break_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::BreakStmt(break_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::BreakStmt(break_stmt);
+                self.push_children(kind, children);
             }
             Stmt::Continue(continue_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::ContinueStmt(continue_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ContinueStmt(continue_stmt);
+                self.push_children(kind, children);
             }
             Stmt::If(if_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::IfStmt(if_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::IfStmt(if_stmt);
+                self.push_children(kind, children);
             }
             Stmt::Switch(switch_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::SwitchStmt(switch_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::SwitchStmt(switch_stmt);
+                self.push_children(kind, children);
             }
             Stmt::Throw(throw_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::ThrowStmt(throw_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ThrowStmt(throw_stmt);
+                self.push_children(kind, children);
             }
             Stmt::Try(try_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TryStmt(try_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TryStmt(try_stmt);
+                self.push_children(kind, children);
             }
             Stmt::While(while_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::WhileStmt(while_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::WhileStmt(while_stmt);
+                self.push_children(kind, children);
             }
             Stmt::DoWhile(do_while_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::DoWhileStmt(do_while_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::DoWhileStmt(do_while_stmt);
+                self.push_children(kind, children);
             }
             Stmt::For(for_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::ForStmt(for_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ForStmt(for_stmt);
+                self.push_children(kind, children);
             }
             Stmt::ForIn(for_in_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::ForInStmt(for_in_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ForInStmt(for_in_stmt);
+                self.push_children(kind, children);
             }
             Stmt::ForOf(for_of_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::ForOfStmt(for_of_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ForOfStmt(for_of_stmt);
+                self.push_children(kind, children);
             }
             Stmt::Decl(decl_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::Decl(decl_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::Decl(decl_stmt);
+                self.push_children(kind, children);
             }
             Stmt::Expr(expr_stmt) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::ExprStmt(expr_stmt),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::ExprStmt(expr_stmt);
+                self.push_children(kind, children);
             }
         }
     }
 
-    fn get_block_statement_children(&self, block_stmnt: &'n BlockStmt, children: &mut Vec<usize>) {
+    fn get_block_statement_children(
+        self: &Rc<Self>,
+        block_stmnt: &'m BlockStmt,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         block_stmnt
             .stmts
             .iter()
             .for_each(|statement| self.get_statement_children(statement, children))
     }
 
-    fn get_type_annotation_children(&self, type_annotation: &'n TsTypeAnn, children: &mut Vec<usize>) {
+    fn get_type_annotation_children(
+        self: &Rc<Self>,
+        type_annotation: &'m TsTypeAnn,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         match &*type_annotation.type_ann {
             TsType::TsKeywordType(ts_keyword_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsKeywordType(&ts_keyword_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsKeywordType(&ts_keyword_type);
+                self.push_children(kind, children);
             }
             TsType::TsThisType(ts_this_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsThisType(&ts_this_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsThisType(&ts_this_type);
+                self.push_children(kind, children);
             }
             TsType::TsFnOrConstructorType(ts_fn_or_constructor_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsFnOrConstructorType(&ts_fn_or_constructor_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsFnOrConstructorType(&ts_fn_or_constructor_type);
+                self.push_children(kind, children);
             }
             TsType::TsTypeRef(ts_type_ref) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsTypeRef(&ts_type_ref),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeRef(&ts_type_ref);
+                self.push_children(kind, children);
             }
             TsType::TsTypeQuery(ts_type_query) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsTypeQuery(&ts_type_query),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeQuery(&ts_type_query);
+                self.push_children(kind, children);
             }
             TsType::TsTypeLit(ts_type_lit) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsTypeLit(&ts_type_lit),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeLit(&ts_type_lit);
+                self.push_children(kind, children);
             }
             TsType::TsArrayType(ts_array_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsArrayType(&ts_array_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsArrayType(&ts_array_type);
+                self.push_children(kind, children);
             }
             TsType::TsTupleType(ts_tuple_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsTupleType(&ts_tuple_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTupleType(&ts_tuple_type);
+                self.push_children(kind, children);
             }
             TsType::TsOptionalType(ts_optional_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsOptionalType(&ts_optional_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsOptionalType(&ts_optional_type);
+                self.push_children(kind, children);
             }
             TsType::TsRestType(ts_rest_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsRestType(&ts_rest_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsRestType(&ts_rest_type);
+                self.push_children(kind, children);
             }
             TsType::TsUnionOrIntersectionType(ts_union_or_intersection_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsUnionOrIntersectionType(&ts_union_or_intersection_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsUnionOrIntersectionType(&ts_union_or_intersection_type);
+                self.push_children(kind, children);
             }
             TsType::TsConditionalType(ts_conditional_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsConditionalType(&ts_conditional_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsConditionalType(&ts_conditional_type);
+                self.push_children(kind, children);
             }
             TsType::TsInferType(ts_infer_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsInferType(&ts_infer_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsInferType(&ts_infer_type);
+                self.push_children(kind, children);
             }
             TsType::TsParenthesizedType(ts_parenthesized_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsParenthesizedType(&ts_parenthesized_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsParenthesizedType(&ts_parenthesized_type);
+                self.push_children(kind, children);
             }
             TsType::TsTypeOperator(ts_type_operator) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsTypeOperator(&ts_type_operator),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypeOperator(&ts_type_operator);
+                self.push_children(kind, children);
             }
             TsType::TsIndexedAccessType(ts_indexed_access_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsIndexedAccessType(&ts_indexed_access_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsIndexedAccessType(&ts_indexed_access_type);
+                self.push_children(kind, children);
             }
             TsType::TsMappedType(ts_mapped_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsMappedType(&ts_mapped_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsMappedType(&ts_mapped_type);
+                self.push_children(kind, children);
             }
             TsType::TsLitType(ts_lit_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsLitType(&ts_lit_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsLitType(&ts_lit_type);
+                self.push_children(kind, children);
             }
             TsType::TsTypePredicate(ts_type_predicate) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsTypePredicate(&ts_type_predicate),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsTypePredicate(&ts_type_predicate);
+                self.push_children(kind, children);
             }
             TsType::TsImportType(ts_import_type) => {
-                let mut borrow = self.context.borrow_mut();
-                let child_index = borrow.nodes.len();
-                let child_node = SchemyNode {
-                    kind: NodeKind::TsImportType(&ts_import_type),
-                    index: child_index,
-                    parent_index: Some(self.index.clone()),
-                    context: self.context.clone(),
-                };
-                borrow.nodes.push(Rc::new(child_node));
-                children.push(child_index);
+                let kind = NodeKind::TsImportType(&ts_import_type);
+                self.push_children(kind, children);
             }
         }
     }
 
-    fn get_var_decl_children(&self, variable_declaration: &'n VarDecl, children: &mut Vec<usize>) {
-        let mut borrow = self.context.borrow_mut();
+    fn get_var_decl_children(
+        self: &Rc<Self>,
+        variable_declaration: &'m VarDecl,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
         variable_declaration.decls.iter().for_each(|decl| {
-            let child_index = borrow.nodes.len();
-            let child_node = SchemyNode {
-                kind: NodeKind::VarDeclarator(decl),
-                index: child_index,
-                parent_index: Some(self.index.clone()),
-                context: self.context.clone(),
-            };
-            borrow.nodes.push(Rc::new(child_node));
-            children.push(child_index);
+            let kind = NodeKind::VarDeclarator(decl);
+            self.push_children(kind, children);
         })
     }
 }

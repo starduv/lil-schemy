@@ -1,17 +1,17 @@
-use std::{cell::RefCell, collections::VecDeque, fmt, rc::Rc};
+use std::{cell::RefCell, collections::{VecDeque, BTreeMap}, fmt, rc::Rc};
 
-use ahash::{HashMap, HashMapExt};
+use crate::typescript::SchemyNode;
 
 #[derive(Debug, Default)]
 struct Scope {
-    symbols: HashMap<String, Declaration>,
+    symbols: BTreeMap<String, Declaration>,
     children: Option<Vec<Rc<RefCell<Scope>>>>,
     parent: Option<Rc<RefCell<Scope>>>,
 }
 
 #[derive(Debug, Default)]
 pub struct DeclarationTables {
-    tables: HashMap<String, DeclarationTable>,
+    tables: BTreeMap<String, DeclarationTable>,
 }
 impl<'n> DeclarationTables {
     pub fn has_table(&self, file_name: &str) -> bool {
@@ -78,7 +78,7 @@ pub struct DeclarationTable {
 impl DeclarationTable {
     pub(crate) fn new() -> DeclarationTable {
         let root_scope = Rc::new(RefCell::new(Scope {
-            symbols: HashMap::new(),
+            symbols: BTreeMap::new(),
             children: None,
             parent: None,
         }));
@@ -133,7 +133,7 @@ impl DeclarationTable {
 
     fn add_child_scope(&mut self) -> &mut DeclarationTable {
         let child_scope = Rc::new(RefCell::new(Scope {
-            symbols: HashMap::new(),
+            symbols: BTreeMap::new(),
             children: None,
             parent: Some(Rc::clone(&self.current_scope)),
         }));
@@ -254,7 +254,7 @@ impl DeclarationTable {
 
 pub enum Declaration {
     Alias { to: String },
-    Type { node: usize },
+    Type { node: Rc<SchemyNode<'static>> },
     Export { name: String, source_file_name: String },
     Import { name: String, source_file_name: String },
 }

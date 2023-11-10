@@ -1,6 +1,8 @@
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
-use super::schema::ApiPathOperation;
+use crate::{open_api::schema::ApiPathOperation, typescript::SchemyNode};
+
+use super::Store;
 
 #[derive(Debug, Default)]
 pub struct DeferredSchemas {
@@ -10,19 +12,26 @@ pub struct DeferredSchemas {
     operation_types: BTreeMap<String, BTreeMap<String, OperationType>>,
 }
 
-impl DeferredSchemas {
+impl Store {
     pub(crate) fn next_module(&mut self) -> Option<String> {
-        self.modules.pop()
+        self.deferred_schemas.modules.pop()
     }
 
-    pub(crate) fn defer_local_type(&mut self, file_path: &str, schema_name: &str, type_name: &str, node_index: usize) -> () {
-        self.local_types
+    pub(crate) fn defer_local_type(
+        &mut self,
+        file_path: &str,
+        schema_name: &str,
+        type_name: &str,
+        node: Rc<SchemyNode<'static>>,
+    ) -> () {
+        self.deferred_schemas
+            .local_types
             .entry(file_path.to_string())
             .or_insert(Vec::new())
             .push(LocalType {
                 schema_name: schema_name.into(),
                 type_name: type_name.into(),
-                index: node_index,
+                node,
             });
     }
 
@@ -31,18 +40,17 @@ impl DeferredSchemas {
         let source_file_name = source_file_name.to_string();
         let type_name = type_name.to_string();
 
-        if !self.modules.contains(&source_file_name) {
-            self.modules.push(source_file_name.clone());
+        if !self.deferred_schemas.modules.contains(&source_file_name) {
+            self.deferred_schemas.modules.push(source_file_name.clone());
         }
 
-        let types = self.external_types.entry(source_file_name).or_insert(BTreeMap::new());
+        let types = self
+            .deferred_schemas
+            .external_types
+            .entry(source_file_name)
+            .or_insert(BTreeMap::new());
 
-        types.insert(
-            type_name,
-            ExternalType {
-                schema_name,
-            },
-        );
+        types.insert(type_name, ExternalType { schema_name });
     }
 
     pub(crate) fn defer_operation_type(
@@ -51,11 +59,12 @@ impl DeferredSchemas {
         operation: &Rc<RefCell<ApiPathOperation>>,
         type_name: &str,
     ) -> () {
-        if !self.modules.contains(&source_file_name.to_string()) {
-            self.modules.push(source_file_name.to_string());
+        if !self.deferred_schemas.modules.contains(&source_file_name.to_string()) {
+            self.deferred_schemas.modules.push(source_file_name.to_string());
         }
 
         let types = self
+            .deferred_schemas
             .operation_types
             .entry(source_file_name.to_string())
             .or_insert(BTreeMap::new());
@@ -70,7 +79,7 @@ impl DeferredSchemas {
     }
 
     pub(crate) fn recognize_external_type(&mut self, name: &str, source_file_name: &str) -> Option<ExternalType> {
-        match self.external_types.get_mut(source_file_name) {
+        match self.deferred_schemas.external_types.get_mut(source_file_name) {
             Some(types) => match types.get_mut(name) {
                 Some(deferred_type) => {
                     let clone = deferred_type.clone();
@@ -83,14 +92,14 @@ impl DeferredSchemas {
     }
 
     pub fn recognize_operation_type(&mut self, type_name: &str, source_file_name: &str) -> Option<OperationType> {
-        match self.operation_types.get_mut(source_file_name) {
+        match self.deferred_schemas.operation_types.get_mut(source_file_name) {
             Some(types) => types.remove(type_name),
             None => None,
         }
     }
 
     pub fn recognize_local_types(&mut self, file_path: &str) -> Vec<LocalType> {
-        if let Some(local_types) = self.local_types.get_mut(file_path) {
+        if let Some(local_types) = self.deferred_schemas.local_types.get_mut(file_path) {
             local_types.drain(..).collect()
         } else {
             Vec::new()
@@ -98,14 +107,14 @@ impl DeferredSchemas {
     }
 
     pub fn has_unrecognized_local_types(&self, file_path: &str) -> bool {
-        match self.local_types.get(file_path) {
+        match self.deferred_schemas.local_types.get(file_path) {
             Some(local_types) => local_types.len() > 0,
             None => false,
         }
     }
 
     pub fn debug(&self) -> () {
-        println!("{:?}", self.modules);
+        println!("{:?}", self.deferred_schemas.modules);
     }
 }
 
@@ -124,5 +133,5 @@ pub struct OperationType {
 pub struct LocalType {
     pub schema_name: String,
     pub type_name: String,
-    pub index: usize,
+    pub node: Rc<SchemyNode<'static>>,
 }

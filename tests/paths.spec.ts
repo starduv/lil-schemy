@@ -26,6 +26,21 @@ describe('open api generator', () => {
 
     it('generates schemas', () => {
         expect(schema.components?.schemas).to.deep.equalInAnyOrder({
+            Animal: {
+                $id: "#/components/schemas/Animal",
+                properties: {
+                    shots: {
+                        items: {
+                            type: "string"
+                        },
+                        type: "array"
+                    },
+                    name: {
+                        type: "string"
+                    }
+                },
+                type: "object"
+            },
             Account: {
                 $id: "#/components/schemas/Account",
                 properties: {
@@ -121,6 +136,15 @@ describe('open api generator', () => {
                 $id: "#/components/schemas/UserPatch",
                 type: "object"
             },
+            status: {
+                $id: "#/components/schemas/status",
+                properties: {
+                    status: {
+                        type: "string"
+                    }
+                },
+                type: "object"
+            },
             AdjacentLicense: {
                 $id: "#/components/schemas/AdjacentLicense",
                 $ref: "#/components/schemas/AnimalLicense"
@@ -169,7 +193,7 @@ describe('open api generator', () => {
     it('generates paths', () => {
         expect(schema.paths).to.deep.equal({
             "/animals/{id}/unregister": {
-                post: {
+                put: {
                     requestBody: {
                         content: {
                             "application/json": {
@@ -182,22 +206,11 @@ describe('open api generator', () => {
                     },
                     responses: {
                         200: {
-                            description: "A specific animal",
+                            description: "An unregistered animal",
                             content: {
                                 "application/json": {
                                     schema: {
-                                        properties: {
-                                            shots: {
-                                                items: {
-                                                    type: "string"
-                                                },
-                                                type: "array"
-                                            },
-                                            name: {
-                                                type: "string"
-                                            }
-                                        },
-                                        type: "object"
+                                        $ref: "#/components/schemas/Animal"
                                     }
                                 }
                             }
@@ -238,12 +251,7 @@ describe('open api generator', () => {
                             content: {
                                 "application/xml": {
                                     schema: {
-                                        properties: {
-                                            status: {
-                                                type: "string"
-                                            }
-                                        },
-                                        type: "object"
+                                        "$ref": "#/components/schemas/status"
                                     }
                                 }
                             }
@@ -459,18 +467,7 @@ describe('open api generator', () => {
                             content: {
                                 "application/json": {
                                     schema: {
-                                        properties: {
-                                            shots: {
-                                                items: {
-                                                    type: "string"
-                                                },
-                                                type: "array"
-                                            },
-                                            name: {
-                                                type: "string"
-                                            }
-                                        },
-                                        type: "object"
+                                        $ref: "#/components/schemas/Animal"
                                     }
                                 }
                             }
@@ -480,7 +477,7 @@ describe('open api generator', () => {
                         "Animals"
                     ]
                 },
-                post: {
+                put: {
                     requestBody: {
                         content: {
                             "application/json": {
@@ -493,22 +490,11 @@ describe('open api generator', () => {
                     },
                     responses: {
                         200: {
-                            description: "A specific animal",
+                            description: "An updated animal",
                             content: {
                                 "application/json": {
                                     schema: {
-                                        properties: {
-                                            shots: {
-                                                items: {
-                                                    type: "string"
-                                                },
-                                                type: "array"
-                                            },
-                                            name: {
-                                                type: "string"
-                                            }
-                                        },
-                                        type: "object"
+                                        $ref: "#/components/schemas/Animal"
                                     }
                                 }
                             }

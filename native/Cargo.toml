@@ -10,7 +10,6 @@ rust-version = "1.66.0"
 crate-type=["cdylib", "lib"]
 
 [dependencies]
-lazy_static = "1.4.0"
 url = "2.3.1"
 es_resolve = "0.4.2"
 ahash = "0.8.2"
@@ -22,3 +21,4 @@ swc_atoms = "0.5.8"
 swc_common = { version = "0.31.18", features = ["tty-emitter"] }
 swc_ecma_ast = "0.107.2"
 case = "1.0.0"
+lazy_static = "1.4.0"

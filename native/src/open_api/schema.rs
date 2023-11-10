@@ -328,7 +328,9 @@ impl ApiSchema {
     }
 
     pub fn data_type(&mut self, data_type: &str) -> &mut ApiSchema {
-        self.data_type = Some(data_type.into());
+        if self.reference.is_none(){
+            self.data_type = Some(data_type.into());
+        }
         self
     }
 
