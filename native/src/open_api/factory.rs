@@ -146,7 +146,6 @@ fn add_request_params(
                 store.defer_operation_type(&source_file_name, operation, &name);
             }
             Some(Declaration::Type { node }) => {
-                println!("we're hitting this point");
                 add_request_params(operation, node, file_path, path_options, store);
             }
             _ => {}
@@ -180,13 +179,10 @@ fn add_param_details(
 
     match type_params.get(1) {
         Some(param) => match &param.kind {
-            NodeKind::TsType(required) => match required {
-                TsType::TsLitType(raw) => match raw.lit {
-                    TsLit::Bool(raw_bool) => {
-                        operation_param.required(raw_bool.value);
-                    }
-                    _ => {}
-                },
+            NodeKind::TsLitType(raw) => match raw.lit {
+                TsLit::Bool(raw_bool) => {
+                    operation_param.required(raw_bool.value);
+                }
                 _ => {}
             },
             _ => {}
@@ -198,16 +194,13 @@ fn add_param_details(
 
     match type_params.get(2) {
         Some(param) => match param.kind {
-            NodeKind::TsType(raw_type) => match raw_type {
-                TsType::TsLitType(raw_lit) => match &raw_lit.lit {
-                    TsLit::Str(raw_str) => {
-                        operation_param
-                            .content(None)
-                            .schema()
-                            .format(Some(raw_str.value.to_string()));
-                    }
-                    _ => {}
-                },
+            NodeKind::TsLitType(raw_lit) => match &raw_lit.lit {
+                TsLit::Str(raw_str) => {
+                    operation_param
+                        .content(None)
+                        .schema()
+                        .format(Some(raw_str.value.to_string()));
+                }
                 _ => {}
             },
             _ => {}
@@ -303,11 +296,8 @@ fn add_body_param_details(
 
     let content: Option<&str> = match type_params.get(2) {
         Some(param) => match &param.kind {
-            NodeKind::TsType(media_type) => match media_type {
-                TsType::TsLitType(raw) => match &raw.lit {
-                    TsLit::Str(raw_str) => Some(&raw_str.value),
-                    _ => None,
-                },
+            NodeKind::TsLitType(raw) => match &raw.lit {
+                TsLit::Str(raw_str) => Some(&raw_str.value),
                 _ => None,
             },
             _ => None,
@@ -316,63 +306,56 @@ fn add_body_param_details(
     };
 
     match type_params.get(0) {
-        Some(param) => match param.kind {
-            NodeKind::TsType(raw_type) => match raw_type {
-                TsType::TsTypeLit(raw_lit) => {
-                    let child = root.to_child(NodeKind::TsTypeLit(raw_lit));
-                    define_schema_details(
-                        operation_param.content(content).schema(),
-                        &child,
+        Some(param) => match &param.kind {
+            NodeKind::TsTypeLit(raw_lit) => {
+                let child = root.to_child(NodeKind::TsTypeLit(raw_lit));
+                define_schema_details(
+                    operation_param.content(content).schema(),
+                    &child,
+                    file_path,
+                    false,
+                    &PathOptions::default(),
+                    store,
+                );
+            }
+            NodeKind::TsKeywordType(raw_keyword) => match raw_keyword.kind {
+                TsKeywordTypeKind::TsNumberKeyword => {
+                    operation_param.content(content).schema().data_type("number");
+                }
+                TsKeywordTypeKind::TsBooleanKeyword => {
+                    operation_param.content(content).schema().data_type("boolean");
+                }
+                TsKeywordTypeKind::TsStringKeyword => {
+                    operation_param.content(content).schema().data_type("string");
+                }
+                _ => {}
+            },
+            NodeKind::TsTypeRef(raw_type) => match &raw_type.type_name {
+                TsEntityName::Ident(identifier) => {
+                    let root_schema = operation_param.content(content).schema();
+                    define_schema_from_identifier(
+                        &identifier.sym,
+                        root_schema,
                         file_path,
-                        false,
-                        &PathOptions::default(),
+                        path_options,
+                        true,
+                        &root,
                         store,
                     );
                 }
-                TsType::TsKeywordType(raw_keyword) => match raw_keyword.kind {
-                    TsKeywordTypeKind::TsNumberKeyword => {
-                        operation_param.content(content).schema().data_type("number");
-                    }
-                    TsKeywordTypeKind::TsBooleanKeyword => {
-                        operation_param.content(content).schema().data_type("boolean");
-                    }
-                    TsKeywordTypeKind::TsStringKeyword => {
-                        operation_param.content(content).schema().data_type("string");
-                    }
-                    _ => {}
-                },
-                TsType::TsTypeRef(raw_type) => match &raw_type.type_name {
-                    TsEntityName::Ident(identifier) => {
-                        let identifier = identifier.sym.to_string();
-                        let root_schema = operation_param.content(content).schema();
-                        define_schema_from_identifier(
-                            &identifier,
-                            root_schema,
-                            file_path,
-                            path_options,
-                            &root,
-                            true,
-                            store,
-                        );
-                    }
-                    _ => {}
-                },
                 _ => {}
             },
-            _ => {}
+            other => println!("{:?}", other),
         },
         None => {}
     }
 
     match type_params.get(1) {
         Some(param) => match &param.kind {
-            NodeKind::TsType(required) => match required {
-                TsType::TsLitType(raw) => match raw.lit {
-                    TsLit::Bool(raw_bool) => {
-                        operation_param.required(raw_bool.value);
-                    }
-                    _ => {}
-                },
+            NodeKind::TsLitType(raw) => match raw.lit {
+                TsLit::Bool(raw_bool) => {
+                    operation_param.required(raw_bool.value);
+                }
                 _ => {}
             },
             _ => {}
@@ -536,24 +519,15 @@ fn define_schema_details(
     store: &mut Store,
 ) -> () {
     match root.kind {
-        NodeKind::Ident(raw_ident) => match store.get_root_declaration(file_path, &raw_ident.sym) {
-            Some(Declaration::Type { node }) => {
-                define_schema_details(root_schema, &node, file_path, false, path_options, store);
-            }
-            _ => {
-                let schema_name = store.get_root_declaration_name(file_path, &raw_ident.sym);
-
-                define_schema_from_identifier(
-                    &schema_name,
-                    root_schema,
-                    file_path,
-                    path_options,
-                    root,
-                    is_required,
-                    store,
-                );
-            }
-        },
+        NodeKind::Ident(raw_ident) => define_schema_from_identifier(
+            &raw_ident.sym,
+            root_schema,
+            file_path,
+            path_options,
+            is_required,
+            root,
+            store,
+        ),
         NodeKind::TsUnionOrIntersectionType(_) => {
             for child in root.children() {
                 define_schema_details(root_schema, &child, file_path, is_required, path_options, store);
@@ -622,7 +596,7 @@ fn define_schema_details(
         NodeKind::TsExprWithTypeArgs(raw_expr) => match &*raw_expr.expr {
             Expr::Ident(raw_ident) => {
                 if raw_ident.sym.eq("Omit") || raw_ident.sym.eq("Pick") {
-                    let params = root.params();
+                    let params = root.type_params();
                     let param = params.first().unwrap();
                     define_schema_details(root_schema, &param, file_path, is_required, path_options, store);
                 } else {
@@ -649,8 +623,8 @@ fn define_schema_details(
                     root_schema,
                     file_path,
                     path_options,
-                    root,
                     is_required,
+                    root,
                     store,
                 );
             }
@@ -735,7 +709,7 @@ fn define_schema_details(
         NodeKind::ClassExpr(_) => {
             root_schema.data_type("object");
             if let Some(class_node) = root.class() {
-                for class_member in class_node.body() {
+                for class_member in class_node.members() {
                     match class_member.kind {
                         NodeKind::ClassProp(raw) => {
                             let name = match &raw.key {
@@ -802,7 +776,7 @@ fn define_schema_details(
             root_schema.data_type("object");
 
             if let Some(interface_body) = root.interface_body() {
-                for interface_member in interface_body.body() {
+                for interface_member in interface_body.members() {
                     match interface_member.kind {
                         NodeKind::TsTypeElement(TsTypeElement::TsPropertySignature(raw_prop)) => {
                             let property_schema = match &*raw_prop.key {
@@ -887,8 +861,8 @@ fn define_schema_details(
             }
         }
         NodeKind::TsEnumDecl(_) => {
+            root_schema.data_type("string");
             for member in root.members() {
-                root_schema.data_type("string");
                 define_schema_details(root_schema, &member, file_path, is_required, path_options, store);
             }
         }
@@ -940,44 +914,54 @@ fn define_schema_from_identifier(
     root_schema: &mut ApiSchema,
     file_path: &str,
     path_options: &PathOptions,
-    root: &Rc<SchemyNode<'static>>,
     is_required: bool,
+    root: &Rc<SchemyNode<'static>>,
     store: &mut Store,
 ) -> () {
-    if identifier.eq("LilSub") {
-        let params = root.params();
-        let param = params.last().unwrap();
-        define_schema_details(root_schema, &param.clone(), file_path, true, path_options, store);
-    } else if identifier.eq("LilRequiredProp") {
-        let params = root.params();
-        let param = params.first().unwrap();
-        define_schema_details(root_schema, &param.clone(), file_path, true, path_options, store);
-    } else if identifier.eq("Array") {
-        let items_schema = root_schema.data_type("array").items();
-        if let Some(type_params) = root.type_params() {
-            match type_params.kind {
-                NodeKind::TsTypeParamInstantiation(raw) => {
-                    if let Some(type_param) = raw.params.get(0) {
-                        let type_param = type_params.to_child(NodeKind::TsType(type_param));
-                        define_schema_details(items_schema, &type_param, file_path, is_required, path_options, store);
-                    }
-                }
-                _ => {}
+    let identifier = store.get_root_declaration_name(file_path, identifier);
+    match store.get_root_declaration(file_path, &identifier) {
+        Some(Declaration::Import { name, source_file_name }) => {
+            if identifier.eq("LilRequiredProp") {
+                let params = root.params();
+                let param = params.first().unwrap();
+                define_schema_details(root_schema, &param.clone(), file_path, true, path_options, store);
+            } else if identifier.eq("LilSub") {
+                let params = root.params();
+                let param = params.last().unwrap();
+                define_schema_details(root_schema, &param.clone(), file_path, true, path_options, store);
+            } else {
+                root_schema.reference(Some(identifier.to_string()), false);
+                store.defer_external_type(&source_file_name, &identifier, &name);
             }
         }
-    } else if identifier.eq("Uint8Array") | identifier.eq("Buffer") {
-        root_schema.data_type("string").format(Some("binary".into()));
-    } else if identifier.eq("URL") {
-        root_schema.data_type("string").format(Some("uri".into()));
-    } else {
-        match store.get_root_declaration(file_path, identifier) {
-            Some(Declaration::Import { name, source_file_name }) => {
-                root_schema.reference(Some(identifier.to_string()), false);
-                store.defer_external_type(&source_file_name, identifier, &name);
+        Some(Declaration::Type { node: root }) => {
+            if identifier.eq("LilSub") {
+                let params = root.params();
+                let param = params.last().unwrap();
+                define_schema_details(root_schema, &param.clone(), file_path, true, path_options, store);
+            } else if identifier.eq("LilRequiredProp") {
+                let params = root.params();
+                let param = params.first().unwrap();
+                define_schema_details(root_schema, &param.clone(), file_path, true, path_options, store);
+            } else {
+                store.defer_local_type(file_path, &identifier, &identifier, root.clone());
+                root_schema.reference(Some(identifier), false);
             }
-            _ => {
-                root_schema.reference(Some(identifier.to_string()), false);
-                store.defer_local_type(file_path, identifier, identifier, root.clone());
+        }
+        _ => {
+            if identifier.eq("Array") {
+                let items_schema = root_schema.data_type("array").items();
+                let type_params = root.type_params();
+                if let Some(type_param) = type_params.first() {
+                    define_schema_details(items_schema, &type_param, file_path, is_required, path_options, store);
+                }
+            } else if identifier.eq("Uint8Array") | identifier.eq("Buffer") {
+                root_schema.data_type("string").format(Some("binary".into()));
+            } else if identifier.eq("URL") {
+                root_schema.data_type("string").format(Some("uri".into()));
+            } else {
+                store.defer_local_type(file_path, &identifier, &identifier, root.clone());
+                root_schema.reference(Some(identifier), false);
             }
         }
     }

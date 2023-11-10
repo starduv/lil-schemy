@@ -8,8 +8,9 @@ impl<'m> SchemyNode<'m> {
     pub fn children(self: &Rc<Self>) -> Vec<Rc<SchemyNode<'m>>> {
         let mut children = Vec::new();
         match self.kind {
-            NodeKind::AwaitExpr(raw_await) => self.get_await_expr_children(raw_await, &mut children),
-            NodeKind::ArrowExpr(arrow) => self.get_arrow_expr_children(arrow, &mut children),
+            NodeKind::AwaitExpr(raw) => self.get_await_expr_children(raw, &mut children),
+            NodeKind::ArrowExpr(raw) => self.get_arrow_expr_children(raw, &mut children),
+            NodeKind::BindingIdent(raw) => self.get_binding_ident_children(raw, &mut children),
             NodeKind::BlockStmt(raw) => self.get_block_statement_children(raw, &mut children),
             NodeKind::BlockStmtOrExpr(temp) => match temp {
                 BlockStmtOrExpr::BlockStmt(raw) => self.get_block_statement_children(raw, &mut children),
@@ -21,6 +22,7 @@ impl<'m> SchemyNode<'m> {
             NodeKind::ClassDecl(raw) => self.get_class_decl_children(raw, &mut children),
             NodeKind::ClassExpr(raw) => self.get_class_expr_children(raw, &mut children),
             NodeKind::ClassMember(raw) => self.get_class_member_children(raw, &mut children),
+            NodeKind::ClassProp(raw) => self.get_class_prop_children(raw, &mut children),
             NodeKind::Constructor(raw) => self.get_constructor_children(raw, &mut children),
             NodeKind::Decl(raw) => self.get_decl_children(raw, &mut children),
             NodeKind::ExportDecl(raw) => self.get_export_declartion_children(raw, &mut children),
@@ -47,6 +49,8 @@ impl<'m> SchemyNode<'m> {
             NodeKind::TsArrayType(raw) => self.get_ts_array_type_children(raw, &mut children),
             NodeKind::TsAsExpr(raw) => self.get_ts_as_expr_children(raw, &mut children),
             NodeKind::TsEntityName(raw) => self.get_ts_entity_name_children(raw, &mut children),
+            NodeKind::TsEnumDecl(raw) => self.get_ts_enum_decl_children(raw, &mut children),
+            NodeKind::TsExprWithTypeArgs(raw) => self.get_ts_expr_with_type_args_children(raw, &mut children),
             NodeKind::TsInterfaceBody(raw) => self.get_ts_interface_body_children(raw, &mut children),
             NodeKind::TsInterfaceDecl(raw) => self.get_ts_interface_decl_children(raw, &mut children),
             NodeKind::TsIntersectionType(raw) => self.get_ts_intersection_type_children(raw, &mut children),
@@ -82,6 +86,34 @@ impl<'m> SchemyNode<'m> {
         });
 
         children.push(node);
+    }
+
+    fn get_ts_expr_with_type_args_children(
+        self: &Rc<Self>,
+        raw: &'m TsExprWithTypeArgs,
+        children: &mut Vec<Rc<SchemyNode<'m>>>,
+    ) {
+        let kind = NodeKind::Expr(&raw.expr);
+        self.push_children(kind, children);
+
+        if let Some(type_args) = &raw.type_args {
+            let kind = NodeKind::TsTypeParamInstantiation(type_args);
+            self.push_children(kind, children);
+        }
+    }
+
+    fn get_binding_ident_children(self: &Rc<Self>, raw: &'m BindingIdent, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        if let Some(ref raw_ann) = raw.type_ann {
+            let kind = NodeKind::TsTypeAnnotation(raw_ann);
+            self.push_children(kind, children);
+        }
+    }
+
+    fn get_class_prop_children(self: &Rc<Self>, raw: &'m ClassProp, children: &mut Vec<Rc<SchemyNode<'m>>>) {
+        if let Some(ref raw_ann) = raw.type_ann {
+            let kind = NodeKind::TsTypeAnnotation(raw_ann);
+            self.push_children(kind, children);
+        }
     }
 
     fn get_ts_param_prop_children(self: &Rc<Self>, raw: &'m TsParamProp, children: &mut Vec<Rc<SchemyNode<'m>>>) {
@@ -454,7 +486,15 @@ impl<'m> SchemyNode<'m> {
     }
 
     fn get_new_expr_children(self: &Rc<Self>, expr: &'m NewExpr, children: &mut Vec<Rc<SchemyNode<'m>>>) {
-        self.get_expr_children(&expr.callee, children);
+        let kind = NodeKind::Expr(&expr.callee);
+        self.push_children(kind, children);
+
+        if let Some(args) = &expr.args {
+            for arg in args {
+                let kind = NodeKind::ExprOrSpread(arg);
+                self.push_children(kind, children);
+            }
+        }
     }
 
     fn get_ts_as_expr_children(self: &Rc<Self>, expr: &'m TsAsExpr, children: &mut Vec<Rc<SchemyNode<'m>>>) {
@@ -649,10 +689,12 @@ impl<'m> SchemyNode<'m> {
     }
 
     fn get_class_decl_children(self: &Rc<Self>, decl: &'m ClassDecl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
-        decl.class.body.iter().for_each(|member| {
-            let kind = NodeKind::ClassMember(member);
-            self.push_children(kind, children);
-        });
+        let kind = NodeKind::Class(&decl.class);
+        self.push_children(kind, children);
+        // decl.class.body.iter().for_each(|member| {
+        //     let kind = NodeKind::ClassMember(member);
+        //     self.push_children(kind, children);
+        // });
     }
     fn get_fn_decl_children(self: &Rc<Self>, decl: &'m FnDecl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         decl.function.body.iter().for_each(|member| {
@@ -813,7 +855,8 @@ impl<'m> SchemyNode<'m> {
         }
 
         if let Some(type_ann) = &signature.type_ann {
-            self.get_type_annotation_children(type_ann, children);
+            let kind = NodeKind::TsTypeAnnotation(type_ann);
+            self.push_children(kind, children);
         }
     }
     fn get_ts_getter_signature_children(

@@ -38,10 +38,10 @@ Router.put("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUp
 
     await reply.send(LilResponse(lilTike, {
         statusCode: 200,
-        description: "A specific animal",
+        description: "An updated animal",
     }));
 }, {
-    method: 'POST',
+    method: 'PUT',
     path: '/animals/{id}',
     tags: ['Animals'],
 }));
@@ -49,10 +49,10 @@ Router.put("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUp
 Router.put("", {}, LilPath(async (request: Request<{ Body: LilBodyParam<AnimalUpdate> }>, reply: any): Promise<void> => {
     await reply.send(LilResponse(new Animal("Billy", ["tetnis", "rabies"]), {
         statusCode: 200,
-        description: "A specific animal",
+        description: "An unregistered animal",
     }));
 }, {
-    method: 'POST',
+    method: 'PUT',
     path: '/animals/{id}/unregister',
     tags: ['Animals'],
 }));

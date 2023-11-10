@@ -17,17 +17,6 @@ impl<'m> SchemyNode<'m> {
         args
     }
 
-    pub fn body(self: &Rc<Self>) -> Vec<Rc<SchemyNode<'m>>> {
-        let mut body = vec![];
-        for child in self.children() {
-            match child.kind {
-                NodeKind::ClassMember(_) => body.push(child.clone()),
-                _ => {}
-            }
-        }
-        body
-    }
-
     pub fn callee(self: &Rc<Self>) -> Option<Rc<SchemyNode<'m>>> {
         for child in self.children() {
             match child.kind {
@@ -98,6 +87,7 @@ impl<'m> SchemyNode<'m> {
         let mut members = vec![];
         for child in self.children() {
             match child.kind {
+                NodeKind::ClassMember(_) => members.push(child.clone()),
                 NodeKind::TsEnumMember(_) => members.push(child.clone()),
                 NodeKind::TsTypeElement(_) => members.push(child.clone()),
                 _ => {}
@@ -106,14 +96,17 @@ impl<'m> SchemyNode<'m> {
         members
     }
 
-    pub fn type_params(self: &Rc<Self>) -> Option<Rc<SchemyNode<'m>>> {
+    pub fn type_params(self: &Rc<Self>) -> Vec<Rc<SchemyNode<'m>>> {
+        let mut params = vec![];
         for child in self.children() {
             match child.kind {
-                NodeKind::TsTypeParamInstantiation(_) => return Some(child.clone()),
+                NodeKind::TsTypeParamInstantiation(_) => for child in child.children() {
+                    params.push(child.clone());
+                }
                 _ => {}
             }
         }
-        None
+        params
     }
 
     pub fn params(self: &Rc<Self>) -> Vec<Rc<SchemyNode<'m>>> {
@@ -123,10 +116,7 @@ impl<'m> SchemyNode<'m> {
                 NodeKind::Pat(_) => params.push(child.clone()),
                 NodeKind::TsTypeParamInstantiation(_) => {
                     for child in child.children() {
-                        match child.kind {
-                            NodeKind::TsTypeRef(_) => params.push(child.clone()),
-                            _ => {}
-                        }
+                        params.push(child.clone());
                     }
                 }
                 _ => {}
@@ -183,6 +173,14 @@ impl<'m> SchemyNode<'m> {
             match child.kind {
                 NodeKind::TsType(_) => return Some(child.clone()),
                 NodeKind::TsTypeAnnotation(_) => return Some(child.clone()),
+                NodeKind::TsPropertySignature(_) => {
+                    for child in child.children() {
+                        match child.kind {
+                            NodeKind::TsTypeAnnotation(_) => return Some(child.clone()),
+                            _ => {}
+                        }
+                    }
+                }
                 NodeKind::TsTypeElement(_) => {
                     for child in child.children() {
                         match child.kind {

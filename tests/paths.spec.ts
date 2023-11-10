@@ -3,6 +3,7 @@ import deepEqual from 'deep-equal-in-any-order';
 import { OpenAPIV3 } from 'openapi-types';
 import { generateSchemas } from '../src/generator';
 import { getRootFiles } from '../src/utils';
+import { writeFileSync } from 'fs';
 
 use(deepEqual);
 
@@ -18,6 +19,8 @@ describe('open api generator', () => {
         });
 
         schema = JSON.parse(result.openApi.schema || "");
+
+        writeFileSync("/Users/joelrainear-wills/Desktop/b.json", result.openApi.schema || "")
     });
 
     it('sets OpenApi version', () => {
@@ -136,6 +139,15 @@ describe('open api generator', () => {
                 $id: "#/components/schemas/UserPatch",
                 type: "object"
             },
+            status: {
+                $id: "#/components/schemas/status",
+                properties: {
+                    status: {
+                        type: "string"
+                    }
+                },
+                type: "object"
+            },
             AdjacentLicense: {
                 $id: "#/components/schemas/AdjacentLicense",
                 $ref: "#/components/schemas/AnimalLicense"
@@ -184,7 +196,7 @@ describe('open api generator', () => {
     it('generates paths', () => {
         expect(schema.paths).to.deep.equal({
             "/animals/{id}/unregister": {
-                post: {
+                put: {
                     requestBody: {
                         content: {
                             "application/json": {
@@ -197,22 +209,11 @@ describe('open api generator', () => {
                     },
                     responses: {
                         200: {
-                            description: "A specific animal",
+                            description: "An unregistered animal",
                             content: {
                                 "application/json": {
                                     schema: {
-                                        properties: {
-                                            shots: {
-                                                items: {
-                                                    type: "string"
-                                                },
-                                                type: "array"
-                                            },
-                                            name: {
-                                                type: "string"
-                                            }
-                                        },
-                                        type: "object"
+                                        $ref: "#/components/schemas/Animal"
                                     }
                                 }
                             }
@@ -253,12 +254,7 @@ describe('open api generator', () => {
                             content: {
                                 "application/xml": {
                                     schema: {
-                                        properties: {
-                                            status: {
-                                                type: "string"
-                                            }
-                                        },
-                                        type: "object"
+                                        "$ref": "#/components/schemas/status"
                                     }
                                 }
                             }
@@ -484,7 +480,7 @@ describe('open api generator', () => {
                         "Animals"
                     ]
                 },
-                post: {
+                put: {
                     requestBody: {
                         content: {
                             "application/json": {
@@ -497,22 +493,11 @@ describe('open api generator', () => {
                     },
                     responses: {
                         200: {
-                            description: "A specific animal",
+                            description: "An updated animal",
                             content: {
                                 "application/json": {
                                     schema: {
-                                        properties: {
-                                            shots: {
-                                                items: {
-                                                    type: "string"
-                                                },
-                                                type: "array"
-                                            },
-                                            name: {
-                                                type: "string"
-                                            }
-                                        },
-                                        type: "object"
+                                        $ref: "#/components/schemas/Animal"
                                     }
                                 }
                             }

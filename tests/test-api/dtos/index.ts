@@ -15,8 +15,8 @@ class AdminUser {
     name!: string;
 }
 
-export interface GetUserRequest { lat: LilQueryParam<number, false>, long: LilQueryParam<number, false>; headers: { user: LilHeader<User, true, "v1">; }; }
+export interface GetUserRequest { lat: LilQueryParam<number, false>, long: LilQueryParam<number, false>; headers: { user: LilHeader<User, true>; }; }
 
-export interface UserPatchRequest { id: LilRouteParam<string, true>; date: LilQueryParam<string, false, undefined, "date">; }
+export interface UserPatchRequest { id: LilRouteParam<string, true>; date: LilQueryParam<string, false, "date">; }
 
 export default AdminUser
