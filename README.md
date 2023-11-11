@@ -34,7 +34,6 @@
   - [OpenApiResult](#openapiresult)
 - [Programmatic Use](#programmatic-use)
 - [Supported Platforms](#supported-platforms)
-- [Roadmap](#roadmap)
 - [MIT](#mit)
 
 
@@ -253,9 +252,6 @@ This is a [Node addon]. The supported platforms/architectures are:
 - Linux - x86_64 | aarch64
 - Windows - x86_64 | aarch64
 - Apple - x86_64 | aarch64
-
-## Roadmap
-- Add JSON Schema support
 
 ## [MIT](LICENSE)
 
