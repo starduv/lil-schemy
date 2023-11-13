@@ -11,7 +11,6 @@ pub use self::node_kind::NodeKind;
 
 #[derive(Debug)]
 pub struct SchemyNode<'m> {
-    pub this: Option<Weak<SchemyNode<'m>>>,
     pub parent: Option<Weak<SchemyNode<'m>>>,
     pub kind: NodeKind<'m>,
 }
@@ -20,7 +19,6 @@ impl<'m, 'c> SchemyNode<'m> {
     pub fn from_module(module: Module) -> Rc<SchemyNode<'m>> {
         let parent = None;
         Rc::new(SchemyNode {
-            this: None,
             parent,
             kind: NodeKind::Module(module),
         })
@@ -28,7 +26,6 @@ impl<'m, 'c> SchemyNode<'m> {
 
     pub fn to_child(&self, kind: NodeKind<'m>) -> Rc<SchemyNode<'m>> {
         Rc::new(SchemyNode {
-            this: None,
             parent: None,
             kind,
         })

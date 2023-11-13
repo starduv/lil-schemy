@@ -82,7 +82,6 @@ impl<'m> SchemyNode<'m> {
         let node = Rc::new(SchemyNode {
             kind,
             parent: Some(Rc::downgrade(self)),
-            this: None,
         });
 
         children.push(node);
