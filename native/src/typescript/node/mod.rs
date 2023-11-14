@@ -15,7 +15,7 @@ pub struct SchemyNode<'m> {
     pub kind: NodeKind<'m>,
 }
 
-impl<'m, 'c> SchemyNode<'m> {
+impl<'m> SchemyNode<'m> {
     pub fn from_module(module: Module) -> Rc<SchemyNode<'m>> {
         let parent = None;
         Rc::new(SchemyNode {
