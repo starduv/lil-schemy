@@ -113,6 +113,7 @@ impl Store {
         }
     }
 
+    #[allow(dead_code)]
     pub fn debug(&self) -> () {
         println!("{:?}", self.deferred_schemas.modules);
     }

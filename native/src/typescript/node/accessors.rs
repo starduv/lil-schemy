@@ -17,32 +17,10 @@ impl<'m> SchemyNode<'m> {
         args
     }
 
-    pub fn callee(self: &Rc<Self>) -> Option<Rc<SchemyNode<'m>>> {
-        for child in self.children() {
-            match child.kind {
-                NodeKind::Callee(_) => return Some(child.clone()),
-                _ => {}
-            }
-        }
-
-        None
-    }
-
     pub fn class(self: &Rc<Self>) -> Option<Rc<SchemyNode<'m>>> {
         for child in self.children() {
             match child.kind {
                 NodeKind::Class(_) => return Some(child.clone()),
-                _ => {}
-            }
-        }
-
-        None
-    }
-
-    pub fn decl(self: &Rc<Self>) -> Option<Rc<SchemyNode<'m>>> {
-        for child in self.children() {
-            match child.kind {
-                NodeKind::Decl(_) => return Some(child.clone()),
                 _ => {}
             }
         }
@@ -100,8 +78,10 @@ impl<'m> SchemyNode<'m> {
         let mut params = vec![];
         for child in self.children() {
             match child.kind {
-                NodeKind::TsTypeParamInstantiation(_) => for child in child.children() {
-                    params.push(child.clone());
+                NodeKind::TsTypeParamInstantiation(_) => {
+                    for child in child.children() {
+                        params.push(child.clone());
+                    }
                 }
                 _ => {}
             }

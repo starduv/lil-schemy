@@ -690,23 +690,15 @@ impl<'m> SchemyNode<'m> {
     fn get_class_decl_children(self: &Rc<Self>, decl: &'m ClassDecl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         let kind = NodeKind::Class(&decl.class);
         self.push_children(kind, children);
-        // decl.class.body.iter().for_each(|member| {
-        //     let kind = NodeKind::ClassMember(member);
-        //     self.push_children(kind, children);
-        // });
     }
-    fn get_fn_decl_children(self: &Rc<Self>, decl: &'m FnDecl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
-        decl.function.body.iter().for_each(|member| {
-            let kind = NodeKind::BlockStmt(member);
-            self.push_children(kind, children);
-        });
-    }
+
     fn get_ts_enum_decl_children(self: &Rc<Self>, decl: &'m TsEnumDecl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
         decl.members.iter().for_each(|member| {
             let kind = NodeKind::TsEnumMember(member);
             self.push_children(kind, children);
         });
     }
+
     fn get_ts_interface_decl_children(
         self: &Rc<Self>,
         decl: &'m TsInterfaceDecl,
@@ -735,17 +727,6 @@ impl<'m> SchemyNode<'m> {
     ) {
         let kind = NodeKind::TsType(&decl.type_ann);
         self.push_children(kind, children);
-    }
-
-    fn get_module_decl_children(self: &Rc<Self>, decl: &'m ModuleDecl, children: &mut Vec<Rc<SchemyNode<'m>>>) {
-        match decl {
-            ModuleDecl::Import(raw) => self.get_import_decl_children(raw, children),
-            ModuleDecl::ExportDecl(raw) => self.get_export_declartion_children(raw, children),
-            ModuleDecl::ExportNamed(raw) => self.get_named_export_children(raw, children),
-            ModuleDecl::ExportDefaultDecl(raw) => self.get_export_default_decl_children(raw, children),
-            ModuleDecl::ExportDefaultExpr(raw) => self.get_export_default_expr_children(raw, children),
-            _ => {}
-        }
     }
 
     fn get_named_export_children(

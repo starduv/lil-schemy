@@ -25,9 +25,6 @@ impl<'m> SchemyNode<'m> {
     }
 
     pub fn to_child(&self, kind: NodeKind<'m>) -> Rc<SchemyNode<'m>> {
-        Rc::new(SchemyNode {
-            parent: None,
-            kind,
-        })
+        Rc::new(SchemyNode { parent: None, kind })
     }
 }

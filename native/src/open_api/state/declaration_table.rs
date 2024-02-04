@@ -1,4 +1,9 @@
-use std::{cell::RefCell, collections::{VecDeque, BTreeMap}, fmt, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, VecDeque},
+    fmt,
+    rc::Rc,
+};
 
 use crate::typescript::SchemyNode;
 
@@ -14,10 +19,6 @@ pub struct DeclarationTables {
     tables: BTreeMap<String, DeclarationTable>,
 }
 impl<'n> DeclarationTables {
-    pub fn has_table(&self, file_name: &str) -> bool {
-        self.tables.contains_key(file_name)
-    }
-
     pub fn insert(&mut self, file_path: &str, name: String, value: Declaration) -> () {
         let table = self.tables.entry(file_path.to_owned()).or_insert_with(Default::default);
         table.insert(name, value);
@@ -51,6 +52,7 @@ impl<'n> DeclarationTables {
             .get_root_declaration(reference)
     }
 
+    #[allow(dead_code)]
     pub fn debug(&self, file_path: &str, reference: &str) -> () {
         let table = self.tables.get(file_path);
         match table {
@@ -60,35 +62,14 @@ impl<'n> DeclarationTables {
             None => println!("No table found for file path: {}", file_path),
         }
     }
-
-    pub fn has_key(&self, file_path: &str, reference: &str) -> bool {
-        let table = self.tables.get(file_path);
-        match table {
-            Some(table) => table.get_declaration(reference).is_some(),
-            None => false,
-        }
-    }
 }
 
 #[derive(Debug, Default)]
 pub struct DeclarationTable {
     current_scope: Rc<RefCell<Scope>>,
-    root_scope: Rc<RefCell<Scope>>,
 }
 impl DeclarationTable {
-    pub(crate) fn new() -> DeclarationTable {
-        let root_scope = Rc::new(RefCell::new(Scope {
-            symbols: BTreeMap::new(),
-            children: None,
-            parent: None,
-        }));
-
-        DeclarationTable {
-            current_scope: Rc::clone(&root_scope),
-            root_scope,
-        }
-    }
-
+    #[allow(dead_code)]
     fn debug(&self, reference: &str) -> () {
         let mut declaration: Option<Declaration> = None;
         let mut queue = VecDeque::from([Rc::clone(&self.current_scope)]);
@@ -231,24 +212,6 @@ impl DeclarationTable {
         }
 
         current.to_owned()
-    }
-
-    fn get_declaration(&self, type_reference: &str) -> Option<Declaration> {
-        let mut queue = VecDeque::from([Rc::clone(&self.current_scope)]);
-        while !queue.is_empty() {
-            if let Some(scope) = queue.pop_front() {
-                let scope = scope.borrow();
-                if let Some(declaration) = scope.symbols.get(type_reference) {
-                    return Some(Declaration::clone(declaration));
-                }
-
-                if let Some(parent) = &scope.parent {
-                    queue.push_back(Rc::clone(&parent))
-                }
-            }
-        }
-
-        None
     }
 }
 

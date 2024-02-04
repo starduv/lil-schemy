@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 mod open_api;
 mod typescript;
 mod utils;

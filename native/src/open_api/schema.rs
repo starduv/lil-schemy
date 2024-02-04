@@ -23,11 +23,6 @@ impl OpenApi {
     pub fn path(&mut self, key: &str) -> &mut ApiPath {
         self.paths.entry(key.to_string()).or_insert(ApiPath::new())
     }
-
-    pub fn merge(&mut self, open_api: OpenApi) -> () {
-        self.components.schemas.extend(open_api.components.schemas);
-        self.paths.extend(open_api.paths);
-    }
 }
 
 #[derive(Serialize, Debug)]
@@ -40,10 +35,6 @@ impl ApiComponents {
         ApiComponents {
             schemas: HashMap::new(),
         }
-    }
-
-    pub fn schema(&mut self, name: &str) -> &mut ApiSchema {
-        self.schemas.entry(name.to_string()).or_insert(ApiSchema::new())
     }
 
     pub fn schema_with_id(&mut self, name: &str) -> &mut ApiSchema {
@@ -328,7 +319,7 @@ impl ApiSchema {
     }
 
     pub fn data_type(&mut self, data_type: &str) -> &mut ApiSchema {
-        if self.reference.is_none(){
+        if self.reference.is_none() {
             self.data_type = Some(data_type.into());
         }
         self
@@ -357,11 +348,6 @@ impl ApiSchema {
             .or_insert(ApiSchema::new())
     }
 
-    pub fn array(&mut self) -> &mut ApiSchema {
-        self.data_type = Some(String::from("array"));
-        self
-    }
-
     pub fn items(&mut self) -> &mut ApiSchema {
         self.items.get_or_insert(Box::new(ApiSchema::new()))
     }
@@ -376,11 +362,6 @@ impl ApiSchema {
 
     pub(crate) fn all_of(&mut self) -> &mut Vec<ApiSchema> {
         self.all_of.get_or_insert(vec![])
-    }
-
-    fn append_enums(&mut self, enums: &Vec<String>) -> &mut ApiSchema {
-        self.enums.get_or_insert(Vec::new()).extend(enums.iter().cloned());
-        self
     }
 
     pub(crate) fn has_enums(&self) -> bool {
